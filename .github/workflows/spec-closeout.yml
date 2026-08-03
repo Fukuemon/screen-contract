@@ -1,0 +1,162 @@
+name: Spec closeout
+
+# issue の close 時に spec ディレクトリが残っていれば、削除を提案する PR を起票する。
+# 自動では消さない: 削除の前提 (durable な成果が design / context / ADR へ sync 済みか) は
+# 機械判定できないため、可否は PR のマージで人が決める。手順の正本は `spec-lifecycle` skill の
+# references/closeout.md、消費 repo 側の設定手順は README。
+#
+# 前提: Settings → Actions → General で "Allow GitHub Actions to create and approve pull requests"
+# を有効にする (未設定は Open deletion PR step が検出して案内する)。Workflow permissions
+# (default_workflow_permissions) は Read のままでよい — contents: write は下の permissions 宣言で
+# 足りている (実測)。`issues` イベントはデフォルトブランチ版が実行されるため、本ファイルを
+# マージするまで発火しない。
+#
+# secret CLOSEOUT_PR_TOKEN (任意、contents:write / pull-requests:write を持つ PAT):
+# 既定の github.token による push / PR 作成は再帰実行防止で workflow を発火させないため、
+# 未設定だと起票された PR に CI が回らない。GitHub App の installation token は 1 時間で失効し、
+# 期限切れの値がフォールバックを塞ぐので secret に固定せず run ごとに発行する。
+
+on:
+  issues:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: closeout 対象の issue 番号
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose-deletion:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          # push 時の認証にもこの token を使う。PAT があれば push が workflow を発火させる
+          token: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
+
+      - name: Resolve spec dir from context/project.yml
+        id: config
+        run: |
+          set -euo pipefail
+          # 固有値は直書きせず paths.spec_dir (例: specs/<issue-id>-<slug>/) の固定部分を使う
+          specs_dir=""
+          if [ -f context/project.yml ]; then
+            specs_dir="$(sed -n 's/^[[:space:]]*spec_dir:[[:space:]]*\([^#]*\).*/\1/p' context/project.yml | head -1)"
+            specs_dir="${specs_dir%%<*}"
+            specs_dir="$(printf '%s' "$specs_dir" | tr -d '"'"'"' ' | sed 's:/*$::')"
+          fi
+          echo "specs_dir=${specs_dir:-specs}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve target spec
+        id: target
+        env:
+          ISSUE: ${{ github.event.issue.number || inputs.issue }}
+          SPECS_DIR: ${{ steps.config.outputs.specs_dir }}
+        run: |
+          set -euo pipefail
+          if [ ! -d "$SPECS_DIR" ]; then
+            echo "$SPECS_DIR/ が無い。何もしない"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # "<issue>-" の前方一致。3-* が 31-* を拾わないようハイフンを含めて照合する
+          dir="$(find "$SPECS_DIR" -maxdepth 1 -type d -name "${ISSUE}-*" -print -quit)"
+          if [ -z "$dir" ]; then
+            echo "issue #${ISSUE} の spec は存在しない。何もしない"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "issue=${ISSUE}" >> "$GITHUB_OUTPUT"
+          echo "dir=${dir}" >> "$GITHUB_OUTPUT"
+          echo "branch=chore/closeout-${ISSUE}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if a closeout PR is already open
+        id: existing
+        if: steps.target.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
+          BRANCH: ${{ steps.target.outputs.branch }}
+        run: |
+          set -euo pipefail
+          n="$(gh pr list --head "$BRANCH" --state open --json number --jq 'length')"
+          echo "open=${n}" >> "$GITHUB_OUTPUT"
+          [ "$n" = "0" ] || echo "既に $BRANCH の PR が open。再起票しない"
+
+      - name: Create deletion branch
+        if: steps.target.outputs.found == 'true' && steps.existing.outputs.open == '0'
+        env:
+          BRANCH: ${{ steps.target.outputs.branch }}
+          DIR: ${{ steps.target.outputs.dir }}
+          ISSUE: ${{ steps.target.outputs.issue }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git rm -rq "$DIR"
+          git commit -q \
+            -m "chore(spec): closeout #${ISSUE} — spec を削除" \
+            -m "issue #${ISSUE} の close にともなう closeout。sync 済みかの確認は本 PR のレビューで行う。"
+          # 前回 run の残骸 branch があると非 fast-forward で詰むため force で上書きする。
+          # branch 名前空間は本 workflow 専有で、直前の step が open PR 不在を確認済み。
+          git push -q --force origin "$BRANCH"
+
+      - name: Open deletion PR
+        if: steps.target.outputs.found == 'true' && steps.existing.outputs.open == '0'
+        env:
+          GH_TOKEN: ${{ secrets.CLOSEOUT_PR_TOKEN || github.token }}
+          BRANCH: ${{ steps.target.outputs.branch }}
+          DIR: ${{ steps.target.outputs.dir }}
+          ISSUE: ${{ steps.target.outputs.issue }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/body.md <<BODY
+          ## 概要
+
+          issue #${ISSUE} が close されたため、\`${DIR}\` の削除を提案する。**この PR をマージするかどうかが削除の判断**であり、自動では消していない。
+
+          ## 判断してほしいこと
+
+          durable な設計成果 (IA / データモデル / フロー / アーキ判断 / 規約) が design / context / ADR に反映済みか。未反映があれば **この PR をマージせず**、先に反映してから再度 closeout する。
+
+          - [ ] durable な設計成果が design / context / ADR に反映済み
+          - [ ] 選択肢を比較して決めた判断は ADR に昇格済み
+          - [ ] この spec を指すリンクが他文書に残っていない (残っていれば issue リンクへ置換)
+          - [ ] 上記を確認した
+
+          手順の正本は \`spec-lifecycle\` skill の \`references/closeout.md\` (前提条件・最終刈り取り・参照の後始末)。
+
+          ## 却下する場合
+
+          この PR を close すれば spec は残る。ただし残存検査 (\`bash scripts/check-specs-residue.sh\`) は検出し続けるため、残す理由を issue #${ISSUE} にコメントで残しておくとよい。
+
+          ## 関連 issue
+
+          - Refs #${ISSUE}
+
+          ---
+          この PR は \`.github/workflows/spec-closeout.yml\` が自動起票した。
+          BODY
+          # 前提未設定 (Actions の PR 作成許可) は踏むまで分からず、素のエラーからは
+          # 設定箇所に辿り着きにくい。既知原因を検出して案内へ変換する。
+          if ! gh pr create \
+            --base "$BASE" \
+            --head "$BRANCH" \
+            --title "chore: closeout #${ISSUE} — spec を削除" \
+            --body-file /tmp/body.md 2> /tmp/pr-err.txt; then
+            cat /tmp/pr-err.txt >&2
+            if grep -q "not permitted to create or approve pull requests" /tmp/pr-err.txt; then
+              echo "::error::既知の前提未設定: repo の Settings → Actions → General → 'Allow GitHub Actions to create and approve pull requests' を有効にすること (README の closeout 前提)。"
+              echo "::error::なお Workflow permissions (default_workflow_permissions) は Read のままでよい — contents: write は本 workflow の permissions 宣言で足りている。"
+            fi
+            exit 1
+          fi
