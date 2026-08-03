@@ -1,0 +1,35 @@
+name: Spec residue check
+
+# closed issue の spec dir が残っていないかを検査する (closeout 契約の機械検査)。
+# 実体は scripts/check-specs-residue.sh。exit 2 (検査不能) を成功扱いにしないこと。
+#
+# PR ゲートにしない: 別 PR で spec を清算する運用だと「issue は閉じたが spec は残っている」窓の間、
+# 無関係な PR が落ちる。ゲート化の条件は closeout.md を参照。
+
+# branches は "**" で受けて job 側でデフォルトブランチに絞る (on ではブランチ名を動的に解決できず、
+# 決め打ちすると別名の消費 repo で検査が効かない)。対象外では job が skip され runner は起動しない。
+# paths filter は置かない — 最も拾いたい「spec を触らない issue close」を取りこぼすため。
+on:
+  push:
+    branches: ["**"]
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 00:00 UTC — spec 削除を伴わない issue close を拾う
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  check:
+    if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check spec residue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPECS_CHECK_REPO: ${{ github.repository }}
+        run: bash scripts/check-specs-residue.sh

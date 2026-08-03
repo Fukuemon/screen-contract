@@ -1,0 +1,34 @@
+# 消費 repo 向け git hooks (sdd-template が配布する初期値)。
+# link.sh が消費 repo に「無い場合だけ」コピーする。以後は消費 repo が所有・編集してよい。
+# テンプレ側の lefthook.yml とは別物 (check-skills 等のテンプレ著作用検査は含めない)。
+# 有効化: npx lefthook install
+
+pre-commit:
+  commands:
+    protected-branch:
+      run: python3 hooks/protected-branch/git_hook.py pre-commit
+    format:
+      run: hooks/format/run_prettier.sh
+
+pre-push:
+  commands:
+    protected-branch:
+      run: python3 hooks/protected-branch/git_hook.py pre-push
+
+commit-msg:
+  commands:
+    ticket-number:
+      glob: "**/*"
+      run: hooks/commit-msg/check_ticket_number.sh {1}
+    # AI の attribution trailer を落とす。.claude/settings.json で無効化して
+    # いるが、それでも入った commit が 332 件積み上がったため機械検査を置く。
+    no-ai-attribution:
+      run: bash hooks/commit-msg/check_no_ai_attribution.sh {1}
+
+# git worktree を作った直後に共有プロセス層を繋ぐ。
+# 配布は symlink で追跡されないため、worktree には配布物が 1 つも来ない。
+# 手当てしないと hook が silent に no-op になる。
+post-checkout:
+  commands:
+    link-worktree:
+      run: bash scripts/link-worktree.sh

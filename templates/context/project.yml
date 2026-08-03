@@ -1,0 +1,153 @@
+# Project Profile — プロジェクト固有値の唯一の正本 (機械可読)
+#
+# `.rulesync/rules/CLAUDE.md` と `spec-*` / `dev-commands` / `workflow-git` 等の skill は、
+# 固有名をハードコードせず本ファイルを読む。
+#
+# 記入ガイド:
+# - 新規プロダクトでは `<...>` のプレースホルダをすべて埋める (context-bootstrap skill が下書きする)。
+# - DesignDoc から導ける値は context-bootstrap が抽出する。
+# - 値を変えたら meta.updated を更新し、依存する context/*.md との整合を確認する。
+
+meta:
+  updated: <YYYY-MM-DD>
+
+product:
+  name: <記入> # 製品の通称 (例: 備品管理)
+  slug: <記入> # パス・ラベル等で使う識別子 (例: asset-management-app)
+
+# Repository Map。パス記法 (ghq 等) は convention に書く
+repos:
+  convention: <ghq などのパス規約。例: $(ghq root)/<host>/<org>/<repo>>
+  app: <path> # 実装 repo。単一 repo 構成なら "."
+  docs: <path or "."> # 設計文書 repo (app と同一なら ".")
+  infra: <path or null> # 別管理の infra repo。無ければ null
+  layout: | # 主要ディレクトリ構成
+    <repo-root>/
+    ├── <主要ディレクトリ構成をここに記述>
+    ├── design/        # 全体像 (landscape) と feature 設計
+    ├── context/       # 技術規約 / codebase architecture / 運用契約
+    └── specs/         # 機能単位の作業文書
+
+# Naming Conventions
+naming:
+  package: <例: @<scope>/<module>>
+  component: <例: PascalCase>
+  branch: <例: feature/<issue-id>>
+  base_branch: <例: develop / main> # 統合ブランチ。作業ブランチはここから切り、PR もここへ出す
+  release_branch: <例: main / null> # リリース先。trunk based (base_branch がそのままリリース先) なら null
+
+# Commit 規約の固有値 (記法そのものは workflow-git skill の commit-format)
+commit:
+  attribution: none # エージェント付与の trailer (Claude-Session / Co-Authored-By 等)。none = 付けない / keep = 残す。後から変えると全履歴の書き換えになるため開始時に確定する
+
+# Quick Commands (dev-commands skill が読むコマンド契約)
+commands:
+  dev: <cmd> # 開発起動
+  build: <cmd>
+  lint: <cmd> # Lint / typecheck
+  format: <cmd> # Format (確認)
+  test: <cmd> # Unit test
+  e2e: <cmd>
+  check: <cmd> # 健全性検査
+  add-dep: <cmd> # 依存追加
+
+tracker:
+  type: <github / gitlab / redmine / jira / ...>
+  cli: <gh / glab / ...>
+  project: <org/repo or project path>
+
+# 対象ドメイン (spec「実装対象」テーブルと domain:* ラベルの正本)
+domains:
+  - <module-a>
+  - <module-b>
+
+# Label Policy — Issue / PR のラベル体系の唯一の正本 (workflow-git skill が読む)。
+# 命名は名前空間付き (<axis>:<value>) とし、軸ごとに色を揃える。
+labels:
+  axes:
+    - axis: "type:*"
+      values: [type:feature, type:bug, type:research, type:task, type:chore]
+      color: "#1d76db"
+      rule: 必須・1 件。issue の種類 (workflow-git の issue-format と一致させる)
+    - axis: "phase:*"
+      values: [phase:design, phase:implementation]
+      color: "#5319e7"
+      rule: SDD ライフサイクル。設計 issue は phase:design
+    - axis: "domain:*"
+      values_from: domains # 上記 domains と一対一 + 横断は domain:core
+      color: "#0e8a16"
+      rule: 1 件以上。ドメインを増やすときは domains と両方更新する
+    - axis: flag
+      values: [epic]
+      color: "#fbca04"
+      rule: 複数 phase / spec にまたがる大きい要件 (親)
+    - axis: "status:*"
+      values: [status:designing, status:ready-to-implement, status:implementing]
+      color: "#0052cc"
+      rule: 設計対象 issue に常に 1 件。遷移は節目の skill が行う (workflow-git の issue-status.md)
+    - axis: "quality:*"
+      values: [quality:requirement-gap, quality:design-gap]
+      color: "#d93f0b"
+      rule: 派生 issue (前段 phase の取りこぼし) 側にのみ付与し、変更元 issue には付けない (workflow-git の derived-issue.md)
+  minimum: # 付与の最低ライン
+    - すべての issue に type:* を 1 件付ける
+    - 実装対象が定まる issue には該当する domain:* を付ける
+    - 設計フェーズ issue には phase:design、実装フェーズには phase:implementation
+    - 複数 phase / spec に展開される親 issue には epic を付ける
+
+spec:
+  # spec-lifecycle が実行する phase の集合と順序 (未設定なら skill の既定列)。
+  # 識別子の意味と gate 属性の正本は .rulesync/skills/spec-lifecycle/SKILL.md の phase レジストリ。
+  phases: [intake, scaffold, clarify, diagram, track, sync, prompts]
+
+design:
+  prd: <separate / integrated> # PRD を独立文書にするか DesignDoc の Why/What 節に統合するか
+
+# Source of Truth — 正本ドキュメントのパス契約 (spec-* skill が参照)
+paths:
+  prd: PRD.md # 統合モードでは design/DesignDoc.md の Why/What 節
+  design_doc: design/DesignDoc.md
+  feature_dir: design/features/<feature>/
+  feature_doc: design/features/<feature>/DesignDoc_<feature>.md
+  context: context/<topic>.md
+  adr: adr/
+  spec_dir: specs/<issue-id>-<slug>/
+  spec_body: specs/<issue-id>-<slug>/index.md
+  spec_prompts: specs/<issue-id>-<slug>/prompts/
+  spec_requirements: specs/<issue-id>-<slug>/requirements.md # 任意
+  spec_review: specs/<issue-id>-<slug>/review.md # 任意
+
+# 読み取り索引 (「何を読めば足りるか」のルーティング表) の設定。
+# path だけでなく「手書きか生成物か」も持つため paths とは別ブロックにする。
+#
+# 本ブロック自体が無い project では path を context/impact-index.yaml と見なす
+# (キーが増える前から索引を持つ repo を黙って無効化しないため)。
+# 索引を使わないことは明示的な path: null で表す。
+reading_index:
+  path: context/impact-index.yaml # ファイル名は project ごとに変えてよい。null なら索引を使わない
+  generated: false # true なら生成物。skill は索引を手編集せず generate_command を実行する
+  generate_command: null # generated: true のとき必須。索引を再生成するコマンド
+
+# Templates — 各文書の生成元
+templates:
+  prd: templates/prd/template.md
+  design_doc: templates/design-doc/template.md
+  context: templates/context/<topic>.md
+  spec: templates/specs/template.md
+  spec_appendices: templates/specs/appendices/<topic>.md
+  feature: templates/features/template.md
+  requirements: templates/requirements/template.md
+  adr: templates/adr/template.md
+
+# Decision Priority — 迷ったときの判断優先度 (プロダクトに合わせて並べ替える)。
+# 技術選定の根拠は design/DesignDoc.md と adr/。
+decision_priority:
+  - <例: パフォーマンス>
+  - <例: 一貫性>
+  - <例: 開発体験>
+  - <例: 将来拡張性>
+
+# 製品固有のドメイン語。skill / 文書は固有名を直書きせず本 glossary を参照する
+glossary:
+  - term: <用語>
+    def: <定義>

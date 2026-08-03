@@ -1,0 +1,14 @@
+# Prettier の対象外 (sdd-template が配布する初期値。以後は消費 repo が所有・追記してよい)。
+
+# rulesync 生成物 (正本は .rulesync/。整形は中央の生成時に適用済み)
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.mcp.json
+
+# project.yml とそのテンプレート。値がプレースホルダ (<host> / <path> 等) の間は
+# YAML として解析できず、prettier が parse error で落ちる。
+templates/context/project.yml
