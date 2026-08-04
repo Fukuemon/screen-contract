@@ -29,12 +29,12 @@ repos:
     ├── specs/         # 機能単位の作業文書
     ├── hooks/         # 配布された git hooks (編集はテンプレ側)
     ├── templates/     # 文書テンプレート (編集はテンプレ側)
-    └── <実装ディレクトリは技術スタック ADR 確定後に追記>
+    └── packages/      # 実装 (pnpm workspace。core / adapter / app / interface 単位。scaffold 未作成)
 
 # Naming Conventions
 naming:
-  package: "<技術スタック ADR 後に確定 (例: @screen-contract/<module>)>"
-  component: "<技術スタック ADR 後に確定>"
+  package: "@screen-contract/<module>"
+  component: PascalCase
   branch: feature/<issue-id>
   base_branch: develop # 統合ブランチ。作業ブランチはここから切り、PR もここへ出す
   release_branch: main # リリース先。trunk based (base_branch がそのままリリース先) なら null
@@ -45,14 +45,14 @@ commit:
 
 # Quick Commands (dev-commands skill が読むコマンド契約)
 commands:
-  dev: <cmd> # 開発起動
-  build: <cmd>
-  lint: <cmd> # Lint / typecheck
-  format: <cmd> # Format (確認)
-  test: <cmd> # Unit test
-  e2e: <cmd>
-  check: <cmd> # 健全性検査
-  add-dep: <cmd> # 依存追加
+  dev: pnpm dev # 開発起動 (turborepo 経由)
+  build: pnpm build
+  lint: pnpm lint # oxlint + typecheck
+  format: pnpm format # oxfmt (確認)。md / yml は prettier
+  test: pnpm test # vitest
+  e2e: <cmd> # 未定 (E2E 方針は testing.md 確定後)
+  check: pnpm check # lint + format + test + build
+  add-dep: pnpm add --filter <package> # 依存追加
 
 tracker:
   type: github

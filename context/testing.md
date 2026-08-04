@@ -12,7 +12,7 @@ verified_commit: unverified
 
 テストの横断規約。feature 固有のテスト観点は各 [design/features/](../design/features/) に置く。プロジェクト固有のテストコマンドは [context/project.yml](project.yml)。
 
-> 未確定: テストツールと配置は技術スタック ADR (未作成) の確定後に埋める。core 層 (冪等判定・採番規則・決定的生成・差分分類) は外部依存を持たない純粋ロジックとして設計するため、unit test の主対象とする方針だけ先に確定する。
+> unit test は vitest ([adr/0001-tech-stack.md](../adr/0001-tech-stack.md))。core 層 (冪等判定・採番規則・決定的生成・差分分類) は外部依存を持たない純粋ロジックとして設計するため、unit test の主対象とする。E2E の方式と配置は未確定 (scaffold 作成後に埋める)。
 
 ## テスト責務の分担
 

@@ -345,16 +345,17 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 確定した技術判断と却下した代替案は [adr/](../../adr/) を正本とする。
 
-| ADR    | 決定                                                              | 関連ドキュメント    |
-| ------ | ----------------------------------------------------------------- | ------------------- |
-| 未作成 | DSLを画面操作と画面仕様の正本にする判断                           | workflow-dsl.md     |
-| 未作成 | 要素IDと表示用構成番号を分離する判断                              | element-mapping.md  |
-| 未作成 | MVPのブラウザ実行基盤にagent-browserを使用する判断                | execution.md        |
-| 未作成 | coreを機能単位に分割しPorts and Adaptersを採用する判断            | DesignDoc.md        |
-| 未作成 | Web UIをdashboardのforkではなく参考実装として自前構築する判断     | web-editor.md       |
-| 未作成 | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断    | agent-interface.md  |
-| 未作成 | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断 | agent-interface.md  |
-| 未作成 | 構造差分と画像差分を分離する判断                                  | change-detection.md |
+| ADR                                      | 決定                                                                    | 関連ドキュメント    |
+| ---------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
+| [adr/0001](../../adr/0001-tech-stack.md) | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定 | DesignDoc.md        |
+| 未作成                                   | DSLを画面操作と画面仕様の正本にする判断                                 | workflow-dsl.md     |
+| 未作成                                   | 要素IDと表示用構成番号を分離する判断                                    | element-mapping.md  |
+| 未作成                                   | MVPのブラウザ実行基盤にagent-browserを使用する判断                      | execution.md        |
+| 未作成                                   | coreを機能単位に分割しPorts and Adaptersを採用する判断                  | DesignDoc.md        |
+| 未作成                                   | Web UIをdashboardのforkではなく参考実装として自前構築する判断           | web-editor.md       |
+| 未作成                                   | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断          | agent-interface.md  |
+| 未作成                                   | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断       | agent-interface.md  |
+| 未作成                                   | 構造差分と画像差分を分離する判断                                        | change-detection.md |
 
 ## Open Questions / Future Work
 

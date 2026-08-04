@@ -12,19 +12,19 @@ verified_commit: unverified
 
 採用する標準 toolchain。採否の根拠は [adr/](../adr/) を参照する。プロジェクト固有のコマンドは [context/project.yml](project.yml) の `commands` を正本とする。
 
-> 未確定: 実装言語・ツールは技術スタック ADR (未作成) で確定する。下表と `commands` はそれまで空のまま残す。
+選定根拠は [adr/0001-tech-stack.md](../adr/0001-tech-stack.md)。
 
 ## 標準スタック
 
-| 区分            | ツール | 備考 |
-| --------------- | ------ | ---- |
-| Package manager |        |      |
-| Task runner     |        |      |
-| Language        |        |      |
-| Linter          |        |      |
-| Formatter       |        |      |
-| Unit test       |        |      |
-| E2E             |        |      |
+| 区分            | ツール                | 備考                                           |
+| --------------- | --------------------- | ---------------------------------------------- |
+| Package manager | pnpm (workspace)      | packages/ を 4 層のモジュール単位で切る        |
+| Task runner     | turborepo             | 依存グラフで層の依存規約を反映する             |
+| Language        | TypeScript (Node LTS) | web framework は TanStack Start                |
+| Linter          | oxlint                |                                                |
+| Formatter       | oxfmt                 | md / yml は oxfmt 安定まで prettier 併用       |
+| Unit test       | vitest                |                                                |
+| E2E             | 未定                  | テスト方針 ([testing.md](testing.md)) の確定後 |
 
 ## エージェント補助 (任意)
 

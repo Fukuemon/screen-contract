@@ -42,6 +42,7 @@ Port の定義場所:
 ## Runtime Boundary
 
 - Web UI と Workflow Server は別プロセスとする。Web UI はブラウザ操作・成果物生成を直接実行しない。
+- Workflow Server (api 層) を唯一の backend とする。web 側の server 機能 (TanStack Start の server function 等) に API ロジックを置かない。中間層 (BFF / 別言語 backend) を追加しない判断は [adr/0001-tech-stack.md](../adr/0001-tech-stack.md)。
 - agent-browser は Workflow Server の子プロセスとして adapter/browser が起動・管理する。
 - AI エージェント (Claude Code / Codex 等) は interface/agent (MCP server / App Server 型 JSON-RPC) からのみ接続する。
 - ライブ映像は agent-browser の WebSocket ストリーミングを Workflow Server 経由で配信する。公開方式は DesignDoc の Open Question (Browser Stream の公開方式) を参照。
