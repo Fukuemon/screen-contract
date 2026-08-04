@@ -18,7 +18,7 @@ features:
     keywords: ["DSL", "YAML", "Schema", "Workflow IR", "core/workflow"]
     read:
       - context/architecture.md
-      - design/features/workflow-dsl.md
+      - design/features/workflow-dsl/DesignDoc_workflow-dsl.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -34,7 +34,7 @@ features:
       ]
     read:
       - context/architecture.md
-      - design/features/execution.md
+      - design/features/execution/DesignDoc_execution.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -42,7 +42,7 @@ features:
     keywords: ["永続要素 ID", "構成番号", "Locator", "採番", "core/element"]
     read:
       - context/architecture.md
-      - design/features/element-mapping.md
+      - design/features/element-mapping/DesignDoc_element-mapping.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -50,7 +50,7 @@ features:
     keywords: ["注釈画像", "Markdown テーブル", "決定的生成", "core/artifact"]
     read:
       - context/architecture.md
-      - design/features/artifact-generation.md
+      - design/features/artifact-generation/DesignDoc_artifact-generation.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -58,7 +58,7 @@ features:
     keywords: ["差分", "Baseline", "Visual Diff", "core/diff"]
     read:
       - context/architecture.md
-      - design/features/change-detection.md
+      - design/features/change-detection/DesignDoc_change-detection.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -74,7 +74,7 @@ features:
       ]
     read:
       - context/architecture.md
-      - design/features/web-editor.md
+      - design/features/web-editor/DesignDoc_web-editor.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -83,7 +83,7 @@ features:
       ["MCP", "App Server", "JSON-RPC", "AI エージェント", "draft", "agent"]
     read:
       - context/architecture.md
-      - design/features/agent-interface.md
+      - design/features/agent-interface/DesignDoc_agent-interface.md
     source_refs: []
     coverage: partial # feature doc 未作成
 
@@ -91,6 +91,6 @@ features:
     keywords: ["AI 候補", "AI Port", "adapter/ai", "Locator 候補"]
     read:
       - context/architecture.md
-      - design/features/ai-suggestions.md
+      - design/features/ai-suggestions/DesignDoc_ai-suggestions.md
     source_refs: []
     coverage: partial # feature doc 未作成
