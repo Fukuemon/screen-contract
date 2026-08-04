@@ -319,7 +319,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 | Feature                     | 対応モジュール | 文書                                                                                                                                  | 状態   |
 | --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| ワークフロー定義 (DSL / IR) | core/workflow  | [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](features/workflow-dsl/DesignDoc_workflow-dsl.md)                             | 未作成 |
+| ワークフロー定義 (DSL / IR) | core/workflow  | [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](features/workflow-dsl/DesignDoc_workflow-dsl.md)                             | 設計中 |
 | 冪等実行と再生制御          | core/execution | [design/features/execution/DesignDoc_execution.md](features/execution/DesignDoc_execution.md)                                         | 設計中 |
 | 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 未作成 |
 | 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 未作成 |
@@ -349,6 +349,8 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | --------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
 | [adr/0001](../../adr/0001-tech-stack.md)      | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定 | DesignDoc.md        |
 | [adr/0002](../../adr/0002-pause-semantics.md) | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断 | execution           |
+| [adr/0003](../../adr/0003-dsl-structure.md)   | DSL を Screen / Workflow に分離し構成番号を画面単位・永久欠番とする判断 | workflow-dsl        |
+| [adr/0004](../../adr/0004-state-model.md)     | 画面状態を default 根の木で表し statechart と直交合成を採らない判断     | workflow-dsl        |
 | 未作成                                        | DSLを画面操作と画面仕様の正本にする判断                                 | workflow-dsl.md     |
 | 未作成                                        | 要素IDと表示用構成番号を分離する判断                                    | element-mapping.md  |
 | 未作成                                        | MVPのブラウザ実行基盤にagent-browserを使用する判断                      | execution.md        |
@@ -362,18 +364,16 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 ### Open Questions
 
-| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限                |
-| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | ------------------- |
-| 構成番号の採番スコープ                   | 画面単位、状態単位、文書単位                      | 番号の再利用と状態間の追跡方法     | 既存仕様書の番号運用を3画面以上で比較する        | プロダクト設計担当 | DSL Schema v1確定前 |
-| 削除済み番号の扱い                       | 永久欠番、明示操作で再利用                        | 差分の追跡性と番号増加             | 仕様書更新履歴の要件を確認する                   | プロダクト設計担当 | DSL Schema v1確定前 |
-| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前        |
-| adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前    |
-| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前         |
-| Visual Diffの実装方式                    | Pixel Diff、知覚差分、両方                        | 誤検知率と実行コスト               | 固定画面と動的画面のサンプルで比較する           | 差分検知担当       | core/diff実装前     |
-| Visual Diffの既定閾値                    | 固定値、画面ごとの設定                            | 誤検知と見逃し                     | 代表画面で差分率を測定する                       | 差分検知担当       | Baseline運用開始前  |
-| Browser Streamの公開方式                 | API Proxy、同一ホスト接続                         | 認証、ネットワーク構成、操作遅延   | 配置先と利用形態を決定する                       | インフラ担当       | Web UI実装前        |
-| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前      |
-| AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前    |
+| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限               |
+| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | ------------------ |
+| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前       |
+| adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前   |
+| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前        |
+| Visual Diffの実装方式                    | Pixel Diff、知覚差分、両方                        | 誤検知率と実行コスト               | 固定画面と動的画面のサンプルで比較する           | 差分検知担当       | core/diff実装前    |
+| Visual Diffの既定閾値                    | 固定値、画面ごとの設定                            | 誤検知と見逃し                     | 代表画面で差分率を測定する                       | 差分検知担当       | Baseline運用開始前 |
+| Browser Streamの公開方式                 | API Proxy、同一ホスト接続                         | 認証、ネットワーク構成、操作遅延   | 配置先と利用形態を決定する                       | インフラ担当       | Web UI実装前       |
+| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前     |
+| AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前   |
 
 ### Future Work
 

@@ -90,6 +90,29 @@ Expectation の評価は Snapshot (Accessibility ツリー + 補助情報) を�
 
 ### 実行状態と再生制御
 
+run の状態遷移を示す。
+
+```mermaid
+stateDiagram-v2
+    [*] --> idle
+    idle --> running : run 開始
+    running --> running : ステップ完了 → 次ステップ
+    running --> paused : pause 要求<br/>(実行中ステップの完了後に停止)
+    paused --> paused : 要素選択 (座標 query) /<br/>実ページ操作 (許可)
+    paused --> verify : resume / ステップ指定の再実行
+    state verify <<choice>>
+    verify --> running : 前提をすべて満たす<br/>→ 次ステップから続行
+    verify --> rollback : 前提不一致
+    state "巻き戻し" as rollback
+    rollback --> running : 崩れた最初のステップから再実行<br/>(変化のない区間は冪等スキップ)
+    running --> completed : 全ステップ完了
+    running --> failed : 検証失敗
+    running --> aborted : 中断要求
+    completed --> [*]
+    failed --> [*]
+    aborted --> [*]
+```
+
 - **一時停止はステップ境界でのみ効く**。pause 要求は「実行中ステップの完了後に停止する」予約として扱う。
 - **一時停止中の実ページ操作は許可する**。要素選択のための座標問い合わせ (Element Inspector への query) は操作に含めず、常に可能。
 - **再開時は前提を再検証する**: それまでに通過したステップの Expectation を再評価し、
@@ -124,17 +147,19 @@ flowchart TD
     sm -- ExecutionEvent --> appuc
 ```
 
-### フロー / シーケンス (一時停止 → 編集 → 再開)
+### フロー / シーケンス (1 ステップの処理)
 
 ```mermaid
 flowchart TD
-    A["running: ステップ n 実行中"] -->|pause 要求| B["ステップ n 完了まで実行"]
-    B --> C["paused"]
-    C -->|"要素選択 (座標 query)"| C
-    C -->|"実ページ操作 (許可)"| C
-    C -->|resume| D["通過済みステップの Expectation を再評価"]
-    D -->|すべて満たす| E["ステップ n+1 から続行"]
-    D -->|"ステップ k で不一致"| F["ステップ k へ巻き戻して再実行<br/>(変化のない区間は skipped)"]
+    A["ステップ開始"] --> B["Snapshot 取得<br/>(Browser Port)"]
+    B --> C["Expectation を評価<br/>(純粋関数)"]
+    C -->|すべて満たす| D["skipped として記録<br/>(action は実行しない)"]
+    C -->|満たさない| E["action を実行<br/>(Browser Port)"]
+    E --> F["Snapshot 再取得 → Expectation を再評価"]
+    F -->|満たす| G["executed として記録"]
+    F -->|満たさない| H["failed として記録<br/>run を failed へ"]
+    D --> I["次ステップへ"]
+    G --> I
 ```
 
 ### 実行イベント
