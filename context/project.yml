@@ -12,29 +12,32 @@ meta:
   updated: 2026-08-04
 
 product:
-  name: <記入> # 製品の通称 (例: 備品管理)
-  slug: <記入> # パス・ラベル等で使う識別子 (例: asset-management-app)
+  name: Screen Contract # 製品の通称 (例: 備品管理)
+  slug: screen-contract # パス・ラベル等で使う識別子 (例: asset-management-app)
 
 # Repository Map。パス記法 (ghq 等) は convention に書く
 repos:
-  convention: "<ghq などのパス規約。例: $(ghq root)/<host>/<org>/<repo>>"
-  app: <path> # 実装 repo。単一 repo 構成なら "."
-  docs: <path or "."> # 設計文書 repo (app と同一なら ".")
-  infra: <path or null> # 別管理の infra repo。無ければ null
+  convention: "$(ghq root)/<host>/<owner>/<repo> (ghq 管理)"
+  app: "." # 実装 repo。単一 repo 構成なら "."
+  docs: "." # 設計文書 repo (app と同一なら ".")
+  infra: null # 別管理の infra repo。無ければ null
   layout: | # 主要ディレクトリ構成
-    <repo-root>/
-    ├── <主要ディレクトリ構成をここに記述>
+    screen-contract/
     ├── design/        # 全体像 (landscape) と feature 設計
     ├── context/       # 技術規約 / codebase architecture / 運用契約
-    └── specs/         # 機能単位の作業文書
+    ├── adr/           # 意思決定記録
+    ├── specs/         # 機能単位の作業文書
+    ├── hooks/         # 配布された git hooks (編集はテンプレ側)
+    ├── templates/     # 文書テンプレート (編集はテンプレ側)
+    └── <実装ディレクトリは技術スタック ADR 確定後に追記>
 
 # Naming Conventions
 naming:
-  package: "<例: @<scope>/<module>>"
-  component: "<例: PascalCase>"
-  branch: "<例: feature/<issue-id>>"
-  base_branch: "<例: develop / main>" # 統合ブランチ。作業ブランチはここから切り、PR もここへ出す
-  release_branch: "<例: main / null>" # リリース先。trunk based (base_branch がそのままリリース先) なら null
+  package: "<技術スタック ADR 後に確定 (例: @screen-contract/<module>)>"
+  component: "<技術スタック ADR 後に確定>"
+  branch: feature/<issue-id>
+  base_branch: develop # 統合ブランチ。作業ブランチはここから切り、PR もここへ出す
+  release_branch: main # リリース先。trunk based (base_branch がそのままリリース先) なら null
 
 # Commit 規約の固有値 (記法そのものは workflow-git skill の commit-format)
 commit:
@@ -52,14 +55,20 @@ commands:
   add-dep: <cmd> # 依存追加
 
 tracker:
-  type: <github / gitlab / redmine / jira / ...>
-  cli: <gh / glab / ...>
-  project: <org/repo or project path>
+  type: github
+  cli: gh
+  project: Fukuemon/screen-contract
 
 # 対象ドメイン (spec「実装対象」テーブルと domain:* ラベルの正本)
 domains:
-  - <module-a>
-  - <module-b>
+  - workflow
+  - execution
+  - element
+  - artifact
+  - diff
+  - web
+  - agent
+  - infra
 
 # Label Policy — Issue / PR のラベル体系の唯一の正本 (workflow-git skill が読む)。
 # 命名は名前空間付き (<axis>:<value>) とし、軸ごとに色を揃える。
@@ -142,10 +151,11 @@ templates:
 # Decision Priority — 迷ったときの判断優先度 (プロダクトに合わせて並べ替える)。
 # 技術選定の根拠は design/DesignDoc.md と adr/。
 decision_priority:
-  - "<例: パフォーマンス>"
-  - "<例: 一貫性>"
-  - "<例: 開発体験>"
-  - "<例: 将来拡張性>"
+  - 再現性・決定性 (同じ入力から同じ成果物)
+  - AI ネイティブ (エージェントから操作できること)
+  - 拡張性 (Port による差し替え可能性)
+  - 開発体験
+  - パフォーマンス
 
 # 製品固有のドメイン語。skill / 文書は固有名を直書きせず本 glossary を参照する
 glossary:
