@@ -321,7 +321,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | ワークフロー定義 (DSL / IR) | core/workflow  | [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](features/workflow-dsl/DesignDoc_workflow-dsl.md)                             | 設計中 |
 | 冪等実行と再生制御          | core/execution | [design/features/execution/DesignDoc_execution.md](features/execution/DesignDoc_execution.md)                                         | 設計中 |
-| 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 未作成 |
+| 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 設計中 |
 | 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 未作成 |
 | 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 未作成 |
 | Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 未作成 |
@@ -351,6 +351,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | [adr/0002](../../adr/0002-pause-semantics.md) | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断 | execution           |
 | [adr/0003](../../adr/0003-dsl-structure.md)   | DSL を Screen / Workflow に分離し構成番号を画面単位・永久欠番とする判断 | workflow-dsl        |
 | [adr/0004](../../adr/0004-state-model.md)     | 画面状態を default 根の木で表し statechart と直交合成を採らない判断     | workflow-dsl        |
+| [adr/0005](../../adr/0005-renumbering.md)     | 構成番号は DSL に保存し読み順の再採番で欠番を作らない判断               | element-mapping     |
 | 未作成                                        | DSLを画面操作と画面仕様の正本にする判断                                 | workflow-dsl.md     |
 | 未作成                                        | 要素IDと表示用構成番号を分離する判断                                    | element-mapping.md  |
 | 未作成                                        | MVPのブラウザ実行基盤にagent-browserを使用する判断                      | execution.md        |
