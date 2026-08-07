@@ -172,6 +172,7 @@ agent-browserには組み込みのdashboard (Next.js製) があり、WebSocket�
 ### 設計上の前提
 
 - MVPの実行ブラウザはagent-browserが対応するChromium系ブラウザとする。
+- 利用者はagent-browserを直接導入・操作しない。本システムが同梱しadapter/browserが管理する内部実装であり、利用者の接点はDSL、Web UI、agent interfaceに限る。利用者の資産 (DSL・仕様書・POM) は実行基盤に依存しない語彙で書かれ、Browser Portの別実装で実行基盤を差し替えても引き継がれる。
 - 対象画面は、検証可能な開発環境またはテスト環境で起動できる。
 - 動的データはFixture、Mock、固定入力のいずれかによって再現可能にする。
 - DSLはYAMLで記述し、Schemaで検証する。

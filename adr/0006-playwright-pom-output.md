@@ -23,6 +23,7 @@
   - Locator の対応: `role+name` → `getByRole`、`label` → `getByLabel`、`testid` → `getByTestId`、`text` → `getByText`、`css` + `index` → `locator().nth()`
 - 生成コードは**編集禁止・再生成で更新** (生成ヘッダで明示)。個別に編集可能な正本にはしない (DesignDoc の原則) ため、他の成果物と同じ書き換え抑止の対象に入れる。
 - 実行基盤は agent-browser のまま変えない。POM 出力は利用者の Playwright 環境で動くコードの提供であり、本システムの Runner を Playwright に置き換える判断ではない。
+- **POM 生成はプロダクト設定のオプトイン**とする。本システム自体は Playwright に依存せず (codegen はテキスト生成)、依存が生じるのは生成された POM を利用者のテストで import する場合のみ。Playwright を使わない利用者は仕様書生成だけで完結する。
 
 ## 代替案
 

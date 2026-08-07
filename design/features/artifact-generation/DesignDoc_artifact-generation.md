@@ -68,7 +68,10 @@ core/artifact は「DSL と撮影結果から、画面仕様書の成果物を�
 
 ### 注釈画像の描画規則
 
-- バッジは対象要素の bounding box の**左上角の外側**に描く。画像の端にかかる場合は box の内側へ倒す。
+**撮影と注釈は 2 段に分離する**。撮影 (生スクリーンショット + 各要素の bounding box の取得) は実行時に adapter/browser が行い、注釈 (バッジ配置の計算と合成) は core/artifact の純粋計算である。生スクリーンショットと bounding box は保存し、バッジは何度でも再合成できる — 再採番や badges の並べ替えだけなら再撮影は不要。**差分検知 (Visual Diff) の対象は生スクリーンショットであり、バッジを焼き込んだ注釈済み画像は差分検知の対象にしない** (番号の変更が画面の実変化と混ざるため。詳細は change-detection feature)。
+
+- バッジの位置の基準は、**撮影時に取得した対象要素の bounding box** (viewport ピクセル座標。`clip` 指定時は切り抜き後の画像座標へ変換する)。selector から位置を計算するのではなく、Locator の解決はバッジ描画より前 (撮影時) に済んでいる。
+- バッジは bounding box の**左上角の外側**に固定オフセット (設定値) で描く。画像の端にかかる場合は box の内側へ倒す。
 - バッジ同士が重なる場合は、読み順で後の要素のバッジを右方向へずらす (ずらし量は固定値)。決定的に解決できない重なりは生成警告として報告する。
 - バッジの形状・配色・フォントは固定のスタイル設定 (設定値) とし、要素ごとに変えない。
 - バッジを描くのは state の `badges` に載る要素だけ。`optional` / `child_doc` と、その状態に現れない要素 (継承規則の展開結果に従う) は描かない。
@@ -90,6 +93,8 @@ core/artifact は「DSL と撮影結果から、画面仕様書の成果物を�
 ### Playwright POM コードの生成規則
 
 Workflow IR からの決定的 codegen とする。生成コードは編集禁止 (生成ヘッダで明示) で、拡張はクラス継承など生成物の外側で行う。
+
+**Playwright への依存は生成物の利用側にのみ生じる**。本システムの実行 (agent-browser)・仕様書生成・差分検知は Playwright に依存せず、POM 生成もテキスト生成であってランタイムを要しない。POM の生成は**プロダクト設定のオプトイン** (`outputs: [spec]` / `[spec, pom]`) とし、Playwright を使わない利用者には仕様書生成だけで完結させる。codegen の Locator / action 対応表は出力 target 単位で持ち、将来の他フレームワーク向け出力は target の追加で対応する (Future Work)。
 
 - 入力は Screen IR。Screen IR → 画面ごとの Page Object クラス。要素定義 → 型付き locator プロパティ、状態遷移 steps → 遷移メソッド、Expectation → 対応する assertion helper。
 - **Expectation の意味論の正本は execution feature の評価規則**とし、assertion への対応表はそれと同じ意味になるよう定義する。対応できない Expectation (Playwright で表現できない条件) は生成時警告とし、黙って意味を変えない。
