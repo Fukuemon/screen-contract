@@ -92,40 +92,53 @@ screen:
       expect:
         - url: { path: /login }
         - element: { ref: el-username, visible: true }
+      badges: [el-username, el-submit] # バッジ対象と順序。リスト位置 = 構成番号 (1, 2)
     - id: modal-open # 画面内の別状態
       from: default # 遷移元の状態
       steps: # 遷移元からこの状態に至る操作列
         - action: { click: { ref: el-open-modal } }
       expect:
         - element: { ref: el-modal, visible: true }
+      clip: { css: ".v-overlay__content" } # 撮影領域 (省略時は viewport 全体)
+      badges: [el-modal, el-modal-submit]
     - id: modal-error # ネストした状態 (モーダルを開いた状態でのエラートースト)
       from: modal-open # ネストは from の連鎖で表す
       steps:
         - use: submit-empty # 名前付き step 断片の参照
       expect:
         - element: { ref: el-toast, visible: true }
+      clip: { css: ".v-overlay__content" }
+      badges: [el-modal-submit, el-toast] # 状態ごとに 1 から振り直す
   fragments: # 画面内で再利用する名前付き step 断片
     submit-empty:
       - action: { click: { ref: el-modal-submit } }
   elements:
     - id: el-username # 永続要素 ID (画面内で一意。変更しない)
-      number: 1 # 構成番号 (再採番操作が読み順で書き戻す。欠番なし)
       name: ユーザー名入力
       type: input
       locator: { role: textbox, name: ユーザー名 }
     - id: el-modal
-      number: 4
       name: 設定モーダル
       type: dialog
       locator: { role: dialog }
       states: [modal-open] # 初出の状態だけ書く。子孫状態へは継承される
     - id: el-toast
-      number: 5
       name: エラートースト
       type: text
       locator: { role: alert }
       states: [modal-error]
+    - id: el-username-error
+      name: ユーザー名の入力チェックエラー文言
+      type: text
+      optional: true # 条件付き表示。バッジは付かず、テーブルに番号 - で載る
+      note: 未入力のまま送信したときだけ表示
+    - id: el-settings-dialog
+      name: 設定ダイアログ
+      type: dialog
+      child_doc: settings-dialog # 別文書化した Screen への参照。テーブルではリンク行になる
 ```
+
+**badges の読み方**: state の `badges` は「その状態でバッジを付ける要素の順序リスト」であり、**リストの位置がそのまま構成番号**になる (先頭 = 1)。要素定義は番号を持たず、番号・表示順・バッジ対象の 3 つを badges だけが表現する。上の例では `el-modal-submit` が modal-open では番号 2、modal-error では番号 1 になる (採番は状態単位。[adr/0005](../../../adr/0005-renumbering.md))。リストは再採番操作が読み順で書き戻すほか、手動で並べ替えてもよい。
 
 Workflow 文書の例:
 
@@ -161,11 +174,26 @@ stateDiagram-v2
 
 **名前付き step 断片 (`fragments`)**: 複数の状態遷移で同じ操作列を使う場合、画面内に名前付き断片を定義し `use` で参照する。参照解決は entry の Workflow 参照と同じ機構で行い、断片は状態の意味論に影響しない (単なる展開)。
 
+### action の語彙 (MVP)
+
+| action       | 内容                                                                                           |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| `open`       | URL を開く                                                                                     |
+| `click`      | `ref` (要素 ID) で指す要素をクリックする                                                       |
+| `clickPoint` | viewport 座標をクリックする。canvas 描画など DOM に現れない対象専用 (乱用しない)               |
+| `fill`       | `ref` で指す入力要素へ値を入力する                                                             |
+| `hover`      | `ref` で指す要素にポインタを重ねる                                                             |
+| `scroll`     | `ref` で指す要素を可視位置までスクロールする。任意 JS の実行 (`eval`) は導入しない (Non Goals) |
+| `use`        | 名前付き step 断片の展開                                                                       |
+
+意味論 (実行・検証の仕方) は execution feature が定義する。固定時間の wait は語彙に持たず、Expectation の充足待ちで代替する。
+
 ### 要素定義と構成番号の記述規則
 
-- 要素 ID (`id`) は画面内で一意の永続識別子。要素の同一性判定と版間の追跡に使い、変更しない。
-- 構成番号 (`number`) は**画面単位で採番し、DSL に保存する**。再採番はシステムが読み順で計算して DSL へ書き戻す操作であり、欠番を作らない ([adr/0005](../../../adr/0005-renumbering.md)。読み順規則の正本は element-mapping feature)。手動編集も許す。
-- バッジ・テーブル表示・採番の対象外にする要素は `numbered: false` を指定する。番号なし要素も `ref` 参照 (Locator / Expectation / 操作対象) には使える。
+- 要素 ID (`id`) は画面内で一意の永続識別子。要素の同一性判定と版間・状態間の追跡に使い、変更しない。
+- 構成番号は**状態単位で 1 から採番**し、state の `badges` 順序リストを正本とする (リストの位置 = 番号)。要素定義に `number` フィールドは持たない。再採番はシステムが読み順でリストを並べ直して DSL へ書き戻す操作 ([adr/0005](../../../adr/0005-renumbering.md))。手動編集も許す。
+- 要素の表示区分は 3 つ: `badges` に載る要素 (バッジ + 番号行)、`optional: true` の条件付き表示要素 (バッジなし・テーブルに番号 `-` と `note` で載る。未実装は `unimplemented: true` を併記)、どちらにも該当しない補助要素 (テーブルに載せない)。いずれも `ref` 参照 (Locator / Expectation / 操作対象) には使える。
+- `child_doc` は別文書化した Screen への参照。バッジは付かず、テーブルでは番号なしのリンク行になる。
 
 ### Expectation の宣言語彙 (MVP)
 
@@ -187,7 +215,7 @@ IR は「実行可能なステップ列 + 検証済みのメタ情報」であ�
 2. **参照解決**: `entry.workflow` の Workflow 参照、`use` の断片参照、`ref` の要素参照を解決し、未解決参照をエラーにする。
 3. **状態遷移の展開**: 対象の画面状態に至るステップ列を `entry → default → … → 対象状態` の順で平坦化する。各状態に現れる要素の集合も、継承規則 (`states` + `hidden-in`) を展開して確定する。
 4. **既定値の補完と変数展開**: 省略項目の既定値、`{{ base_url }}` 等の入力変数を確定する。
-5. **ID・番号の検査**: 要素 ID の一意性、構成番号の重複、`numbered: false` 要素への番号指定の矛盾を検査する (連番性は要求しない — 再採番操作で揃える)。
+5. **ID・badges の検査**: 要素 ID の一意性、`badges` の参照解決と重複、その状態に現れない要素 (継承規則外) や `optional` / `child_doc` 要素の `badges` 掲載矛盾を検査する。
 
 IR のステップは `action + expectation + 由来 (どの文書のどの宣言から来たか)` を持つ。由来情報により、実行イベントや差分を DSL の該当箇所へ逆引きできる。
 
@@ -228,12 +256,12 @@ flowchart TD
 - 利用者 (または AI エージェント) が Screen 文書を新規作成し、entry に既存 Workflow を参照して、対象画面の default 状態を宣言する。
 - 利用者がモーダル表示状態を `states` に追加し、遷移 step と表示要素を宣言する。実行すると対象状態まで自動再生される。
 - エージェントが不正な参照 (`ref` の綴り間違い) を含む draft を保存しようとし、正規化エラーの機械可読コードを受け取って自己修正する。
-- 要素を削除した後に再採番を実行すると、残った要素へ読み順の連番が draft として書き戻され、承認後の差分成果物に番号対応表 (旧 → 新) が記録される。
+- 要素を削除した後に再採番を実行すると、各状態の badges が読み順で並べ直されて draft に書き戻され、承認後の差分成果物に番号対応表 (旧 → 新) が記録される。
 
 ## テスト観点
 
 - 横断規約は [context/testing.md](../../../context/testing.md)。core/workflow は純粋ロジックとして unit test の主対象。
 - Schema 検証: 正常系 / 型不一致 / 必須欠落 / 未知の version。
-- 正規化: 参照解決 (正常・未解決)、状態遷移の展開順序、循環・孤立状態の検出、番号重複・numbered フラグの矛盾検出。
+- 正規化: 参照解決 (正常・未解決)、状態遷移の展開順序、循環・孤立状態の検出、badges の重複・掲載矛盾の検出。
 - 決定性: 同じ文書と入力から常に同じ IR が生成されること (IR の比較で検証)。
 - 互換性: 旧 version 文書の読み込みが変換規則どおりに動くこと。

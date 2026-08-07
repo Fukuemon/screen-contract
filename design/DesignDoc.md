@@ -22,7 +22,7 @@ Feature単位の詳細は [design/features/](../features/)、技術規約は [co
 本システムは、ブラウザ上の画面状態と操作をYAML DSLで宣言し、agent-browserを使用して再現可能な形で実行する。
 
 利用者はWeb UI上で対象画面を操作し、画面要素を選択して、永続的な要素ID、構成番号、名称、種別、Locatorを割り当てる。
-確定したDSLを正本として、構成番号付きの画面画像とMarkdown形式の構成要素テーブルを生成する。
+確定したDSLを正本として、構成番号付きの画面画像、Markdown形式の構成要素テーブル、およびPlaywrightのPage Objectコードを生成する。
 
 同じDSLと同じ画面状態からは同じ成果物を生成し、前回のBaselineとの間に構造、表示内容、配置、画像の差分がある場合は、その差分を分類して提示する。
 
@@ -62,6 +62,7 @@ MVPの成功条件を次に示す。
 - 画面要素には、表示用の構成番号とは別に永続的な要素IDを付与できる。
 - Web UI上で画面要素を選択し、名称、種別、構成番号、Locatorを編集できる。
 - DSLから構成番号付きPNG画像とMarkdownテーブルを生成できる。
+- Workflow IRからPlaywrightのPage Objectコードを決定的に生成できる。
 - 生成内容に意味上の変更がない場合、既存成果物を書き換えない。
 - Locatorの未解決、複数一致、Role変更、文言変更、位置変更、画像変更を区別して検知できる。
 - DSLの実行をステップ単位で自動再生し、各ステップの対象要素と検証結果をライブ映像上にアノテーション表示できる。
@@ -97,6 +98,7 @@ MVPでは次を対象とする。
 
 - 構成番号付き画像の生成
 - Markdown構成要素テーブルの生成
+- PlaywrightのPage Objectコードの生成 (編集禁止の生成物。adr/0006)
 
 差分検知 (core/diff):
 
@@ -124,7 +126,7 @@ MVPでは、次の一連の操作を完了できる状態をGoalとする。
 3. 利用者は再生を一時停止し、Web UI上で画面要素を選択する。
 4. システムまたはAIが、要素ID、名称、種別、Locatorの候補を提示する。
 5. 利用者が候補を承認して構成番号を確定し、再生を再開する。
-6. システムが注釈付き画像とMarkdownテーブルを生成する。
+6. システムが注釈付き画像、Markdownテーブル、PlaywrightのPage Objectコードを生成する。
 7. 再実行時に前回のBaselineと比較し、変更内容を分類して提示する。
 8. 変更がない成果物は書き換えず、変更がある成果物だけを更新候補とする。
 
@@ -132,8 +134,6 @@ MVPでは、次の一連の操作を完了できる状態をGoalとする。
 
 次の項目は提供価値があるが、MVPでは優先しない。
 
-- DSLからPlaywrightコードを生成する。
-- PlaywrightコードをPage Object Model形式で生成する。
 - 操作履歴から再利用可能なPage ObjectやComponent Objectを推論する。
 - 複数の実行環境による分散実行を行う。
 - 複数利用者が同じ画面仕様を同時編集する。
@@ -345,21 +345,22 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 確定した技術判断と却下した代替案は [adr/](../../adr/) を正本とする。
 
-| ADR                                           | 決定                                                                    | 関連ドキュメント    |
-| --------------------------------------------- | ----------------------------------------------------------------------- | ------------------- |
-| [adr/0001](../../adr/0001-tech-stack.md)      | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定 | DesignDoc.md        |
-| [adr/0002](../../adr/0002-pause-semantics.md) | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断 | execution           |
-| [adr/0003](../../adr/0003-dsl-structure.md)   | DSL を Screen / Workflow に分離し構成番号を画面単位・永久欠番とする判断 | workflow-dsl        |
-| [adr/0004](../../adr/0004-state-model.md)     | 画面状態を default 根の木で表し statechart と直交合成を採らない判断     | workflow-dsl        |
-| [adr/0005](../../adr/0005-renumbering.md)     | 構成番号は DSL に保存し読み順の再採番で欠番を作らない判断               | element-mapping     |
-| 未作成                                        | DSLを画面操作と画面仕様の正本にする判断                                 | workflow-dsl.md     |
-| 未作成                                        | 要素IDと表示用構成番号を分離する判断                                    | element-mapping.md  |
-| 未作成                                        | MVPのブラウザ実行基盤にagent-browserを使用する判断                      | execution.md        |
-| 未作成                                        | coreを機能単位に分割しPorts and Adaptersを採用する判断                  | DesignDoc.md        |
-| 未作成                                        | Web UIをdashboardのforkではなく参考実装として自前構築する判断           | web-editor.md       |
-| 未作成                                        | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断          | agent-interface.md  |
-| 未作成                                        | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断       | agent-interface.md  |
-| 未作成                                        | 構造差分と画像差分を分離する判断                                        | change-detection.md |
+| ADR                                                 | 決定                                                                         | 関連ドキュメント    |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------- |
+| [adr/0001](../../adr/0001-tech-stack.md)            | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定      | DesignDoc.md        |
+| [adr/0002](../../adr/0002-pause-semantics.md)       | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断      | execution           |
+| [adr/0003](../../adr/0003-dsl-structure.md)         | DSL を Screen / Workflow の 2 文書に分離し実画面の文書化語彙を持たせる判断   | workflow-dsl        |
+| [adr/0004](../../adr/0004-state-model.md)           | 画面状態を default 根の木で表し statechart と直交合成を採らない判断          | workflow-dsl        |
+| [adr/0005](../../adr/0005-renumbering.md)           | 構成番号を状態単位で採番し badges リストを正本に読み順の再採番で管理する判断 | element-mapping     |
+| [adr/0006](../../adr/0006-playwright-pom-output.md) | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断      | artifact-generation |
+| 未作成                                              | DSLを画面操作と画面仕様の正本にする判断                                      | workflow-dsl.md     |
+| 未作成                                              | 要素IDと表示用構成番号を分離する判断                                         | element-mapping.md  |
+| 未作成                                              | MVPのブラウザ実行基盤にagent-browserを使用する判断                           | execution.md        |
+| 未作成                                              | coreを機能単位に分割しPorts and Adaptersを採用する判断                       | DesignDoc.md        |
+| 未作成                                              | Web UIをdashboardのforkではなく参考実装として自前構築する判断                | web-editor.md       |
+| 未作成                                              | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断               | agent-interface.md  |
+| 未作成                                              | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断            | agent-interface.md  |
+| 未作成                                              | 構造差分と画像差分を分離する判断                                             | change-detection.md |
 
 ## Open Questions / Future Work
 
@@ -378,8 +379,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 ### Future Work
 
-- Workflow IRからPlaywrightコードを生成する。
-- Page Object ModelとComponent Objectを生成する。
+- 操作履歴から再利用可能なComponent Objectを推論する。
 - 既存Playwrightコードとの統合方式を定義する。
 - 複数ブラウザで同じ画面仕様を検証する。
 - CIで差分検知を実行し、レビュー対象の成果物を生成する。

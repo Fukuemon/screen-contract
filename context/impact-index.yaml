@@ -47,7 +47,15 @@ features:
     coverage: partial # feature doc 未作成
 
   - name: artifact-generation
-    keywords: ["注釈画像", "Markdown テーブル", "決定的生成", "core/artifact"]
+    keywords:
+      [
+        "注釈画像",
+        "Markdown テーブル",
+        "Playwright",
+        "POM",
+        "決定的生成",
+        "core/artifact",
+      ]
     read:
       - context/architecture.md
       - design/features/artifact-generation/DesignDoc_artifact-generation.md
