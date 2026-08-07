@@ -34,7 +34,7 @@ core/execution は「DSL に書かれたステップ列を、ブラウザ上で�
 3. **Browser Port の契約** — ブラウザ操作を外部 (agent-browser) へ委ねるために core が定める interface。
 4. **実行イベント** — 実行の進行を UI・エージェント・実行履歴へ伝える通知の語彙。
 
-本書で使う **Workflow IR** (Intermediate Representation) とは、YAML で書かれた DSL を実行しやすい形へ正規化した内部表現である。core/workflow が DSL の検証と正規化を行って IR を生成し、core/execution は YAML を直接読まず、IR のステップ列だけを入力に取る。IR の構造そのものは workflow-dsl feature が定義する。
+本書で使う **Workflow IR** (Intermediate Representation) とは、YAML で書かれた DSL を実行しやすい形へ正規化した内部表現である。core/workflow が DSL の検証と正規化を行って IR を生成し、core/execution は YAML を直接読まず、IR のうち**実行ステップ列** (対象状態への平坦化ビュー) だけを入力に取る。IR の構造 (Screen IR / 実行ステップ列の 2 ビュー) は workflow-dsl feature が定義する。
 
 ## 背景・要件解釈
 

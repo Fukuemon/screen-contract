@@ -255,7 +255,7 @@ Portは原則、それを使うcoreが定義する。
 | core/workflow  | DSLのSchema検証、Workflow IRへの正規化、バージョン互換性の定義                                                            | なし         |
 | core/execution | ステップ実行のルール、期待状態の検証、冪等スキップ判定、再生制御 (一時停止・再開・ステップ単位の再実行)、実行イベント発行 | Browser Port |
 | core/element   | 永続要素ID、Locatorモデル、構成番号の採番規則、要素候補の正規化 (Snapshot・DOMの生データは入力値として受け取る)           | AI Port      |
-| core/artifact  | 注釈画像・Markdownテーブルの決定的生成、意味上の変更がない場合の書き換え抑止                                              | なし         |
+| core/artifact  | 注釈画像・Markdownテーブル・Playwright POMコードの決定的生成、意味上の変更がない場合の書き換え抑止                        | なし         |
 | core/diff      | Baseline比較、構造差分・要素差分・画像差分の分類                                                                          | なし         |
 
 ### interface / app / adapter層

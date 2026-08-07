@@ -173,5 +173,7 @@ glossary:
     def: 人間の承認により draft を正本へ反映する操作。Baseline 確定と構成番号確定が対象
   - term: agent interface
     def: AI エージェントが use case を操作するための interface (MCP server / App Server 型 JSON-RPC)
+  - term: POM (Page Object Model)
+    def: 画面を 1 クラス、要素を locator プロパティ、操作をメソッドとして表す E2E テストの設計パターン。本システムでは Workflow IR から編集禁止の生成物として出力する (ADR-0006)
   - term: Workflow IR
     def: YAML DSL を実行しやすい形へ正規化した内部表現 (Intermediate Representation)。core/workflow が生成し、実行系は YAML ではなく IR を入力に取る
