@@ -100,6 +100,7 @@ screen:
       expect:
         - element: { ref: el-modal, visible: true }
       clip: { css: ".v-overlay__content" } # 撮影領域 (省略時は viewport 全体)
+      mask: [{ css: ".updated-at" }] # 画像差分から除外する動的領域 (任意)
       badges: [el-modal, el-modal-submit]
     - id: modal-error # ネストした状態 (モーダルを開いた状態でのエラートースト)
       from: modal-open # ネストは from の連鎖で表す
@@ -194,6 +195,7 @@ stateDiagram-v2
 - 構成番号は**状態単位で 1 から採番**し、state の `badges` 順序リストを正本とする (リストの位置 = 番号)。要素定義に `number` フィールドは持たない。再採番はシステムが読み順でリストを並べ直して DSL へ書き戻す操作 ([adr/0005](../../../adr/0005-renumbering.md))。手動編集も許す。
 - 要素の表示区分は 3 つ: `badges` に載る要素 (バッジ + 番号行)、`optional: true` の条件付き表示要素 (バッジなし・テーブルに番号 `-` と `note` で載る。未実装は `unimplemented: true` を併記)、どちらにも該当しない補助要素 (テーブルに載せない)。いずれも `ref` 参照 (Locator / Expectation / 操作対象) には使える。
 - `child_doc` は別文書化した Screen への参照。バッジは付かず、テーブルでは番号なしのリンク行になる。
+- state の `clip` は撮影領域、`mask` は画像差分から除外する動的領域 (日時表示等) の宣言。mask の適用規則は change-detection feature ([adr/0007](../../../adr/0007-visual-diff.md))。
 
 ### Expectation の宣言語彙 (MVP)
 

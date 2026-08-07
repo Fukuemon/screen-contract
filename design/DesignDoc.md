@@ -324,7 +324,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 冪等実行と再生制御          | core/execution | [design/features/execution/DesignDoc_execution.md](features/execution/DesignDoc_execution.md)                                         | 設計中 |
 | 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 設計中 |
 | 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 設計中 |
-| 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 未作成 |
+| 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 設計中 |
 | Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 未作成 |
 | AIエージェント操作          | agent          | [design/features/agent-interface/DesignDoc_agent-interface.md](features/agent-interface/DesignDoc_agent-interface.md)                 | 設計中 |
 | AI候補生成                  | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 未作成 |
@@ -361,22 +361,20 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 未作成                                              | Web UIをdashboardのforkではなく参考実装として自前構築する判断                | web-editor.md       |
 | 未作成                                              | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断               | agent-interface.md  |
 | 未作成                                              | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断            | agent-interface.md  |
-| 未作成                                              | 構造差分と画像差分を分離する判断                                             | change-detection.md |
+| [adr/0007](../../adr/0007-visual-diff.md)           | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断           | change-detection    |
 
 ## Open Questions / Future Work
 
 ### Open Questions
 
-| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限               |
-| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | ------------------ |
-| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前       |
-| adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前   |
-| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前        |
-| Visual Diffの実装方式                    | Pixel Diff、知覚差分、両方                        | 誤検知率と実行コスト               | 固定画面と動的画面のサンプルで比較する           | 差分検知担当       | core/diff実装前    |
-| Visual Diffの既定閾値                    | 固定値、画面ごとの設定                            | 誤検知と見逃し                     | 代表画面で差分率を測定する                       | 差分検知担当       | Baseline運用開始前 |
-| Browser Streamの公開方式                 | API Proxy、同一ホスト接続                         | 認証、ネットワーク構成、操作遅延   | 配置先と利用形態を決定する                       | インフラ担当       | Web UI実装前       |
-| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前     |
-| AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前   |
+| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限             |
+| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | ---------------- |
+| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前     |
+| adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前 |
+| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前      |
+| Browser Streamの公開方式                 | API Proxy、同一ホスト接続                         | 認証、ネットワーク構成、操作遅延   | 配置先と利用形態を決定する                       | インフラ担当       | Web UI実装前     |
+| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前   |
+| AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前 |
 
 ### Future Work
 

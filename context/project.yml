@@ -9,7 +9,7 @@
 # - 値を変えたら meta.updated を更新し、依存する context/*.md との整合を確認する。
 
 meta:
-  updated: 2026-08-05
+  updated: 2026-08-07
 
 product:
   name: Screen Contract # 製品の通称 (例: 備品管理)
@@ -167,6 +167,8 @@ glossary:
     def: 画面要素の同一性を追跡するための、表示用構成番号とは独立した識別子
   - term: 構成番号
     def: 画面仕様書の画像とテーブルで要素を参照するための表示用番号。状態単位で 1 から振り、state の badges 順序リストを正本に読み順の再採番で管理する (ADR-0005)
+  - term: Baseline
+    def: 人間が承認した時点の実行結果セット (生スクリーンショット・Snapshot・badges・DSL 版)。差分比較の基準で、承認によってのみ更新される
   - term: draft
     def: 承認前の作業状態。エージェントと利用者が自由に作成・編集でき、正本 (Baseline・確定済み構成番号) には反映されない
   - term: 確定
