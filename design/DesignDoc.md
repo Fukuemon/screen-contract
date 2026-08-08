@@ -325,7 +325,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 設計中 |
 | 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 設計中 |
 | 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 設計中 |
-| Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 未作成 |
+| Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 設計中 |
 | AIエージェント操作          | agent          | [design/features/agent-interface/DesignDoc_agent-interface.md](features/agent-interface/DesignDoc_agent-interface.md)                 | 設計中 |
 | AI候補生成                  | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 未作成 |
 
@@ -362,6 +362,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 未作成                                              | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断               | agent-interface.md  |
 | 未作成                                              | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断            | agent-interface.md  |
 | [adr/0007](../../adr/0007-visual-diff.md)           | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断           | change-detection    |
+| [adr/0008](../../adr/0008-stream-proxy.md)          | ライブ映像を Workflow Server 経由の Proxy で配信する判断                     | web-editor          |
 
 ## Open Questions / Future Work
 
@@ -372,7 +373,6 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前     |
 | adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前 |
 | agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前      |
-| Browser Streamの公開方式                 | API Proxy、同一ホスト接続                         | 認証、ネットワーク構成、操作遅延   | 配置先と利用形態を決定する                       | インフラ担当       | Web UI実装前     |
 | 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前   |
 | AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前 |
 
