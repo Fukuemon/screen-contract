@@ -253,7 +253,7 @@ Portは原則、それを使うcoreが定義する。
 
 | モジュール     | 責務                                                                                                                      | 定義するPort |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| core/workflow  | DSLのSchema検証、Workflow IRへの正規化、バージョン互換性の定義                                                            | なし         |
+| core/workflow  | DSLのSchema検証、Workflow IRへの正規化、バージョン互換性の定義                                                            | DSL Fix Port |
 | core/execution | ステップ実行のルール、期待状態の検証、冪等スキップ判定、再生制御 (一時停止・再開・ステップ単位の再実行)、実行イベント発行 | Browser Port |
 | core/element   | 永続要素ID、Locatorモデル、構成番号の採番規則、要素候補の正規化 (Snapshot・DOMの生データは入力値として受け取る)           | AI Port      |
 | core/artifact  | 注釈画像・Markdownテーブル・Playwright POMコードの決定的生成、意味上の変更がない場合の書き換え抑止                        | なし         |
@@ -261,15 +261,15 @@ Portは原則、それを使うcoreが定義する。
 
 ### interface / app / adapter層
 
-| モジュール      | 責務                                                                                                       | 実装・依存              |
-| --------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------- |
-| web             | DSL編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                   | apiに依存               |
-| api             | HTTP API、WebSocket、認可                                                                                  | appに依存               |
-| agent           | MCP serverとApp Server型JSON-RPCによるuse caseの公開、実行イベントのストリーム配信、エージェント操作の認可 | appに依存               |
-| app             | use caseの編成 (実行、要素編集、成果物生成、差分承認)、coreとadapterの結線、Store Portの定義               | 各core・各adapterに依存 |
-| adapter/browser | agent-browserの起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                    | Browser Portを実装      |
-| adapter/ai      | 要素名、種別、Locator、DSL修正候補の構造化取得                                                             | AI Portを実装           |
-| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                        | Store Portを実装        |
+| モジュール      | 責務                                                                                                       | 実装・依存                  |
+| --------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------- |
+| web             | DSL編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                   | apiに依存                   |
+| api             | HTTP API、WebSocket、認可                                                                                  | appに依存                   |
+| agent           | MCP serverとApp Server型JSON-RPCによるuse caseの公開、実行イベントのストリーム配信、エージェント操作の認可 | appに依存                   |
+| app             | use caseの編成 (実行、要素編集、成果物生成、差分承認)、coreとadapterの結線、Store Portの定義               | 各core・各adapterに依存     |
+| adapter/browser | agent-browserの起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                    | Browser Portを実装          |
+| adapter/ai      | 要素名、種別、Locator、DSL修正候補の構造化取得                                                             | AI PortとDSL Fix Portを実装 |
+| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                        | Store Portを実装            |
 
 ```mermaid
 flowchart TD
@@ -302,6 +302,7 @@ flowchart TD
     app --> diff
     browser -. "Browser Port実装" .-> exec
     ai -. "AI Port実装" .-> elem
+    ai -. "DSL Fix Port実装" .-> wf
     store -. "Store Port実装" .-> app
 ```
 
@@ -327,7 +328,7 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 設計中 |
 | Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 設計中 |
 | AIエージェント操作          | agent          | [design/features/agent-interface/DesignDoc_agent-interface.md](features/agent-interface/DesignDoc_agent-interface.md)                 | 設計中 |
-| AI候補生成                  | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 未作成 |
+| AI候補生成                  | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 設計中 |
 
 ### Engineering Context (How: 横断規約)
 
@@ -363,18 +364,18 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 | 未作成                                              | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断            | agent-interface.md  |
 | [adr/0007](../../adr/0007-visual-diff.md)           | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断           | change-detection    |
 | [adr/0008](../../adr/0008-stream-proxy.md)          | ライブ映像を Workflow Server 経由の Proxy で配信する判断                     | web-editor          |
+| [adr/0009](../../adr/0009-ai-adapter-auth.md)       | adapter/ai の認証を API キーと OAuth の両対応とする判断                      | ai-suggestions      |
+| [adr/0010](../../adr/0010-ai-data-boundary.md)      | AI への送信を既定 Snapshot 断片のみとし設定でオプトイン拡張する判断          | ai-suggestions      |
 
 ## Open Questions / Future Work
 
 ### Open Questions
 
-| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限             |
-| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | ---------------- |
-| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前     |
-| adapter/aiの認証方式                     | APIキー、サブスクリプションのOAuth連携、両対応    | 導入の容易さと利用規約・コスト     | 主要AIサービスのOAuth仕様と利用規約を確認する    | プロダクト設計担当 | adapter/ai実装前 |
-| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前      |
-| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前   |
-| AIサービスへ送信できる情報               | Snapshotのみ、画像を含む、DOM情報を含む           | 候補精度と情報管理                 | 対象データ分類と利用規約を確認する               | セキュリティ担当   | AI Adapter実装前 |
+| 未決事項                                 | 選択肢                                            | 影響                               | 確認方法                                         | 担当               | 期限           |
+| ---------------------------------------- | ------------------------------------------------- | ---------------------------------- | ------------------------------------------------ | ------------------ | -------------- |
+| 再生中に編集した要素定義の反映タイミング | 即時DSL反映、再生完了後に一括反映                 | 再生の決定性と編集体験             | 編集→再開時のLocator再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI実装前   |
+| agent interfaceの認可方式                | ローカル無認証、トークン、OAuth                   | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める     | プロダクト設計担当 | agent実装前    |
+| 認証状態の保存方式                       | ローカルProfile、暗号化Storage State、外部Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                     | セキュリティ担当   | 認証画面対応前 |
 
 ### Future Work
 

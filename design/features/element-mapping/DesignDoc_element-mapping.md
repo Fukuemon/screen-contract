@@ -62,7 +62,7 @@ core/element は純粋ロジックであり、ブラウザや AI サービスへ
 - 番号・要素定義を DSL のどこに書くか → workflow-dsl feature ([DesignDoc_workflow-dsl.md](../workflow-dsl/DesignDoc_workflow-dsl.md))
 - Locator 解決の実行時評価 (Expectation の評価) → execution feature
 - Snapshot・DOM・座標の取得方法 → adapter/browser (core/element は入力値として受け取る)
-- AI サービスの選定・認証 → adapter/ai (Open Question: 認証方式)
+- AI サービスの選定・認証 → adapter/ai ([DesignDoc_ai-suggestions.md](../ai-suggestions/DesignDoc_ai-suggestions.md)、[adr/0009](../../../adr/0009-ai-adapter-auth.md))
 - 番号バッジの描画・テーブル出力 → artifact-generation feature
 - 要素差分の分類 (Role 変更・文言変更等) → change-detection feature
 
@@ -131,11 +131,11 @@ Web UI の要素選択 (viewport 上のクリック) を要素候補に変える
 
 ### AI Port の契約 (core/element が定義)
 
-| 項目 | 契約                                                                                                                                                                                    |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 入力 | 対象要素の Snapshot 断片 (Accessibility ノード + 周辺文脈)、画面のメタ情報 (タイトル・状態 id)、既存の要素定義一覧 (命名の一貫性のため)                                                 |
-| 出力 | 構造化された候補: 名称・種別・Locator の候補列 (それぞれ確信度つき)。自由文は返さない                                                                                                   |
-| 制約 | 出力は常に draft への提案であり、AI Port の実装が DSL を直接変更することはない。何を AI サービスへ送ってよいか (画像・DOM の可否) は Open Question「AI サービスへ送信できる情報」に従う |
+| 項目 | 契約                                                                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 入力 | 対象要素の Snapshot 断片 (Accessibility ノード + 周辺文脈)、画面のメタ情報 (タイトル・状態 id)、既存の要素定義一覧 (命名の一貫性のため)                                                                 |
+| 出力 | 構造化された候補: 名称・種別・Locator の候補列 (それぞれ確信度つき)。自由文は返さない                                                                                                                   |
+| 制約 | 出力は常に draft への提案であり、AI Port の実装が DSL を直接変更することはない。何を AI サービスへ送ってよいか (画像・DOM の可否) は [adr/0010](../../../adr/0010-ai-data-boundary.md) の送信境界に従う |
 
 ### コンポーネント構成 (C4 L3)
 
