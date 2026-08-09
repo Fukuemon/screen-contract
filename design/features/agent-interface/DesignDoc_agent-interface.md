@@ -14,7 +14,7 @@ verified_commit: unverified
 
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・フロー単位で記述する。責務・範囲・方針の層に留め、実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** MCP と App Server の両採用、draft-確定の線引きの経緯は ADR を参照する (DesignDoc の ADR 候補。個別 ADR は未作成)。
+**現在の設計だけを書く。** 判断の経緯は ADR を参照する (両プロトコル採用は [adr/0016](../../../adr/0016-dual-agent-protocol.md)、draft-確定の線引きは [adr/0017](../../../adr/0017-agent-draft-boundary.md))。
 
 ## 概要
 

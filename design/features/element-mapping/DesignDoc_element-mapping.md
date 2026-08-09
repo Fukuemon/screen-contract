@@ -23,7 +23,7 @@ verified_commit: unverified
 
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・フロー単位で記述する。責務・範囲・方針の層に留め、実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** 判断の経緯は ADR を参照する ([adr/0005](../../../adr/0005-renumbering.md))。
+**現在の設計だけを書く。** 判断の経緯は ADR を参照する (ID と番号の分離は [adr/0012](../../../adr/0012-element-id-number-separation.md)、採番規則は [adr/0005](../../../adr/0005-renumbering.md))。
 
 ## 概要
 

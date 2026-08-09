@@ -347,25 +347,25 @@ Featureはcoreモジュールと一対一に対応させ、interface・adapter�
 
 確定した技術判断と却下した代替案は [adr/](../../adr/) を正本とする。
 
-| ADR                                                 | 決定                                                                         | 関連ドキュメント    |
-| --------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------- |
-| [adr/0001](../../adr/0001-tech-stack.md)            | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定      | DesignDoc.md        |
-| [adr/0002](../../adr/0002-pause-semantics.md)       | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断      | execution           |
-| [adr/0003](../../adr/0003-dsl-structure.md)         | DSL を Screen / Workflow の 2 文書に分離し実画面の文書化語彙を持たせる判断   | workflow-dsl        |
-| [adr/0004](../../adr/0004-state-model.md)           | 画面状態を default 根の木で表し statechart と直交合成を採らない判断          | workflow-dsl        |
-| [adr/0005](../../adr/0005-renumbering.md)           | 構成番号を状態単位で採番し badges リストを正本に読み順の再採番で管理する判断 | element-mapping     |
-| [adr/0006](../../adr/0006-playwright-pom-output.md) | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断      | artifact-generation |
-| 未作成                                              | DSLを画面操作と画面仕様の正本にする判断                                      | workflow-dsl.md     |
-| 未作成                                              | 要素IDと表示用構成番号を分離する判断                                         | element-mapping.md  |
-| 未作成                                              | MVPのブラウザ実行基盤にagent-browserを使用する判断                           | execution.md        |
-| 未作成                                              | coreを機能単位に分割しPorts and Adaptersを採用する判断                       | DesignDoc.md        |
-| 未作成                                              | Web UIをdashboardのforkではなく参考実装として自前構築する判断                | web-editor.md       |
-| 未作成                                              | agent interfaceにMCPとApp Server型JSON-RPCの両方を採用する判断               | agent-interface.md  |
-| 未作成                                              | エージェントの操作範囲をdraftまでとし確定に人間の承認を要する判断            | agent-interface.md  |
-| [adr/0007](../../adr/0007-visual-diff.md)           | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断           | change-detection    |
-| [adr/0008](../../adr/0008-stream-proxy.md)          | ライブ映像を Workflow Server 経由の Proxy で配信する判断                     | web-editor          |
-| [adr/0009](../../adr/0009-ai-adapter-auth.md)       | adapter/ai の認証を API キーと OAuth の両対応とする判断                      | ai-suggestions      |
-| [adr/0010](../../adr/0010-ai-data-boundary.md)      | AI への送信を既定 Snapshot 断片のみとし設定でオプトイン拡張する判断          | ai-suggestions      |
+| ADR                                                        | 決定                                                                         | 関連ドキュメント    |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------- |
+| [adr/0001](../../adr/0001-tech-stack.md)                   | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定      | DesignDoc.md        |
+| [adr/0002](../../adr/0002-pause-semantics.md)              | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断      | execution           |
+| [adr/0003](../../adr/0003-dsl-structure.md)                | DSL を Screen / Workflow の 2 文書に分離し実画面の文書化語彙を持たせる判断   | workflow-dsl        |
+| [adr/0004](../../adr/0004-state-model.md)                  | 画面状態を default 根の木で表し statechart と直交合成を採らない判断          | workflow-dsl        |
+| [adr/0005](../../adr/0005-renumbering.md)                  | 構成番号を状態単位で採番し badges リストを正本に読み順の再採番で管理する判断 | element-mapping     |
+| [adr/0006](../../adr/0006-playwright-pom-output.md)        | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断      | artifact-generation |
+| [adr/0007](../../adr/0007-visual-diff.md)                  | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断           | change-detection    |
+| [adr/0008](../../adr/0008-stream-proxy.md)                 | ライブ映像を Workflow Server 経由の Proxy で配信する判断                     | web-editor          |
+| [adr/0009](../../adr/0009-ai-adapter-auth.md)              | adapter/ai の認証を API キーと OAuth の両対応とする判断                      | ai-suggestions      |
+| [adr/0010](../../adr/0010-ai-data-boundary.md)             | AI への送信を既定 Snapshot 断片のみとし設定でオプトイン拡張する判断          | ai-suggestions      |
+| [adr/0011](../../adr/0011-dsl-as-source-of-truth.md)       | YAML DSL を画面操作と画面仕様の唯一の正本とする判断                          | workflow-dsl        |
+| [adr/0012](../../adr/0012-element-id-number-separation.md) | 永続要素 ID と表示用構成番号を分離する判断                                   | element-mapping     |
+| [adr/0013](../../adr/0013-agent-browser-runtime.md)        | MVP のブラウザ実行基盤に agent-browser を使用する判断                        | execution           |
+| [adr/0014](../../adr/0014-core-split-ports-adapters.md)    | core を機能単位に分割し Ports and Adapters を採用する判断                    | DesignDoc.md        |
+| [adr/0015](../../adr/0015-web-ui-own-implementation.md)    | Web UI を dashboard の fork ではなく自前実装とする判断                       | web-editor          |
+| [adr/0016](../../adr/0016-dual-agent-protocol.md)          | agent interface に MCP と App Server 型 JSON-RPC の両方を採用する判断        | agent-interface     |
+| [adr/0017](../../adr/0017-agent-draft-boundary.md)         | エージェントの操作範囲を draft までとし確定に人間の承認を要する判断          | agent-interface     |
 
 ## Open Questions / Future Work
 

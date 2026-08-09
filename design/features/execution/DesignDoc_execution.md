@@ -23,7 +23,7 @@ verified_commit: unverified
 
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・フロー単位で記述する。責務・範囲・方針の層に留め、実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** 判断の経緯は ADR を参照する ([adr/0002](../../../adr/0002-pause-semantics.md))。
+**現在の設計だけを書く。** 判断の経緯は ADR を参照する (pause の意味論は [adr/0002](../../../adr/0002-pause-semantics.md)、実行基盤の選定は [adr/0013](../../../adr/0013-agent-browser-runtime.md))。
 
 ## 概要
 

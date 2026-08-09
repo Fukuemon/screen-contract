@@ -23,7 +23,7 @@ verified_commit: unverified
 
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・画面・フロー単位で記述する。責務・範囲・方針の層に留め、実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** 判断の経緯は ADR を参照する ([adr/0008](../../../adr/0008-stream-proxy.md)、framework 選定は [adr/0001](../../../adr/0001-tech-stack.md))。
+**現在の設計だけを書く。** 判断の経緯は ADR を参照する ([adr/0008](../../../adr/0008-stream-proxy.md)、framework 選定は [adr/0001](../../../adr/0001-tech-stack.md)、dashboard 非 fork は [adr/0015](../../../adr/0015-web-ui-own-implementation.md))。
 
 ## 概要
 
