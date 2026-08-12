@@ -16,15 +16,15 @@ verified_commit: unverified
 
 ## 標準スタック
 
-| 区分            | ツール                | 備考                                           |
-| --------------- | --------------------- | ---------------------------------------------- |
-| Package manager | pnpm (workspace)      | packages/ を 4 層のモジュール単位で切る        |
-| Task runner     | turborepo             | 依存グラフで層の依存規約を反映する             |
-| Language        | TypeScript (Node LTS) | web framework は TanStack Start                |
-| Linter          | oxlint                |                                                |
-| Formatter       | oxfmt                 | md / yml は oxfmt 安定まで prettier 併用       |
-| Unit test       | vitest                |                                                |
-| E2E             | 未定                  | テスト方針 ([testing.md](testing.md)) の確定後 |
+| 区分            | ツール                | 備考                                     |
+| --------------- | --------------------- | ---------------------------------------- |
+| Package manager | pnpm (workspace)      | packages/ を 4 層のモジュール単位で切る  |
+| Task runner     | turborepo             | 依存グラフで層の依存規約を反映する       |
+| Language        | TypeScript (Node LTS) | web framework は TanStack Start          |
+| Linter          | oxlint                |                                          |
+| Formatter       | oxfmt                 | md / yml は oxfmt 安定まで prettier 併用 |
+| Unit test       | vitest                | 統合テストも vitest で書く               |
+| E2E             | Playwright            | 責務分担は [testing.md](testing.md)      |
 
 ## エージェント補助 (任意)
 

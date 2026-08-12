@@ -50,7 +50,7 @@ commands:
   lint: pnpm lint # oxlint + typecheck
   format: pnpm format # oxfmt (確認)。md / yml は prettier
   test: pnpm test # vitest
-  e2e: <cmd> # 未定 (E2E 方針は testing.md 確定後)
+  e2e: pnpm e2e # Playwright。責務分担は context/testing.md
   check: pnpm check # lint + format + test + build
   add-dep: pnpm add --filter <package> # 依存追加
 
