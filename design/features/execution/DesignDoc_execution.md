@@ -168,11 +168,11 @@ flowchart TD
 
 `run-started / step-started / expectation-evaluated / step-skipped / step-executed / step-failed / paused / resumed / rolled-back / run-completed / run-failed / run-aborted`
 
-イベントには step id、Expectation の評価結果、Snapshot / スクリーンショット参照を含め、UI 側がアノテーション表示に必要な情報をイベントだけで組み立てられるようにする。
+イベントには step id、Expectation の評価結果、Snapshot / スクリーンショット参照を含め、UI 側が注釈表示に必要な情報をイベントだけで組み立てられるようにする。
 
 ## 主要シナリオ / フロー
 
-- 利用者 (または AI エージェント) が run を開始し、全ステップが自動再生され、各ステップのアノテーションがライブ表示される。
+- 利用者 (または AI エージェント) が run を開始し、全ステップが自動再生され、各ステップの注釈がライブ表示される。
 - 2 回目の実行で画面状態が既に期待状態を満たしており、全ステップが skipped で完了し「変更なし」と記録される。
 - 利用者が一時停止し、要素を選択して要素定義を編集し、再開する。ページ状態が変わっていなければそのまま続行される。
 - 利用者が一時停止中にドロップダウンを開くなどの探索操作を行い、再開時に前提が崩れたステップから自動で巻き戻し再実行される。

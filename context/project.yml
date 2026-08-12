@@ -9,7 +9,7 @@
 # - 値を変えたら meta.updated を更新し、依存する context/*.md との整合を確認する。
 
 meta:
-  updated: 2026-08-07
+  updated: 2026-08-13
 
 product:
   name: Screen Contract # 製品の通称 (例: 備品管理)
@@ -179,3 +179,11 @@ glossary:
     def: 画面を 1 クラス、要素を locator プロパティ、操作をメソッドとして表す E2E テストの設計パターン。本システムでは Workflow IR から編集禁止の生成物として出力する (ADR-0006)
   - term: Workflow IR
     def: YAML DSL を実行しやすい形へ正規化した内部表現 (Intermediate Representation)。core/workflow が生成し、実行系は YAML ではなく IR を入力に取る
+  - term: MVP (Minimum Viable Product)
+    def: 実用最小限の製品。DesignDoc の Goal に列挙した一連の操作を完了できる範囲を指す。クラウド利用・チーム利用・CI 実行は含まない
+  - term: DSL (Domain Specific Language)
+    def: ドメイン固有言語。本システムでは画面操作と画面仕様を宣言する YAML 形式の記法を指し、Screen 文書と Workflow 文書の 2 種類に分かれる (ADR-0003)
+  - term: CI (Continuous Integration)
+    def: 継続的インテグレーション。MVP では対象外で、差分検知の CI 実行は Future Work に置く
+  - term: C4 モデル
+    def: システムを Context / Container / Component / Code の 4 階層で描く図法。DesignDoc では L1 (System Context) と L2 (Container) の 2 段を使う

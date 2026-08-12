@@ -20,7 +20,7 @@
 ## 代替案
 
 - **dashboard を fork して拡張する**: 要素選択・採番・差分承認・承認キューという本システム固有の機能が UI の大半を占め、fork による upstream 追従コストが参照の利益を上回るため却下。dashboard は Next.js 製であり、[adr/0001](0001-tech-stack.md) の framework 選定 (TanStack Start) とも一致しない。
-- **dashboard を iframe 等で埋め込む**: viewport と自前 UI (選択モード・アノテーションオーバーレイ・タイムライン) の統合が embed 境界をまたげず、選択モードのクリック捕捉が実現できないため却下。
+- **dashboard を iframe 等で埋め込む**: viewport と自前 UI (選択モード・注釈オーバーレイ・タイムライン) の統合が embed 境界をまたげず、選択モードのクリック捕捉が実現できないため却下。
 
 ## 影響
 

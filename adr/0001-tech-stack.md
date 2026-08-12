@@ -12,7 +12,7 @@
 
 - DesignDoc の再編成で interface / app / core / adapter の 4 層構造と機能単位の core 分割が確定し、実装言語・ツールの選定が commands / naming / toolchain の placeholder を埋める前提条件になった。
 - 実行基盤の agent-browser は Rust 製 CLI だが、操作 SDK・組み込み dashboard (Next.js + React 19)・MCP server SDK はいずれも JS/TS エコシステムにある。
-- Web UI は live viewport とアノテーション編集を中心とする SPA 型エディタで、SEO・初期表示 SSR の要件がない。
+- Web UI は live viewport と注釈編集を中心とする SPA 型エディタで、SEO・初期表示 SSR の要件がない。
 - decision_priority は再現性・決定性 > AI ネイティブ > 拡張性 > 開発体験 > パフォーマンス ([context/project.yml](../context/project.yml))。
 
 ## 決定

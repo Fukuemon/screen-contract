@@ -94,7 +94,7 @@ core/artifact は「DSL と撮影結果から、画面仕様書の成果物を�
 
 Workflow IR からの決定的 codegen とする。生成コードは編集禁止 (生成ヘッダで明示) で、拡張はクラス継承など生成物の外側で行う。
 
-**Playwright への依存は生成物の利用側にのみ生じる**。本システムの実行 (agent-browser)・仕様書生成・差分検知は Playwright に依存せず、POM 生成もテキスト生成であってランタイムを要しない。POM の生成は**プロダクト設定のオプトイン** (`outputs: [spec]` / `[spec, pom]`) とし、Playwright を使わない利用者には仕様書生成だけで完結させる。codegen の Locator / action 対応表は出力 target 単位で持ち、将来の他フレームワーク向け出力は target の追加で対応する (Future Work)。
+**Playwright への依存は生成物の利用側にのみ生じる**。本システムの実行 (agent-browser)・仕様書生成・差分検知は Playwright に依存せず、POM 生成もテキスト生成であってランタイムを要しない。POM の生成は、**プロダクト設定で明示的に有効にしたときだけ行う** (`outputs: [spec]` / `[spec, pom]`)。Playwright を使わない利用者は仕様書生成だけで完結する。codegen の Locator / action 対応表は出力 target 単位で持ち、将来の他フレームワーク向け出力は target の追加で対応する (Future Work)。
 
 - 入力は Screen IR。Screen IR → 画面ごとの Page Object クラス。要素定義 → 型付き locator プロパティ、状態遷移 steps → 遷移メソッド、Expectation → 対応する assertion helper。
 - **Expectation の意味論の正本は execution feature の評価規則**とし、assertion への対応表はそれと同じ意味になるよう定義する。対応できない Expectation (Playwright で表現できない条件) は生成時警告とし、黙って意味を変えない。
