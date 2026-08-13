@@ -21,7 +21,7 @@ repos:
   app: "." # 実装 repo。単一 repo 構成なら "."
   docs: "." # 設計文書 repo (app と同一なら ".")
   infra: null # 別管理の infra repo。無ければ null
-  layout: | # 主要ディレクトリ構成
+  layout: | # 主要ディレクトリ構成 (実装は scaffold 未作成)
     screen-contract/
     ├── design/        # 全体像 (landscape) と feature 設計
     ├── context/       # 技術規約 / codebase architecture / 運用契約
@@ -29,7 +29,20 @@ repos:
     ├── specs/         # 機能単位の作業文書
     ├── hooks/         # 配布された git hooks (編集はテンプレ側)
     ├── templates/     # 文書テンプレート (編集はテンプレ側)
-    └── packages/      # 実装 (pnpm workspace。core / adapter / app / interface 単位。scaffold 未作成)
+    ├── apps/          # デプロイ単位。他のパッケージから依存されない
+    │   ├── server/    #   合成ルート + bin。adapter の具象を選ぶ唯一の場所 (ADR-0023)
+    │   ├── web/       #   TanStack Start (SPA)
+    │   └── mcp-bridge/#   stdio とループバックの透過 proxy (ADR-0021)
+    ├── packages/      # 内部モジュール。デプロイ単位にならない
+    │   ├── domain/    #   全 core が共有する型のみ
+    │   ├── core-*/    #   workflow / execution / element / artifact / diff
+    │   ├── app/       #   use case + Store Port
+    │   ├── adapter-*/ #   browser / store (ai は MVP 実装なし。ADR-0019)
+    │   ├── api/       #   Hono app factory (listen しない)
+    │   ├── agent/     #   MCP / JSON-RPC + 共通マッピング層
+    │   ├── fixture-app/ # テスト対象アプリ
+    │   └── config/    #   tsconfig / oxlint / vitest の共有設定
+    └── e2e/           # Playwright。apps に依存してよい唯一の例外
 
 # Naming Conventions
 naming:
@@ -49,7 +62,8 @@ commands:
   build: pnpm build
   lint: pnpm lint # oxlint + typecheck
   format: pnpm format # oxfmt (確認)。md / yml は prettier
-  test: pnpm test # vitest
+  test: pnpm test # vitest (unit のみ)
+  test-integration: pnpm test:integration # vitest。agent-browser を実起動するため test から分離
   e2e: pnpm e2e # Playwright。責務分担は context/testing.md
   check: pnpm check # lint + format + test + build
   add-dep: pnpm add --filter <package> # 依存追加
