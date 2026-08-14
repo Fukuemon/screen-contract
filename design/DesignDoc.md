@@ -92,7 +92,7 @@ MVP では次を対象とする。
 - 画面状態ごとの要素定義
 - 永続的な要素 ID と表示用構成番号の管理
 - Accessibility Snapshot と DOM 情報を使った要素候補抽出
-- AI による要素名、種別、Locator 候補の提案
+- AI による要素名、種別、Locator 候補の提案 (推論はエージェント自身が行う。本システムは AI サービスへ接続しない。[adr/0019](../adr/0019-agent-led-ai-suggestions.md))
 
 成果物生成 (core/artifact):
 
@@ -196,17 +196,17 @@ C4Context
     Person(user, "仕様作成者・開発者", "画面操作、要素マッピング、差分確認を行う")
     System(sys, "ブラウザワークフロー・画面仕様管理基盤", "画面状態を再現し、仕様成果物と変更差分を生成する")
     System_Ext(target, "対象 Web アプリケーション", "操作、要素取得、画面撮影の対象")
-    System_Ext(ai, "AI サービス", "要素名、種別、Locator、DSL 修正候補を生成する")
-    System_Ext(agent, "AI エージェント", "Claude Code / Codex 等。agent interface から draft を操作する")
+    System_Ext(agent, "AI エージェント", "Claude Code / Codex 等。agent interface から draft を操作し、要素名や種別を自身で推論する")
     Rel(user, sys, "編集、実行、承認")
     Rel(agent, sys, "workflow 定義、実行、要素定義の draft 操作")
     Rel(sys, target, "ブラウザで操作、取得、撮影")
-    Rel(sys, ai, "構造化された候補生成を要求")
 ```
 
 利用者は本システム上で画面状態と要素定義を管理する。
 AI エージェントは人間と同じ use case を agent interface から操作するが、Baseline と構成番号の確定 (承認) は利用者のみが行う。
-対象 Web アプリケーションと AI サービスは正本を保持せず、実行対象または候補生成手段として利用する。
+対象 Web アプリケーションは正本を保持せず、実行対象として利用する。
+
+本システムは外部の AI サービスへ接続しない。要素名や種別の推論は AI エージェント自身が行い、本システムは LLM の認証情報を保持しない ([adr/0019](../adr/0019-agent-led-ai-suggestions.md))。
 
 ### Container (C4 L2) — 主要な実行単位とデータの流れ
 
@@ -217,7 +217,6 @@ flowchart TD
     web --> server["Workflow Server (api / agent / app / core / adapter)"]
     server --> browser["agent-browser"]
     browser --> target["対象 Web アプリケーション"]
-    server --> aisvc["AI サービス"]
     server --> store[("Artifact Store")]
 ```
 
@@ -232,12 +231,13 @@ Server 内部のモジュール分割は次節に示す。
 
 ### 設計方針
 
-モジュールは interface / app / core / adapter の 4 区分に分ける。
+モジュールは interface / app / core / adapter の 4 区分に分け、加えて 4 区分のどれでもない**合成ルート**を置く。
 
 - interface 層 (web / api / agent) は利用者・エージェントとの接点だけを持ち、ドメインロジックを持たない。人間用とエージェント用の interface は同じ app 層の use case を呼び、操作範囲の差は承認ゲートだけに置く。
-- app 層は複数の core と adapter を結線して use case を編成する。ドメインロジックを持たない。
+- app 層は複数の core を結線して use case を編成する。ドメインロジックを持たない。**adapter へは依存せず、Port の実装を合成ルートから受け取る。**
 - core 層は機能単位に分割し、機能ごとのドメインモデル、ドメインロジック、Port 定義を持つ。core 同士は型の参照以外で依存しない。
-- adapter 層は core が定義する Port を実装し、外部技術の固有処理を閉じ込める。
+- adapter 層は Port を実装し、外部技術の固有処理を閉じ込める。
+- **合成ルートは adapter の具象を選んで app へ注入し、プロセスを起動する。** 唯一 adapter を知る場所である ([adr/0023](../adr/0023-composition-root.md))。
 
 Port は原則、それを使う core が定義する。
 保存だけは機能横断のため、Store Port を app 層で定義する。
@@ -261,15 +261,16 @@ Port は原則、それを使う core が定義する。
 
 ### interface / app / adapter 層
 
-| モジュール      | 責務                                                                                                              | 実装・依存                     |
-| --------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                         | api に依存                     |
-| api             | HTTP API、WebSocket、認可                                                                                         | app に依存                     |
-| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可 | app に依存                     |
-| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、core と adapter の結線、Store Port の定義                 | 各 core・各 adapter に依存     |
-| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                          | Browser Port を実装            |
-| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得                                                                   | AI Port と DSL Fix Port を実装 |
-| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                               | Store Port を実装              |
+| モジュール      | 責務                                                                                                                          | 実装・依存                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                                     | api に依存                             |
+| api             | HTTP API、WebSocket、認可                                                                                                     | app に依存                             |
+| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可             | app に依存                             |
+| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、Store Port の定義                                                     | 各 core に依存。adapter へは依存しない |
+| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                                      | Browser Port を実装                    |
+| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得。**MVP では実装しない** ([adr/0019](../adr/0019-agent-led-ai-suggestions.md)) | AI Port と DSL Fix Port を実装         |
+| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                                           | Store Port を実装                      |
+| 合成ルート      | adapter の具象を選んで app へ注入、api と agent を 1 プロセスへ載せる、起動と終了の管理                                       | 全層に依存してよい                     |
 
 ```mermaid
 flowchart TD
@@ -290,9 +291,16 @@ flowchart TD
     end
     subgraph adapterLayer["adapter 層"]
         browser["adapter/browser"]
-        ai["adapter/ai"]
+        ai["adapter/ai<br/>(MVP 実装なし)"]
         store["adapter/store"]
     end
+    root["合成ルート"]
+    root --> web
+    root --> api
+    root --> agent
+    root --> app
+    root --> browser
+    root --> store
     web --> api --> app
     agent --> app
     app --> wf
@@ -306,8 +314,12 @@ flowchart TD
     store -. "Store Port 実装" .-> app
 ```
 
-依存方向は interface → app → core とし、adapter は Port の型を通じてのみ core へ依存する。
-agent-browser、AI サービス、保存方式の固有処理は adapter 内に閉じ込める。
+依存方向は interface → app → core とし、adapter は自身が実装する Port の定義元へ型を通じてのみ依存する。
+実線は実装への依存、破線は Port の型だけへの依存を示す。
+
+**adapter を知るのは合成ルートだけである。** app が adapter へ依存すると、Store Port が app にあるため循環し、テスト時の fake 差し替えが実行時分岐になる ([adr/0023](../adr/0023-composition-root.md))。
+
+agent-browser と保存方式の固有処理は adapter 内に閉じ込める。
 
 ## 詳細の所在 (委譲先)
 
@@ -319,16 +331,16 @@ landscape より下の詳細は以下を正本とする。
 Feature 単位の設計は [design/features/](features/) を正本とする。
 Feature は core モジュールと一対一に対応させ、interface・adapter 固有の設計はそれを使う Feature または専用文書に置く。
 
-| Feature                     | 対応モジュール | 文書                                                                                                                                  | 状態   |
-| --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| ワークフロー定義 (DSL / IR) | core/workflow  | [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](features/workflow-dsl/DesignDoc_workflow-dsl.md)                             | 設計中 |
-| 冪等実行と再生制御          | core/execution | [design/features/execution/DesignDoc_execution.md](features/execution/DesignDoc_execution.md)                                         | 設計中 |
-| 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 設計中 |
-| 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 設計中 |
-| 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 設計中 |
-| Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 設計中 |
-| AI エージェント操作         | agent          | [design/features/agent-interface/DesignDoc_agent-interface.md](features/agent-interface/DesignDoc_agent-interface.md)                 | 設計中 |
-| AI 候補生成                 | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 設計中 |
+| Feature                     | 対応モジュール | 文書                                                                                                                                  | 状態                    |
+| --------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| ワークフロー定義 (DSL / IR) | core/workflow  | [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](features/workflow-dsl/DesignDoc_workflow-dsl.md)                             | 設計中                  |
+| 冪等実行と再生制御          | core/execution | [design/features/execution/DesignDoc_execution.md](features/execution/DesignDoc_execution.md)                                         | 設計中                  |
+| 画面要素マッピング          | core/element   | [design/features/element-mapping/DesignDoc_element-mapping.md](features/element-mapping/DesignDoc_element-mapping.md)                 | 設計中                  |
+| 仕様成果物生成              | core/artifact  | [design/features/artifact-generation/DesignDoc_artifact-generation.md](features/artifact-generation/DesignDoc_artifact-generation.md) | 設計中                  |
+| 変更差分検知                | core/diff      | [design/features/change-detection/DesignDoc_change-detection.md](features/change-detection/DesignDoc_change-detection.md)             | 設計中                  |
+| Web UI                      | web            | [design/features/web-editor/DesignDoc_web-editor.md](features/web-editor/DesignDoc_web-editor.md)                                     | 設計中                  |
+| AI エージェント操作         | agent          | [design/features/agent-interface/DesignDoc_agent-interface.md](features/agent-interface/DesignDoc_agent-interface.md)                 | 設計中                  |
+| AI 候補生成                 | adapter/ai     | [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](features/ai-suggestions/DesignDoc_ai-suggestions.md)                     | 改訂待ち (MVP 実装なし) |
 
 ### Engineering Context (How: 横断規約)
 
@@ -357,7 +369,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0006](../adr/0006-playwright-pom-output.md)        | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断           | artifact-generation |
 | [adr/0007](../adr/0007-visual-diff.md)                  | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断                | change-detection    |
 | [adr/0008](../adr/0008-stream-proxy.md)                 | ライブ映像を Workflow Server 経由の Proxy で配信する判断                          | web-editor          |
-| [adr/0009](../adr/0009-ai-adapter-auth.md)              | adapter/ai の認証を API キーと OAuth の両対応とする判断                           | ai-suggestions      |
+| [adr/0009](../adr/0009-ai-adapter-auth.md)              | adapter/ai の認証を API キーと OAuth の両対応とする判断 (ADR-0019 に置換)         | ai-suggestions      |
 | [adr/0010](../adr/0010-ai-data-boundary.md)             | AI への送信を既定 Snapshot 断片のみとし設定で明示的に許可したときだけ拡張する判断 | ai-suggestions      |
 | [adr/0011](../adr/0011-dsl-as-source-of-truth.md)       | YAML DSL を画面操作と画面仕様の唯一の正本とする判断                               | workflow-dsl        |
 | [adr/0012](../adr/0012-element-id-number-separation.md) | 永続要素 ID と表示用構成番号を分離する判断                                        | element-mapping     |
@@ -366,16 +378,26 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0015](../adr/0015-web-ui-own-implementation.md)    | Web UI を dashboard の fork ではなく自前実装とする判断                            | web-editor          |
 | [adr/0016](../adr/0016-dual-agent-protocol.md)          | agent interface に MCP と App Server 型 JSON-RPC の両方を採用する判断             | agent-interface     |
 | [adr/0017](../adr/0017-agent-draft-boundary.md)         | エージェントの操作範囲を draft までとし確定に人間の承認を要する判断               | agent-interface     |
+| [adr/0018](../adr/0018-ir-version-pinning.md)           | 再生中の要素定義編集を run 単位の IR version 固定で反映する判断                   | execution           |
+| [adr/0019](../adr/0019-agent-led-ai-suggestions.md)     | AI 候補生成をエージェント主導とし adapter/ai を MVP 実装対象外とする判断          | ai-suggestions      |
+| [adr/0020](../adr/0020-suggestion-pull-queue.md)        | 人間起点の提案依頼を pull 型キューで実現する判断                                  | agent-interface     |
+| [adr/0021](../adr/0021-agent-interface-authz.md)        | agent interface の認可をループバック限定とローカルトークンで行う判断              | agent-interface     |
+| [adr/0022](../adr/0022-auth-state-storage.md)           | 認証状態を暗号化 Storage State で保持し実行時パラメータで指定する判断             | execution           |
+| [adr/0023](../adr/0023-composition-root.md)             | 合成ルートを apps/server に置き app から adapter への依存を禁じる判断             | DesignDoc.md        |
 
 ## Open Questions / Future Work
 
 ### Open Questions
 
-| 未決事項                                 | 選択肢                                               | 影響                               | 確認方法                                           | 担当               | 期限           |
-| ---------------------------------------- | ---------------------------------------------------- | ---------------------------------- | -------------------------------------------------- | ------------------ | -------------- |
-| 再生中に編集した要素定義の反映タイミング | 即時 DSL 反映、再生完了後に一括反映                  | 再生の決定性と編集体験             | 編集→再開時の Locator 再解決の挙動を試作で確認する | プロダクト設計担当 | Web UI 実装前  |
-| agent interface の認可方式               | ローカル無認証、トークン、OAuth                      | エージェントに許す操作範囲と安全性 | ローカル利用とリモート利用の想定構成を決める       | プロダクト設計担当 | agent 実装前   |
-| 認証状態の保存方式                       | ローカル Profile、暗号化 Storage State、外部 Secrets | 再現性と情報漏えいリスク           | 利用環境の認証要件を確認する                       | セキュリティ担当   | 認証画面対応前 |
+実装着手前に決めるべき未決事項はない。過去の 3 件はいずれも ADR として確定した。
+
+| 決着した未決事項                         | 決定                                                       | ADR                                              |
+| ---------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
+| 再生中に編集した要素定義の反映タイミング | run 単位で Workflow IR の version を固定し再開時に差し替え | [adr/0018](../adr/0018-ir-version-pinning.md)    |
+| agent interface の認可方式               | ループバック限定とローカルトークン                         | [adr/0021](../adr/0021-agent-interface-authz.md) |
+| 認証状態の保存方式                       | 暗号化 Storage State と実行時プロファイル参照              | [adr/0022](../adr/0022-auth-state-storage.md)    |
+
+個別の feature や adapter の実装時に判断する事項は、各 ADR の「未確認事項」と [context/engineering.md](../context/engineering.md) に記載する。
 
 ### Future Work
 
