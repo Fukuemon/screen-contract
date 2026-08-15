@@ -17,6 +17,19 @@
 
 - **Web UI は Workflow Server の単一エンドポイントにのみ接続し、server が agent-browser のストリームを中継 (Proxy) する**。映像フレームの配信と、操作モード時の入力転送 (逆方向) を同じ経路で行う。
 - agent-browser のポートは外部に公開せず、Workflow Server のみが接続する。
+- **逆方向の入力転送は素通ししない。** server 側で、対象 run が `paused` かつ操作モードであることを検証してから中継する。満たさない入力は破棄する。
+
+### 入力転送を server で検証する理由
+
+「再生中は入力を受け付けない」という規則は、Web UI が守るだけでは**規則ではなく画面の都合**にすぎない。認証を通したクライアントは Proxy へ直接フレームを送れるため、client 側の制御は迂回できる。迂回されると、実行中の run の途中でページ状態が変わり、**Expectation の評価が実際の操作と噛み合わなくなる**。冪等実行と巻き戻しの前提が崩れる。
+
+| 中継の条件                    | 満たさない場合 |
+| ----------------------------- | -------------- |
+| 対象 run が `paused`          | 破棄する       |
+| 操作モードである              | 破棄する       |
+| 対象 run が要求元のものである | 破棄する       |
+
+**破棄したことをイベントとして残す。** 黙って捨てると、UI 側の不具合と迂回の試みを区別できない。
 
 ## 代替案
 
@@ -44,6 +57,7 @@
 - context / AI 向け設定更新要否:
   - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に接続構成を反映 — 本 commit で実施
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「Browser Stream の公開方式」を削除 — 本 commit で実施
+  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に、入力転送を server 側で検証する契約を追加する — 実施済み
 
 ## 関連ドキュメント / チケット
 

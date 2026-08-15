@@ -140,6 +140,7 @@ flowchart LR
 
 - web の接続先は Workflow Server (api) の単一エンドポイントのみ ([adr/0008](../../../adr/0008-stream-proxy.md))。agent-browser のポートには接続しない。
 - 映像はフレーム列の中継、入力転送は操作モード時のみ逆方向に流す。
+- **入力転送は server 側でも検証する。** 対象 run が `paused` かつ操作モードであることを Workflow Server が確かめてから中継する ([adr/0008](../../../adr/0008-stream-proxy.md))。client 側の制御だけでは、認証を通したクライアントが Proxy へ直接送って迂回できる。破棄した入力はイベントとして残す。
 
 #### 接続時の認証
 

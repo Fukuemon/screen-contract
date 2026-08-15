@@ -22,7 +22,8 @@
 - 認証状態は **Storage State (cookie / localStorage の JSON) として保持する**。実体は OS のキーストア (macOS Keychain / libsecret / DPAPI) から得た鍵で暗号化してローカルに保存し、キーストアには鍵のみを置く。キーストアは小さい secret 向けであり、Storage State の JSON をそのまま格納する用途に適さないためこの分離を採る。
 - 初回は、**人間がブラウザで手動ログインし、その時点の Storage State を取り込む導線**を用意する。MFA / SSO がある場合も初回だけ人間が通れば以降は再現できる。
 - **認証プロファイルは実行時パラメータとする**。run の開始時に名前で指定し、DSL には書かない。
-- **Baseline は `(screen, state, authProfile)` で識別する**。
+- **Baseline は `(screen, state, authProfile)` で識別する**。ただし `authProfile` は名前だけでなく **generation (取り込みの世代) を伴う**。
+- **Storage State の失効判定は、プロファイルごとに宣言した認証検証条件で行う**。汎用のブラウザ基盤だけでは判定できない。
 - Browser Port の `createSession` は認証コンテキストを受け取る。実際の注入は adapter/browser の責務とする。
 - Storage State の失効は `auth/expired` の機械可読コードを持つ構造化エラーとして返す。
 
@@ -36,7 +37,7 @@ flowchart TD
     run["run 開始<br/>authProfile を名前で指定"]
     session["Browser Port の createSession へ注入<br/>(注入は adapter/browser の責務)"]
     exec["ステップ実行"]
-    base["Baseline を<br/>(screen, state, authProfile) で識別"]
+    base["Baseline を<br/>(screen, state, authProfile, generation) で識別"]
     expired["auth/expired を<br/>構造化エラーで返す"]
 
     login --> capture --> store
@@ -49,6 +50,33 @@ flowchart TD
 ```
 
 DSL には認証への参照を持たせない。同じ Screen 文書を複数の `authProfile` で実行できる。
+
+### プロファイル名だけでは Baseline を分けきれない
+
+プロファイル名は**可変**である。失効時は「取り込み直して中身を差し替える」運用であり、同じ名前へ**別のアカウント**の Storage State を入れることもできる。名前だけを識別子にすると、その瞬間から権限の違う結果が同じ Baseline へ混ざる。
+
+**取り込みのたびに generation を 1 つ進める。** Baseline の識別子は `(screen, state, authProfile, generation)` とする。
+
+| 起きること                       | 扱い                                                          |
+| -------------------------------- | ------------------------------------------------------------- |
+| 同じアカウントを取り込み直す     | generation が進む。前の Baseline は残るが、比較対象は最新のみ |
+| 別のアカウントを同じ名前で入れる | 同上。**古い Baseline を上書きしない**ため権限差が混ざらない  |
+
+古い generation の Baseline は保持する。捨てると、取り込み直した直後に「Baseline 未作成」へ戻り、差分検知が一度使えなくなる。
+
+### 失効の判定条件
+
+サーバ側の失効や SSO の期限切れは、**ログイン画面への遷移**として現れる。これは通常の画面変更や Locator の解決失敗と見分けがつかない。判定条件なしに `auth/expired` と断定すると、単なる画面改修を認証エラーとして報告する。
+
+プロファイルごとに**認証済みであることの検証条件**を宣言する。実行前にこれを評価し、満たさないときだけ `auth/expired` とする。
+
+| 状況                                   | 返すもの                                                  |
+| -------------------------------------- | --------------------------------------------------------- |
+| 検証条件を満たさない                   | `auth/expired`                                            |
+| 検証条件を宣言していない               | **`auth/expired` と断定しない**。通常の実行失敗として返す |
+| 検証条件を満たすが、その後の操作が失敗 | 通常の実行失敗として返す                                  |
+
+検証条件は Expectation と同じ語彙で書く。新しい語彙を増やさないためである。
 
 ## 代替案
 
@@ -85,6 +113,8 @@ DSL には認証への参照を持たせない。同じ Screen 文書を複数�
   - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の Browser Port 契約に認証コンテキストを追加し、エラーコードに `auth/expired` を追加する — 実施済み
   - [design/features/change-detection/DesignDoc_change-detection.md](../design/features/change-detection/DesignDoc_change-detection.md) と [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md) の Baseline 識別子に `authProfile` を反映する — 実施済み
   - [context/infrastructure.md](../context/infrastructure.md) に保存場所、暗号化方式、取り込み導線、失効時の扱いを記載する — 実施済み
+  - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) に認証検証条件の評価と `auth/expired` の判定規則を追加する — 実施済み
+  - [design/features/change-detection/DesignDoc_change-detection.md](../design/features/change-detection/DesignDoc_change-detection.md) の Baseline 識別子に generation を反映する — 実施済み
 
 ## 関連ドキュメント / チケット
 

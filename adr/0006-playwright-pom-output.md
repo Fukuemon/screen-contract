@@ -21,6 +21,7 @@
   - Screen 文書 → 画面ごとの Page Object クラス (要素定義 → 型付き locator プロパティ、状態遷移 steps → メソッド)
   - Workflow 文書 → 到達手順の fixture / helper
   - Locator の対応: `role+name` → `getByRole`、`label` → `getByLabel`、`testid` → `getByTestId`、`text` → `getByText`、`css` + `index` → `locator().nth()`
+  - **`index` は 1 始まり、`nth()` は 0 始まりである。** 変換時に 1 を引く。引き忘れると生成した POM が隣の要素を操作し、しかも実行しても例外にならない (規則は [artifact-generation feature](../design/features/artifact-generation/DesignDoc_artifact-generation.md))
 - 生成コードは**編集禁止・再生成で更新** (生成ヘッダで明示)。個別に編集可能な正本にはしない (DesignDoc の原則) ため、他の成果物と同じ書き換え抑止の対象に入れる。
 - 実行基盤は agent-browser のまま変えない。POM 出力は利用者の Playwright 環境で動くコードの提供であり、本システムの Runner を Playwright に置き換える判断ではない。
 - **POM 生成はプロダクト設定で明示的に有効にしたときだけ行う**。本システム自体は Playwright に依存せず (codegen はテキスト生成)、依存が生じるのは生成された POM を利用者のテストで import する場合のみ。Playwright を使わない利用者は仕様書生成だけで完結する。
@@ -51,6 +52,7 @@
 ## 実装・運用への反映
 
 - spec 更新要否: 不要 (spec 未作成)
+- 追補: `index` の 0/1 始まりの変換規則を [artifact-generation feature](../design/features/artifact-generation/DesignDoc_artifact-generation.md) へ追加した — 実施済み
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) のスコープ・成功条件・Lower-Priority Goals を更新する — 本 commit で実施
   - [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md) に POM 生成の規則を追記する — 本 commit で実施

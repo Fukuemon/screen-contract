@@ -15,9 +15,29 @@
 
 ## 決定
 
-- **エージェントと AI 出力の操作範囲は draft までとし、Baseline と構成番号の確定は人間の承認後にのみ行う**。
-- interface 上もこの境界を強制する: 正本 (Baseline・確定済み DSL) を変更する tool は存在せず、エージェントができるのは承認依頼 (`approval.request`) までとする。
-- 承認は非ブロッキングとし、承認待ちの間もエージェントは他の draft 作業を継続できる。差し戻しは構造化コメントで返し、修正 → 再依頼のループを回せるようにする。
+- **エージェントと AI 出力が管理対象データへ書き込める範囲は draft までとし、正本への反映は人間の承認後にのみ行う**。
+- 承認の対象は次の 3 つとする。**確定済み DSL の変更も対象に含める。**
+
+| 承認対象      | 何が正本になるか                  |
+| ------------- | --------------------------------- |
+| DSL 変更      | 確定済みの Screen / Workflow 文書 |
+| 構成番号      | state の `badges` (NumberingPlan) |
+| Baseline 更新 | 承認済みの実行結果セット          |
+
+- interface 上もこの境界を強制する: 正本を変更する tool は存在せず、エージェントができるのは承認依頼 (`approval.request`) までとする。
+- 承認は非ブロッキングとし、承認待ちの間もエージェントは他の draft 作業を継続できる。差し戻しは構造化コメントで返し、修正 → 再依頼のループを回せるようにする。**依頼は対象 draft の revision を固定し、承認時に一致しなければ確定しない** (承認待ちの間の編集が、人間の見ていない差分のまま確定するのを防ぐ)。
+
+### この境界が及ばない範囲
+
+**本境界は「管理対象データへの書き込み」に限る。** `run.start` / `run.resume` / `run.rerun_step` は draft 空間に閉じない。対象 Web アプリケーションに対して実際にクリックと入力を行い、**外部に副作用を起こす**。draft の安全性とは別の制約が要る。
+
+| 制約             | 内容                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| 対象の限定       | 実行してよい origin をプロダクト設定で列挙する。列挙外への `open` を拒否する                                 |
+| 操作の記録       | どの run がどの origin へ何を行ったかを実行履歴に残す                                                        |
+| 破壊的操作の扱い | 対象アプリ側の取り消せない操作を本システムは判別できない。**利用者が対象環境を選ぶ責任を負う**ことを明示する |
+
+run 系を承認ゲートの対象にしない。実行のたびに人間の承認を要求すると、エージェントが自律的に再生して失敗を特定するという中核の動線が成立しないためである。**代わりに対象の限定と記録で守る。**
 
 ## 代替案
 
@@ -42,7 +62,10 @@
 ## 実装・運用への反映
 
 - spec 更新要否: 不要 (spec 未作成)
-- context / AI 向け設定更新要否: [design/DesignDoc.md](../design/DesignDoc.md) の ADR 表を更新、[design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の ADR 参照を更新 — 本 commit で実施
+- context / AI 向け設定更新要否:
+  - [design/DesignDoc.md](../design/DesignDoc.md) の ADR 表を更新、[design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の ADR 参照を更新 — 実施済み
+  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) に run 系 tool の対象 origin 制限と記録の契約を追加する — 実施済み
+  - [context/infrastructure.md](../context/infrastructure.md) に実行してよい origin の設定の置き場を記載する — 実施済み
 
 ## 関連ドキュメント / チケット
 
