@@ -5,6 +5,7 @@ description: テスト 3 層 (unit / 統合 / E2E) の責務分担、fixture 対
 keywords: [testing, unit test, 統合テスト, e2e, fixture, テスト方針]
 governs:
   - packages/*/src/**/*.test.ts
+  - apps/web/src/**/*.test.ts
   - apps/server/src/**/*.integration.test.ts
   - packages/config/vitest/
   - packages/fixture-app/
@@ -20,11 +21,11 @@ verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
 
 3 層に分ける。層の境界は **agent-browser を実起動するか** で引く。
 
-| 種別 | ツール     | 配置                                       | 主担当範囲                                                                    | agent-browser |
-| ---- | ---------- | ------------------------------------------ | ----------------------------------------------------------------------------- | ------------- |
-| unit | vitest     | `packages/*/src/**/*.test.ts`              | core 5 モジュールの純粋ロジック、web の表示ロジック、agent の共通マッピング層 | 使わない      |
-| 統合 | vitest     | `apps/server/src/**/*.integration.test.ts` | app + adapter の結線。実行系を api から直接叩く                               | **実起動**    |
-| E2E  | Playwright | `e2e/src/`                                 | Web UI からの通し操作。要素選択、採番、承認、成果物の受け取り                 | fake で置換   |
+| 種別 | ツール     | 配置                                                          | 主担当範囲                                                                    | agent-browser |
+| ---- | ---------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------- |
+| unit | vitest     | `packages/*/src/**/*.test.ts`<br/>`apps/web/src/**/*.test.ts` | core 5 モジュールの純粋ロジック、web の表示ロジック、agent の共通マッピング層 | 使わない      |
+| 統合 | vitest     | `apps/server/src/**/*.integration.test.ts`                    | app + adapter の結線。実行系を api から直接叩く                               | **実起動**    |
+| E2E  | Playwright | `e2e/src/`                                                    | Web UI からの通し操作。要素選択、採番、承認、成果物の受け取り                 | fake で置換   |
 
 ```mermaid
 flowchart TD

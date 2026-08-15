@@ -99,7 +99,7 @@ root から束ねるのは [project.yml](project.yml) の `commands` と 1 対 1
 
 root の `test` から外すもの:
 
-- **統合テスト** (`test:integration`) — agent-browser を実起動するため。直実行と pre-push に置く
+- **統合テスト** (`test:integration`) — agent-browser を実起動するため。**手動でのみ実行する**
 - **E2E** (`e2e`) — Playwright と Workflow Server の起動を伴うため
 
 `e2e` は Playwright 未導入のため、実行すると理由を出して失敗する。**黙って成功させない。** 実行対象を持たないタスクが緑になると、導入し忘れに気付けないためである。

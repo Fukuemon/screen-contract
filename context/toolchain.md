@@ -40,7 +40,9 @@ Node のバージョンは `mise.toml` で **24 (LTS)** に固定する。宣言
 
 ### TypeScript 7 の併置構成
 
-TypeScript 7 は言語サービスの programmatic API が未安定で、`tsserver` を同梱しない。エディタと `tsserver` を要求するツールのために TypeScript 6 を併置する。
+TypeScript 7 は言語サービスの programmatic API が未安定である。**この API を要求するツールのために TypeScript 6 を併置する。**
+
+併置するパッケージが配るのは `tsc6` の実行ファイルと `tsserverlibrary` (programmatic API) であり、**`tsserver` の実行ファイルは含まない**。エディタが tsserver を必要とする場合は、エディタ側が持つ TypeScript を使うか、別途用意する。
 
 ```json
 "typescript": "npm:@typescript/typescript6@^6.0.2",  // 言語サービス。bin は tsc6
