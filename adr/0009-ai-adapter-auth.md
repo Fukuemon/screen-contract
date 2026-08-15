@@ -47,7 +47,7 @@
 - context / AI 向け設定更新要否:
   - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) に認証の設計を反映 — 本 commit で実施
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「adapter/ai の認証方式」を削除 — 本 commit で実施
-- 未確認事項: 対応 provider の OAuth 仕様と、サブスクリプション credential のプログラム利用に関する利用規約の確認 (adapter/ai 実装 spec で provider を確定するときに行う)
+- 未確認事項: 本 ADR は [adr/0019](0019-agent-led-ai-suggestions.md) に置換済み。provider の確定と規約確認は、将来 adapter/ai を実装する場合にその spec で行う
 
 ## 関連ドキュメント / チケット
 

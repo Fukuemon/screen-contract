@@ -101,7 +101,8 @@ stateDiagram-v2
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
   - [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](../design/features/workflow-dsl/DesignDoc_workflow-dsl.md) の状態モデル節に反映済み
-  - 要素継承の除外構文 (`hidden-in`) の最終名は Schema 確定時に見直す — 未実施
+  - 要素継承の除外構文 (`hidden-in`) の最終名は `hidden-in` で確定する — 実施済み
+    - 下流の [workflow-dsl feature](../design/features/workflow-dsl/DesignDoc_workflow-dsl.md) が既に規則として記述しており、暫定名のまま参照が広がっている。読んで意味が通り、他の語彙と衝突しないため、名前を変える利得がない
 
 ## 関連ドキュメント / チケット
 

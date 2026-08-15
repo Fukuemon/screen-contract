@@ -66,7 +66,7 @@
   - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) に送信境界の設計を反映 — 実施済み
   - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) の AI Port 制約の Open Question 参照を本 ADR 参照へ更新 — 実施済み
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「AI サービスへ送信できる情報」を削除 — 実施済み
-  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) の送信境界を、エージェント経路にも適用される形へ書き直す
+  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) の送信境界を、エージェント経路にも適用される形へ書き直す — 実施済み
 - 未決事項: なし。エージェント経路でも既定は「不許可」で確定した (推論がモデル提供者のサーバで行われるため、送信先の扱いを変える理由がない)。
 
 ## 関連ドキュメント / チケット

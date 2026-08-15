@@ -367,49 +367,47 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 
 確定した技術判断と却下した代替案は [adr/](../adr/) を正本とする。
 
-| ADR                                                     | 決定                                                                              | 関連ドキュメント    |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------- |
-| [adr/0001](../adr/0001-tech-stack.md)                   | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定           | DesignDoc.md        |
-| [adr/0002](../adr/0002-pause-semantics.md)              | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断           | execution           |
-| [adr/0003](../adr/0003-dsl-structure.md)                | DSL を Screen / Workflow の 2 文書に分離し実画面の文書化語彙を持たせる判断        | workflow-dsl        |
-| [adr/0004](../adr/0004-state-model.md)                  | 画面状態を default 根の木で表し statechart と直交合成を採らない判断               | workflow-dsl        |
-| [adr/0005](../adr/0005-renumbering.md)                  | 構成番号を状態単位で採番し badges リストを正本に読み順の再採番で管理する判断      | element-mapping     |
-| [adr/0006](../adr/0006-playwright-pom-output.md)        | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断           | artifact-generation |
-| [adr/0007](../adr/0007-visual-diff.md)                  | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断                | change-detection    |
-| [adr/0008](../adr/0008-stream-proxy.md)                 | ライブ映像を Workflow Server 経由の Proxy で配信する判断                          | web-editor          |
-| [adr/0009](../adr/0009-ai-adapter-auth.md)              | adapter/ai の認証を API キーと OAuth の両対応とする判断 (ADR-0019 に置換)         | ai-suggestions      |
-| [adr/0010](../adr/0010-ai-data-boundary.md)             | AI への送信を既定 Snapshot 断片のみとし設定で明示的に許可したときだけ拡張する判断 | ai-suggestions      |
-| [adr/0011](../adr/0011-dsl-as-source-of-truth.md)       | YAML DSL を画面操作と画面仕様の唯一の正本とする判断                               | workflow-dsl        |
-| [adr/0012](../adr/0012-element-id-number-separation.md) | 永続要素 ID と表示用構成番号を分離する判断                                        | element-mapping     |
-| [adr/0013](../adr/0013-agent-browser-runtime.md)        | MVP のブラウザ実行基盤に agent-browser を使用する判断                             | execution           |
-| [adr/0014](../adr/0014-core-split-ports-adapters.md)    | core を機能単位に分割し Ports and Adapters を採用する判断                         | DesignDoc.md        |
-| [adr/0015](../adr/0015-web-ui-own-implementation.md)    | Web UI を dashboard の fork ではなく自前実装とする判断                            | web-editor          |
-| [adr/0016](../adr/0016-dual-agent-protocol.md)          | agent interface に MCP と App Server 型 JSON-RPC の両方を採用する判断             | agent-interface     |
-| [adr/0017](../adr/0017-agent-draft-boundary.md)         | エージェントの操作範囲を draft までとし確定に人間の承認を要する判断               | agent-interface     |
-| [adr/0018](../adr/0018-ir-version-pinning.md)           | 再生中の要素定義編集を run 単位の IR version 固定で反映する判断                   | execution           |
-| [adr/0019](../adr/0019-agent-led-ai-suggestions.md)     | AI 候補生成をエージェント主導とし adapter/ai を MVP 実装対象外とする判断          | ai-suggestions      |
-| [adr/0020](../adr/0020-suggestion-pull-queue.md)        | 人間起点の提案依頼を pull 型キューで実現する判断                                  | agent-interface     |
-| [adr/0021](../adr/0021-agent-interface-authz.md)        | agent interface の認可をループバック限定とローカルトークンで行う判断              | agent-interface     |
-| [adr/0022](../adr/0022-auth-state-storage.md)           | 認証状態を暗号化 Storage State で保持し実行時パラメータで指定する判断             | execution           |
-| [adr/0023](../adr/0023-composition-root.md)             | 合成ルートを apps/server に置き app から adapter への依存を禁じる判断             | DesignDoc.md        |
+| ADR                                                     | 決定                                                                              | 関連ドキュメント             |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------- |
+| [adr/0001](../adr/0001-tech-stack.md)                   | 技術スタック (TypeScript monorepo / TanStack Start / 中間層なし) の選定           | DesignDoc.md                 |
+| [adr/0002](../adr/0002-pause-semantics.md)              | 一時停止をステップ境界とし pause 中操作を許可して再開時に再検証する判断           | execution                    |
+| [adr/0003](../adr/0003-dsl-structure.md)                | DSL を Screen / Workflow の 2 文書に分離し実画面の文書化語彙を持たせる判断        | workflow-dsl                 |
+| [adr/0004](../adr/0004-state-model.md)                  | 画面状態を default 根の木で表し statechart と直交合成を採らない判断               | workflow-dsl                 |
+| [adr/0005](../adr/0005-renumbering.md)                  | 構成番号を状態単位で採番し badges リストを正本に読み順の再採番で管理する判断      | element-mapping              |
+| [adr/0006](../adr/0006-playwright-pom-output.md)        | 正本は YAML DSL のまま Playwright POM を生成物として MVP で提供する判断           | artifact-generation          |
+| [adr/0007](../adr/0007-visual-diff.md)                  | 画像差分は生スクショ対象・Pixel Diff → 知覚差分の 2 段階とする判断                | change-detection             |
+| [adr/0008](../adr/0008-stream-proxy.md)                 | ライブ映像を Workflow Server 経由の Proxy で配信する判断                          | web-editor                   |
+| [adr/0009](../adr/0009-ai-adapter-auth.md)              | adapter/ai の認証を API キーと OAuth の両対応とする判断 (ADR-0019 に置換)         | ai-suggestions               |
+| [adr/0010](../adr/0010-ai-data-boundary.md)             | AI への送信を既定 Snapshot 断片のみとし設定で明示的に許可したときだけ拡張する判断 | ai-suggestions               |
+| [adr/0011](../adr/0011-dsl-as-source-of-truth.md)       | YAML DSL を画面操作と画面仕様の唯一の正本とする判断                               | workflow-dsl                 |
+| [adr/0012](../adr/0012-element-id-number-separation.md) | 永続要素 ID と表示用構成番号を分離する判断                                        | element-mapping              |
+| [adr/0013](../adr/0013-agent-browser-runtime.md)        | MVP のブラウザ実行基盤に agent-browser を使用する判断                             | execution                    |
+| [adr/0014](../adr/0014-core-split-ports-adapters.md)    | core を機能単位に分割し Ports and Adapters を採用する判断                         | DesignDoc.md                 |
+| [adr/0015](../adr/0015-web-ui-own-implementation.md)    | Web UI を dashboard の fork ではなく自前実装とする判断                            | web-editor                   |
+| [adr/0016](../adr/0016-dual-agent-protocol.md)          | agent interface に MCP と App Server 型 JSON-RPC の両方を採用する判断             | agent-interface              |
+| [adr/0017](../adr/0017-agent-draft-boundary.md)         | エージェントの操作範囲を draft までとし確定に人間の承認を要する判断               | agent-interface              |
+| [adr/0018](../adr/0018-ir-version-pinning.md)           | 再生中の要素定義編集を run 単位の IR version 固定で反映する判断                   | execution                    |
+| [adr/0019](../adr/0019-agent-led-ai-suggestions.md)     | AI 候補生成をエージェント主導とし adapter/ai を MVP 実装対象外とする判断          | ai-suggestions               |
+| [adr/0020](../adr/0020-suggestion-pull-queue.md)        | 人間起点の提案依頼を pull 型キューで実現する判断                                  | agent-interface              |
+| [adr/0021](../adr/0021-agent-interface-authz.md)        | agent interface の認可をループバック限定とローカルトークンで行う判断              | agent-interface              |
+| [adr/0022](../adr/0022-auth-state-storage.md)           | 認証状態を暗号化 Storage State で保持し実行時パラメータで指定する判断             | execution                    |
+| [adr/0023](../adr/0023-composition-root.md)             | 合成ルートを apps/server に置き app から adapter への依存を禁じる判断             | DesignDoc.md                 |
+| [adr/0024](../adr/0024-http-framework.md)               | HTTP / WebSocket framework に Hono を採用する判断                                 | web-editor / agent-interface |
+| [adr/0025](../adr/0025-image-diff-library.md)           | 画像差分に pixelmatch と ssim.js を採用する判断                                   | change-detection             |
 
 ## Open Questions / Future Work
 
 ### Open Questions
 
-実装着手前に決めるべき未決事項はない。過去の 3 件はいずれも ADR として確定した。
+**実装着手前に決めるべき未決事項は残っていない。** 過去の 5 件はいずれも ADR として確定した。
 
-| 決着した未決事項                         | 決定                                                       | ADR                                              |
-| ---------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| 再生中に編集した要素定義の反映タイミング | run 単位で Workflow IR の version を固定し再開時に差し替え | [adr/0018](../adr/0018-ir-version-pinning.md)    |
-| agent interface の認可方式               | ループバック限定とローカルトークン                         | [adr/0021](../adr/0021-agent-interface-authz.md) |
-| 認証状態の保存方式                       | 暗号化 Storage State と実行時プロファイル参照              | [adr/0022](../adr/0022-auth-state-storage.md)    |
-
-実装着手までに残っているのは次の 1 件で、いずれも着手を止めない。
-
-| 残っている未決                | 現状                                                           | 決める時期                  |
-| ----------------------------- | -------------------------------------------------------------- | --------------------------- |
-| HTTP / WebSocket の framework | [adr/0001](../adr/0001-tech-stack.md) が Hono を第一候補とする | `packages/api` の実装 issue |
+| 決着した未決事項                         | 決定                                                | ADR                                              |
+| ---------------------------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| 再生中に編集した要素定義の反映タイミング | run 単位で Workflow IR の版を固定し再開時に差し替え | [adr/0018](../adr/0018-ir-version-pinning.md)    |
+| agent interface の認可方式               | ループバック限定とローカルトークン                  | [adr/0021](../adr/0021-agent-interface-authz.md) |
+| 認証状態の保存方式                       | 暗号化 Storage State と実行時プロファイル参照       | [adr/0022](../adr/0022-auth-state-storage.md)    |
+| HTTP / WebSocket の framework            | Hono (listen は合成ルートが行う)                    | [adr/0024](../adr/0024-http-framework.md)        |
+| 画像差分のライブラリ                     | pixelmatch と ssim.js                               | [adr/0025](../adr/0025-image-diff-library.md)    |
 
 個別の feature や adapter の実装時に判断する事項は、各 ADR の「未確認事項」、各 feature doc の Open Questions、[context/engineering.md](../context/engineering.md) に記載する。`adapter/ai` を前提とする未決 ([ai-suggestions feature](features/ai-suggestions/DesignDoc_ai-suggestions.md)) は MVP の対象外であり、着手条件にならない。
 

@@ -20,7 +20,7 @@
 - **MCP server と App Server 型 JSON-RPC の両方を提供する**。
 - 両プロトコルは同じ tool 語彙・同じ JSON Schema を共有し、agent モジュール内の共通マッピング層が app use case へ 1:1 で変換する。プロトコル固有の処理 (通知・タスク形式) だけを各サーバ実装に置く。
 - 分担: 汎用エージェントからの操作は MCP、常駐・低遅延が要る統合は JSON-RPC。
-- **提案依頼の取得 (`suggestion.list`) は App Server 型 JSON-RPC でロングポーリングさせる**。MCP ではポーリング間隔がそのまま遅延になる。プロトコル対応の詳細は [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) を正本とする。
+- **提案依頼の取得 (`suggestion.list`) は App Server 型 JSON-RPC でロングポーリングさせる**。MCP 側は依頼リストをリソースとして購読させ、通知を合図に取りに来させる ([adr/0020](0020-suggestion-pull-queue.md))。購読を張らないクライアントではポーリング間隔がそのまま遅延になる。プロトコル対応の詳細は [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) を正本とする。
 
 ## 代替案
 

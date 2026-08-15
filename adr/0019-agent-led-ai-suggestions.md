@@ -50,6 +50,16 @@ flowchart LR
 
 Workflow Server は LLM credential を持たない。破線は MVP で実装しない経路を示す。
 
+### OpenAI (Codex) 側の調査結果
+
+Anthropic 側と同じく、**第三者プロダクトからサブスクリプションの credential を使わせる形は取れない**。
+
+- OpenAI の利用規約は、サービスを「自動的またはプログラム的に」利用・抽出することを禁じている。
+- Codex にはプログラム利用向けの料金表が別に用意されており、サブスクリプションとは課金の枠が分かれている。
+- サブスクリプション認証を前提とするモデルも存在するが、それを第三者プロダクトが代理で使う形は規約上グレーである。
+
+いずれにせよ **本決定は変わらない**。仮に Codex 側で許容されても、Claude Code の利用者には提供できない機能になり、プロダクトとして成立しないためである。
+
 ## 代替案
 
 - **OAuth によるサブスクリプション直接利用** ([adr/0009](0009-ai-adapter-auth.md) の決定): 技術的には成立する。Claude Agent SDK の Streaming Input Mode は常駐セッションと `--json-schema` による構造化出力を提供しており、AI Port の契約 (入力 + 出力 Schema から検証済みオブジェクトを得る) にそのまま嵌る。しかし背景に挙げた規約が禁じる形に該当するため却下。
@@ -84,9 +94,9 @@ Workflow Server は LLM credential を持たない。破線は MVP で実装し�
   - [adr/0009](0009-ai-adapter-auth.md) の状態を「ADR-0019 に置換」へ変更する
   - [adr/0010](0010-ai-data-boundary.md) の送信境界の理由付けを、送信先がローカルのエージェントである前提に見直す
   - [design/DesignDoc.md](../design/DesignDoc.md): モジュール責務表の adapter/ai を MVP 実装対象外と明記、Container 図から AI サービスへの線を削除、スコープの「AI による要素名、種別、Locator 候補の提案」の位置づけを修正、ADR 表に本 ADR を追加する
-  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) を改訂する (provider 抽象と credential 解決層を落とし、AI Port の実装候補と適用時期の整理へ差し替える)
+  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) を改訂する (provider 抽象と credential 解決層を落とし、AI Port の実装候補と適用時期の整理へ差し替える) — 実施済み
   - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する — 実施済み
-- 未確認事項: OpenAI (Codex) のサブスクリプションのプログラム利用規定。将来 adapter/ai を実装する際に確認する。
+- 未確認事項: なし。OpenAI 側も調査した結果、本決定は変わらない (下記)。
 
 ## 関連ドキュメント / チケット
 

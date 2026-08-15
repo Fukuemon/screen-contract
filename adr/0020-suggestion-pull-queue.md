@@ -21,6 +21,7 @@
 - **サーバからエージェントへ要求を push する方式は採らない**。
 - **依頼を特定のエージェントへ排他的に割り当てない**。複数のエージェントが同じ依頼に回答した場合、回答は複数の draft として並び、人間が選ぶ。
 - 依頼が回答されないまま期限を過ぎた場合は `expired` とし、Web UI は手動で名付ける導線へ戻す。これにより [adr/0019](0019-agent-led-ai-suggestions.md) の「AI なしでも要素マッピングが完結する」要件を、この経路が壊さないことを保証する。
+- **未処理の依頼リストを購読可能なリソースとしても公開する** (後述)。契約は pull のままで、待ち時間だけを縮める。
 
 依頼から回答までの流れを示す。
 
@@ -43,6 +44,21 @@ sequenceDiagram
 ```
 
 期限内に回答が来ない場合は `expired` となり、Web UI は手動で名付ける導線へ戻す。
+
+### 待ち時間を縮める経路 (near-push)
+
+MCP の仕様 (2026-07-28) を確認したところ、**リソース購読が使える**。未処理の依頼リストを 1 つのリソースとして公開し、更新を通知する。
+
+| 段階                     | やりとり                                                                    |
+| ------------------------ | --------------------------------------------------------------------------- |
+| サーバの宣言             | `capabilities.resources.subscribe: true`                                    |
+| エージェントの購読       | `subscriptions/listen` に依頼リストの URI を `resourceSubscriptions` で渡す |
+| 依頼が積まれたときの通知 | サーバが `notifications/resources/updated` を送る                           |
+| 取得                     | エージェントが `resources/read`、または `suggestion.list` を呼ぶ            |
+
+**契約は pull のままである。** 通知は「見に来る合図」であって依頼の割り当てではない。通知を取りこぼしても `suggestion.list` のポーリングで追いつけるため、購読は最適化であり前提ではない。
+
+App Server 型 JSON-RPC はロングポーリングで待てるため、購読は要らない ([adr/0016](0016-dual-agent-protocol.md))。
 
 ## 代替案
 
@@ -78,9 +94,9 @@ sequenceDiagram
   - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の tool 語彙に `suggestion` namespace (`suggestion.list` / `suggestion.respond`) を追加する — 実施済み
   - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に依頼の導線と `expired` 時の手動フォールバックを追加する — 実施済み
   - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する — 実施済み
-  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) にキューのデータモデルと状態遷移を追加する
-  - [adr/0016](0016-dual-agent-protocol.md) に、App Server 型 JSON-RPC を採る根拠として `suggestion.list` のロングポーリングを追記する
-- 未確認事項: MCP の `subscriptions/listen` で未処理依頼リストを購読可能リソースとして公開できるか。成立すれば pull を near-push にできる。agent 実装時に仕様を確認する。
+  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) にキューのデータモデルと状態遷移を追加する — 実施済み
+  - [adr/0016](0016-dual-agent-protocol.md) に、App Server 型 JSON-RPC を採る根拠として `suggestion.list` のロングポーリングを追記する — 実施済み
+- 未確認事項: なし。MCP の仕様 (2026-07-28) を確認し、リソース購読で near-push にできることを確かめた (下記)。
 
 ## 関連ドキュメント / チケット
 
