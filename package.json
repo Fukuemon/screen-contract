@@ -29,7 +29,6 @@
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.6.2",
     "turbo": "^2.10.9",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vitest": "^4.1.10"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

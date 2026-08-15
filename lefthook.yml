@@ -7,8 +7,14 @@ pre-commit:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-commit
-    format:
-      run: hooks/format/run_prettier.sh
+    # 配布物の hooks/format/run_prettier.sh は使わない。整形後に
+    # `git add <ファイル全体>` するため、部分 stage したファイルの未 stage 変更まで
+    # commit に巻き込む。lefthook の stage_fixed で同じことを安全に行う。
+    # (配布物はテンプレ側でのみ編集できるため、ここで置き換えている)
+    prettier:
+      glob: "*.{md,yml,yaml,json,css}"
+      run: pnpm exec prettier --write --ignore-unknown -- {staged_files}
+      stage_fixed: true
     # TypeScript / JavaScript の整形と lint。prettier は .prettierignore で
     # これらを除外しており、ここが担当する (context/engineering.md)。
     # 型検査は入れない。TypeScript 7 は tsc にファイルパスを渡せないため、

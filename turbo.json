@@ -13,7 +13,7 @@
       "cache": false
     },
     "e2e": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["@screen-contract/server#build"],
       "cache": false
     }
   }

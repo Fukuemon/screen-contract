@@ -28,6 +28,33 @@ module.exports = {
       to: { path: "^apps/" },
     },
     {
+      name: "apps-not-to-apps",
+      severity: "error",
+      comment:
+        "apps 同士も参照しない。デプロイ単位は互いに独立したプロセスであり、繋ぐと片方の変更が他方の配布物へ波及する (ADR-0023)。",
+      from: { path: "^apps/([a-z-]+)/" },
+      to: { path: "^apps/", pathNot: "^apps/$1/" },
+    },
+    {
+      name: "app-not-to-interface",
+      severity: "error",
+      comment:
+        "依存は interface → app の一方向。app から interface を参照すると逆流する (context/architecture.md)。",
+      from: { path: "^packages/app/" },
+      to: { path: "^packages/(api/|agent/)" },
+    },
+    {
+      name: "adapter-not-outward",
+      severity: "error",
+      comment:
+        "adapter は Port を実装するだけ。interface 層と他の adapter、fixture へは依存しない (context/architecture.md)。",
+      from: { path: "^packages/adapter-([a-z-]+)/" },
+      to: {
+        path: "^packages/(api/|agent/|fixture-app/|adapter-)",
+        pathNot: "^packages/adapter-$1/",
+      },
+    },
+    {
       name: "interface-not-to-core-adapter",
       severity: "error",
       comment: "interface は app のみに依存する。use case を経由せず境界が崩れるため。",

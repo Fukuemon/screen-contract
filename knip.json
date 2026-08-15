@@ -1,16 +1,37 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    "packages/*": {},
-    "packages/config": {
-      "entry": ["tsconfig/*.json"],
-      "project": ["**/*.ts"]
+    ".": {
+      "entry": [],
+      "project": []
     },
-    "apps/*": {},
+    "packages/*": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/config": {
+      "entry": ["tsconfig/*.json", "vitest/*.ts"],
+      "project": ["vitest/**/*.ts"]
+    },
+    "apps/server": {
+      "entry": [
+        "src/bin/serve.ts",
+        "src/**/*.test.ts",
+        "src/**/*.integration.test.ts"
+      ],
+      "project": ["src/**/*.ts"]
+    },
+    "apps/web": {
+      "entry": ["src/main.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "apps/mcp-bridge": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "e2e": {
-      "entry": ["src/**/*.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@screen-contract/server"]
+      "entry": ["src/**/*.ts", "scripts/*.mjs"],
+      "project": ["src/**/*.ts", "scripts/*.mjs"]
     }
   }
 }

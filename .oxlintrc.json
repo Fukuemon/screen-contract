@@ -14,7 +14,8 @@
               "@screen-contract/core-*",
               "@screen-contract/app",
               "@screen-contract/adapter-*",
-              "@screen-contract/agent"
+              "@screen-contract/agent",
+              "@screen-contract/domain"
             ]
           }
         ]
