@@ -99,9 +99,34 @@ URL は `screen / state / run` を表し、リロードしても同じ文脈に�
 | 選択モード (既定) | 要素選択。実ページへ転送しない | 座標を `element.candidates` の query に使う (execution の「座標 query は操作に含まない」に対応) |
 | 操作モード        | 実ページ操作。転送する         | 入力を Stream 経路で agent-browser へ転送 (再開時の前提再検証は execution の責務)               |
 
+操作モードには**記録の入り / 切り**がある ([adr/0026](../../../adr/0026-operation-recording.md))。既定は切りとする。操作モードの主用途は探索であり、探索のたびに steps が増えると draft が汚れるためである。
+
 - 再生中 (running) は viewport への入力を受け付けない (閲覧のみ)。モード切替は一時停止中だけ有効。
 - 操作モード中は「再開時に前提の再検証が走る」ことを UI 上に明示する (黙って巻き戻さない)。
 - **選択モードで要素定義を編集した場合も同じ明示を出す。** 編集した run を再開すると Workflow IR の版が差し替わり、前提の再検証と巻き戻しが起きる ([adr/0018](../../../adr/0018-ir-version-pinning.md))。操作モードだけの注意にすると、編集による巻き戻しが不意打ちになる。
+
+### 操作の記録 → draft のフロー
+
+DSL を書けない利用者でも画面仕様を起こせるようにする ([adr/0026](../../../adr/0026-operation-recording.md))。**操作して、Expectation を選び、承認する**だけで正本ができる。
+
+```mermaid
+flowchart TD
+    start["操作モードで記録を開始<br/>(記録中であることを常時表示)"] --> op["ブラウザを操作する"]
+    op --> rec["server が入力を要素へ解決し<br/>steps の draft を組み立てる"]
+    rec --> stop["記録を停止"]
+    stop --> review["記録した steps を確認する<br/>(解決できなかった操作は警告つき)"]
+    review --> expect["操作後の Snapshot から<br/>Expectation の候補を提示"]
+    expect --> pick["人が取捨選択する"]
+    pick --> place["どの状態の遷移として置くか決める"]
+    place --> approve["承認して正本へ"]
+```
+
+UI 上の要点を挙げる。
+
+- **記録中であることを常時表示する。** 黙って記録しない。停止も明示操作とする。
+- 一意な Locator へ解決できなかった操作は `clickPoint` として残り、**警告を出す**。無視して承認できるが、脆い DSL になることを示す。
+- **Expectation を選ばずに承認できてしまう点を明示する。** 選ばないと期待状態を持たないステップになり、冪等スキップが効かず毎回実行される ([execution feature](../execution/DesignDoc_execution.md))。
+- 記録した steps をどの状態の遷移として置くかは機械的に決まらない。**人が選ぶ**。
 
 ### 要素選択 → draft → 再採番のフロー
 

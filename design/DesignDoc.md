@@ -112,6 +112,7 @@ AI エージェント操作 (agent):
 interface・保存:
 
 - Web UI によるライブ画面表示と操作転送
+- **操作の記録による DSL の draft 生成** ([adr/0026](../adr/0026-operation-recording.md))
 - Web UI による要素選択、採番、編集
 - 実行履歴と生成成果物の保存
 
@@ -175,7 +176,7 @@ agent-browser には組み込みの dashboard (Next.js 製) があり、WebSocke
 - 利用者は agent-browser を直接導入・操作しない。本システムが同梱し adapter/browser が管理する内部実装であり、利用者の接点は DSL、Web UI、agent interface に限る。利用者の資産 (DSL・仕様書・POM。POM は Page Object Model) は実行基盤に依存しない語彙で書かれ、Browser Port の別実装で実行基盤を差し替えても引き継がれる。
 - 対象画面は、検証可能な開発環境またはテスト環境で起動できる。
 - 動的データは Fixture、Mock、固定入力のいずれかによって再現可能にする。
-- DSL は YAML で記述し、Schema で検証する。
+- DSL は YAML で記述し、Schema で検証する。書く手段は、手書き / エージェント / **操作の記録** の 3 つとする ([adr/0026](../adr/0026-operation-recording.md))。いずれも出力は draft であり、正本は DSL のまま変わらない。
 - 実行系は YAML を直接扱わず、core/workflow が正規化した Workflow IR を使用する。
 - 要素の同一性には永続的な要素 ID を使用し、構成番号を識別子として使用しない。
 - agent-browser の一時的な要素参照は DSL へ保存しない。
@@ -394,6 +395,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0023](../adr/0023-composition-root.md)             | 合成ルートを apps/server に置き app から adapter への依存を禁じる判断             | DesignDoc.md                 |
 | [adr/0024](../adr/0024-http-framework.md)               | HTTP / WebSocket framework に Hono を採用する判断                                 | web-editor / agent-interface |
 | [adr/0025](../adr/0025-image-diff-library.md)           | 画像差分に pixelmatch と ssim.js を採用する判断                                   | change-detection             |
+| [adr/0026](../adr/0026-operation-recording.md)          | 操作の記録を DSL の draft を書く手段として提供する判断                            | web-editor / workflow-dsl    |
 
 ## Open Questions / Future Work
 
