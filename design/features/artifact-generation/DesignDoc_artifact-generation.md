@@ -7,7 +7,7 @@ keywords:
   [注釈画像, Markdown テーブル, 決定的生成, バッジ, 書き換え抑止, core/artifact]
 governs:
   - packages/core-artifact/
-verified_commit: 6422cca632d7f5e4851fb0597cea65904a1ed28d
+verified_commit: f0e228a2d8dc16cb24b8d36710cfd27a271b594f
 ---
 
 # Feature 設計: 仕様成果物生成 (core/artifact)

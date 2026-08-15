@@ -6,7 +6,7 @@ keywords:
   [infrastructure, deployment, environment, secret, token, storage state]
 governs:
   - .github/
-verified_commit: 6422cca632d7f5e4851fb0597cea65904a1ed28d
+verified_commit: f0e228a2d8dc16cb24b8d36710cfd27a271b594f
 ---
 
 # Infrastructure & Operations
