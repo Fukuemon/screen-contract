@@ -152,10 +152,13 @@ flowchart TD
     appuc --> num
     appuc --> cand
     cand --> loc
-    cand -. 候補の補強を委任 .-> aiport
-    aiadp["adapter/ai"] -. 実装 .-> aiport
+    cand -. "候補の補強を委任<br/>(将来の経路。MVP では実装しない)" .-> aiport
     browser["adapter/browser"] -- Snapshot / 座標 / DOM を提供<br/>(app 経由の入力値) --> cand
+    queue["app: 提案依頼キュー"] -- "依頼を積む / 応答を受ける" --> appuc
+    agentcli["AI エージェント"] -- "suggestion.list / respond" --> queue
 ```
+
+**MVP では AI Port を実装しない** ([adr/0019](../../../adr/0019-agent-led-ai-suggestions.md))。候補の補強はエージェント自身の推論で行い、提案依頼キュー経由でやり取りする ([adr/0020](../../../adr/0020-suggestion-pull-queue.md))。AI Port は型として残すが、`adapter/ai` は作らない。
 
 ### フロー / シーケンス (要素選択 → 定義の draft 化)
 
@@ -164,12 +167,16 @@ flowchart TD
     A["利用者が viewport 上で<br/>クリック (一時停止中)"] --> B["adapter/browser が座標 +<br/>Snapshot を取得"]
     B --> C["CandidateExtractor が<br/>候補列を正規化"]
     C --> D{"候補で十分?"}
-    D -->|不足| E["AI Port へ名称・種別・<br/>Locator 候補を要求"]
-    E --> F
+    D -->|不足| E["提案依頼キューへ積む<br/>(pending)"]
+    E --> E2{"エージェントの応答"}
+    E2 -->|answered| F
+    E2 -->|expired| F
     D -->|十分| F["利用者 / エージェントが<br/>候補を選択・編集 (draft)"]
     F --> G["再採番の計算 →<br/>NumberingPlan を draft へ"]
     G --> H["承認 (構成番号の確定) で<br/>Screen 文書の正本に反映"]
 ```
+
+候補が不足したときも**手を止めない**。依頼を積んだうえで利用者はそのまま手で名付けられ、`expired` になっても同じ導線へ戻る。AI が居なくても完結することが要件である。
 
 ## 主要シナリオ / フロー
 
@@ -186,4 +193,5 @@ flowchart TD
 - 再採番: 追加・削除・移動それぞれで状態ごとの badges と対応表が正しいこと。
 - Locator 解決: resolved / not-found / ambiguous の分類、属性 AND の一致規則、index の序数解決、all の全件列挙。
 - 候補抽出: 座標 → 最小ノード選択、祖先候補列の順序、一意にならない Locator を提案しないこと。
-- AI Port: 出力 Schema の検証 (自由文・未知種別の拒否)、draft 以外へ書き込まないこと (fake 実装で検証)。
+- 提案依頼キュー: 依頼が `pending` で積まれること、応答で `answered` になること、期限超過で `expired` になり手動の導線へ戻せること。エージェントの応答が来なくても要素定義を作れること。
+- AI Port: 型としてのみ存在する。実装は MVP に無いため、テスト対象は fake 実装での出力 Schema 検証 (自由文・未知種別の拒否) と draft 以外へ書き込まないことに限る。

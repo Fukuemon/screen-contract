@@ -81,10 +81,10 @@ DSL には認証への参照を持たせない。同じ Screen 文書を複数�
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「認証状態の保存方式」を削除する
-  - [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](../design/features/workflow-dsl/DesignDoc_workflow-dsl.md) に、DSL が認証を持たない決定とその理由を記載する (Schema の決定事項)
-  - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の Browser Port 契約に認証コンテキストを追加し、エラーコードに `auth/expired` を追加する
-  - [design/features/change-detection/DesignDoc_change-detection.md](../design/features/change-detection/DesignDoc_change-detection.md) と [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md) の Baseline 識別子に `authProfile` を反映する
-  - [context/infrastructure.md](../context/infrastructure.md) に保存場所、暗号化方式、取り込み導線、失効時の扱いを記載する
+  - [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](../design/features/workflow-dsl/DesignDoc_workflow-dsl.md) に、DSL が認証を持たない決定とその理由を記載する (Schema の決定事項) — 実施済み
+  - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の Browser Port 契約に認証コンテキストを追加し、エラーコードに `auth/expired` を追加する — 実施済み
+  - [design/features/change-detection/DesignDoc_change-detection.md](../design/features/change-detection/DesignDoc_change-detection.md) と [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md) の Baseline 識別子に `authProfile` を反映する — 実施済み
+  - [context/infrastructure.md](../context/infrastructure.md) に保存場所、暗号化方式、取り込み導線、失効時の扱いを記載する — 実施済み
 
 ## 関連ドキュメント / チケット
 

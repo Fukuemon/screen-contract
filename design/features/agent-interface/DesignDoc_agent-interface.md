@@ -48,7 +48,8 @@ agent はドメインロジックを持たず、すべての tool は app 層の
 
 - use case の実装 → app 層 (tool は呼ぶだけ)
 - 実行イベントの語彙定義 → execution feature ([DesignDoc_execution.md](../execution/DesignDoc_execution.md))
-- 認可方式の決定 → Open Question「agent interface の認可方式」(ローカル無認証 / トークン / OAuth。MCP 現行仕様の認可強化 — 標準 OAuth / OIDC 準拠、Client ID Metadata Documents — が検討材料)
+- 認可の実装配置と secret の置き場 → [context/infrastructure.md](../../../context/infrastructure.md) (本書は経路ごとの認証要件だけを示す)
+- リモート公開時の OAuth / OIDC → 実用最小限の製品 (MVP) の対象外 ([adr/0021](../../../adr/0021-agent-interface-authz.md))
 - 人間向け UI → web-editor feature
 - エージェント側の実装 (Claude Code の skill や Codex の設定) → 利用者のドキュメント (Future Work)
 
@@ -63,30 +64,60 @@ agent はドメインロジックを持たず、すべての tool は app 層の
 
 ### tool 語彙 (MVP)
 
-| namespace | tool                                                     | 内容                                                                                         |
-| --------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| screen    | `screen.list` / `screen.get`                             | Screen 文書の一覧・取得 (draft と正本の別を含む)                                             |
-| screen    | `screen.save_draft`                                      | Screen 文書の draft 保存。保存時に Schema 検証 + 正規化検査を行い、構造化エラーを返す        |
-| workflow  | `workflow.list` / `workflow.get` / `workflow.save_draft` | Workflow 文書の一覧・取得・draft 保存                                                        |
-| run       | `run.start`                                              | 対象 (screen, state または workflow) を指定して実行を開始する                                |
-| run       | `run.pause` / `run.resume` / `run.rerun_step`            | 再生制御 (意味論は execution feature)                                                        |
-| run       | `run.get` / `run.events`                                 | 実行状態の取得、イベント列の取得 (後述の配信も参照)                                          |
-| element   | `element.candidates`                                     | 座標または Snapshot 問い合わせから要素候補列を得る                                           |
-| element   | `element.renumber`                                       | 再採番を計算し NumberingPlan を draft に反映する                                             |
-| artifact  | `artifact.preview`                                       | draft の内容で成果物 (注釈画像・テーブル) を試し生成する。Baseline は更新しない              |
-| diff      | `diff.compare`                                           | 現在の draft / 実行結果を Baseline と比較し、分類済み差分を返す                              |
-| approval  | `approval.request` / `approval.status`                   | 指定した draft (DSL 変更・NumberingPlan・Baseline 更新) の承認を人間へ依頼し、状態を確認する |
+| namespace  | tool                                                     | 内容                                                                                                          |
+| ---------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| screen     | `screen.list` / `screen.get`                             | Screen 文書の一覧・取得 (draft と正本の別を含む)                                                              |
+| screen     | `screen.save_draft`                                      | Screen 文書の draft 保存。保存時に Schema 検証 + 正規化検査を行い、構造化エラーを返す                         |
+| workflow   | `workflow.list` / `workflow.get` / `workflow.save_draft` | Workflow 文書の一覧・取得・draft 保存                                                                         |
+| run        | `run.start`                                              | 対象 (screen, state または workflow) を指定して実行を開始する                                                 |
+| run        | `run.pause` / `run.resume` / `run.rerun_step`            | 再生制御 (意味論は execution feature)                                                                         |
+| run        | `run.get` / `run.events`                                 | 実行状態の取得、イベント列の取得 (後述の配信も参照)                                                           |
+| element    | `element.candidates`                                     | 座標または Snapshot 問い合わせから要素候補列を得る                                                            |
+| element    | `element.renumber`                                       | 再採番を計算し NumberingPlan を draft に反映する                                                              |
+| artifact   | `artifact.preview`                                       | draft の内容で成果物 (注釈画像・テーブル) を試し生成する。Baseline は更新しない                               |
+| diff       | `diff.compare`                                           | 現在の draft / 実行結果を Baseline と比較し、分類済み差分を返す                                               |
+| approval   | `approval.request` / `approval.status`                   | 指定した draft (DSL 変更・NumberingPlan・Baseline 更新) の承認を人間へ依頼し、状態を確認する                  |
+| suggestion | `suggestion.list` / `suggestion.respond`                 | 人間が出した候補生成の依頼を取り出し、推論結果を返す ([adr/0020](../../../adr/0020-suggestion-pull-queue.md)) |
+
+### 認可 ([adr/0021](../../../adr/0021-agent-interface-authz.md))
+
+常駐サーバは **127.0.0.1 にのみ bind する**。接続経路ごとに要件が異なる。
+
+| 接続経路               | 認証                                   | 備考                                                 |
+| ---------------------- | -------------------------------------- | ---------------------------------------------------- |
+| MCP (stdio)            | エージェント側は**認証情報を持たない** | MCP ブリッジがループバック側でトークンを付与する     |
+| App Server 型 JSON-RPC | ローカルトークン + Origin 検査         | クライアントがトークンファイルを読む                 |
+| Stream Proxy           | 同上                                   | 経路は [adr/0008](../../../adr/0008-stream-proxy.md) |
+
+**MCP ブリッジ** (`apps/mcp-bridge`) は、エージェントが stdio で起動する薄い転送プロセスである。tool 語彙を解釈せず、JSON-RPC のフレームをループバックへ転送してトークンを付与する。ブリッジ自身は依存グラフの終端であり、app / core を参照しない。
+
+ブリッジが転送してよい method は **agent tool 語彙に限る**。全経路を素通しさせると、stdio を握った任意のプロセスがトークンなしで Stream Proxy と管理系へ到達でき、ADR-0021 が却下した「無認証ポートの公開」と同じ状態になる。
+
+### 提案依頼キュー ([adr/0020](../../../adr/0020-suggestion-pull-queue.md))
+
+人間が Web UI から候補生成を依頼し、エージェントが `suggestion.list` で取り出して `suggestion.respond` で返す **pull 型**とする。サーバからエージェントへ push しない。
+
+| 状態       | 意味                                         |
+| ---------- | -------------------------------------------- |
+| `pending`  | 依頼が積まれ、まだ誰も応答していない         |
+| `answered` | いずれかのエージェントが応答した             |
+| `expired`  | 期限を過ぎた。人間が手動で名付ける導線へ戻す |
+
+**排他的な割り当てをしない。** 複数のエージェントが同じ依頼を取り出してよく、先に `suggestion.respond` した応答を採る。割り当てを持つと、応答しないエージェントに依頼が滞留する。
+
+`expired` を用意するのは、**AI が居なくても完結する**という要件を守るためである。応答が無いまま待ち続けさせない。
 
 ### プロトコル対応
 
 MCP は **stateless 化後の現行仕様**に準拠する (版・変更点は末尾の参考リンク)。旧仕様の initialize ハンドシェイク・プロトコルセッション・任意の server 通知を前提にしない。
 
-| 観点          | MCP server                                                          | App Server 型 JSON-RPC                      |
-| ------------- | ------------------------------------------------------------------- | ------------------------------------------- |
-| 接続          | エージェント設定に 1 行追加 (標準)。stateless (セッションなし)      | 専用クライアント実装が必要 (接続実装は容易) |
-| tool 呼び出し | MCP tools (上表と同名)。run id 等はサーバ発行ハンドルとして引数渡し | JSON-RPC method (同名・同 Schema)           |
-| 実行イベント  | Tasks 拡張 + `run.events` ポーリング (後述)                         | 双方向ストリームでサーバ push (低遅延)      |
-| 想定用途      | 汎用エージェントからの操作                                          | 常駐・低遅延が要る統合 (エディタ拡張等)     |
+| 観点           | MCP server                                                          | App Server 型 JSON-RPC                                                          |
+| -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 接続           | エージェント設定に 1 行追加 (標準)。stateless (セッションなし)      | 専用クライアント実装が必要 (接続実装は容易)                                     |
+| tool 呼び出し  | MCP tools (上表と同名)。run id 等はサーバ発行ハンドルとして引数渡し | JSON-RPC method (同名・同 Schema)                                               |
+| 実行イベント   | Tasks 拡張 + `run.events` ポーリング (後述)                         | 双方向ストリームでサーバ push (低遅延)                                          |
+| 提案依頼の取得 | `suggestion.list` を短い間隔でポーリングする                        | ロングポーリングで待てる ([adr/0016](../../../adr/0016-dual-agent-protocol.md)) |
+| 想定用途       | 汎用エージェントからの操作                                          | 常駐・低遅延が要る統合 (エディタ拡張等)                                         |
 
 - 両プロトコルは同じ tool 語彙・同じ JSON Schema を共有し、agent モジュール内の共通マッピング層が app use case へ変換する。プロトコル固有の処理 (通知・タスクの形式) だけを各サーバ実装に置く。
 - イベントの語彙・順序は execution feature の ExecutionEvent と同一。プロトコルによって内容が変わらない。
@@ -113,16 +144,21 @@ sequenceDiagram
     AG->>IF: screen.save_draft / element.renumber
     IF->>APP: draft 更新
     APP-->>AG: 検証結果 (構造化エラー or 成功)
-    AG->>IF: approval.request (対象 draft)
-    IF->>APP: 承認依頼を登録
-    APP-->>HU: Web UI に承認待ちを表示
+    AG->>IF: approval.request (対象 draft + revision)
+    IF->>APP: 承認依頼を登録 (revision を固定)
+    APP-->>HU: Web UI に承認待ちを表示 (固定した revision の内容)
     HU->>APP: 内容を確認して承認 / 差し戻し
+    APP->>APP: 現在の draft と revision を照合
     AG->>IF: approval.status
-    IF-->>AG: approved / rejected / pending (+差し戻し理由)
+    IF-->>AG: approved / rejected / pending / stale (+差し戻し理由)
 ```
 
 - 差し戻しには人間のコメントを構造化して含め、エージェントが修正 → 再依頼のループを回せるようにする。
 - 承認待ちの間もエージェントは他の draft 作業を継続できる (承認はブロッキングでない)。
+
+**`approval.request` は対象 draft の revision を固定する。** 固定しないと、承認はブロッキングでないため、依頼後にエージェントが編集した内容まで、人間が見ていない差分のまま確定してしまう。承認時に現在の draft の revision と照合し、一致しなければ確定せず `stale` を返して再確認を求める。
+
+revision は draft の内容から決まる値とする。編集していなければ同じ値になり、1 文字でも変われば別の値になる。
 
 ### エラー応答の形式
 
@@ -138,13 +174,16 @@ flowchart TD
         rpc["App Server 型<br/>JSON-RPC server"]
         map["共通マッピング層<br/>(tool ↔ use case, Schema 検証)"]
     end
-    cli["AI エージェント<br/>(Claude Code / Codex 等)"] --> mcp
-    cli --> rpc
+    cli["AI エージェント<br/>(Claude Code / Codex 等)"] -->|"stdio"| bridge
+    bridge["MCP ブリッジ (apps/mcp-bridge)<br/>フレームを転送しトークンを付与する<br/>tool 語彙を解釈しない"] -->|"ループバック + トークン"| mcp
+    cli -->|"トークン + Origin 検査"| rpc
     mcp --> map
     rpc --> map
     map --> app["app: use case"]
     app -- ExecutionEvent --> map
 ```
+
+ブリッジを別プロセスにするのは、MCP 利用者にトークンの取り回しを負わせないためである ([adr/0021](../../../adr/0021-agent-interface-authz.md))。ブリッジは `apps/` に置き、依存グラフの終端とする。
 
 ## 主要シナリオ / フロー
 

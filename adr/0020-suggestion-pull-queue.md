@@ -75,9 +75,9 @@ sequenceDiagram
 
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
-  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の tool 語彙に `suggestion` namespace (`suggestion.list` / `suggestion.respond`) を追加する
-  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に依頼の導線と `expired` 時の手動フォールバックを追加する
-  - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する
+  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の tool 語彙に `suggestion` namespace (`suggestion.list` / `suggestion.respond`) を追加する — 実施済み
+  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に依頼の導線と `expired` 時の手動フォールバックを追加する — 実施済み
+  - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する — 実施済み
   - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) にキューのデータモデルと状態遷移を追加する
   - [adr/0016](0016-dual-agent-protocol.md) に、App Server 型 JSON-RPC を採る根拠として `suggestion.list` のロングポーリングを追記する
 - 未確認事項: MCP の `subscriptions/listen` で未処理依頼リストを購読可能リソースとして公開できるか。成立すれば pull を near-push にできる。agent 実装時に仕様を確認する。

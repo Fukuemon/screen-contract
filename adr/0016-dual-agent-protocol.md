@@ -49,7 +49,7 @@
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) の ADR 表を更新、[design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の ADR 参照を更新 — 実施済み
-  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) のプロトコル対応表に、提案依頼の取得における差 (ロングポーリングの可否) を追加する
+  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) のプロトコル対応表に、提案依頼の取得における差 (ロングポーリングの可否) を追加する — 実施済み
 
 ## 関連ドキュメント / チケット
 

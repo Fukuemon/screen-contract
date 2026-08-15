@@ -85,7 +85,7 @@ Workflow Server は LLM credential を持たない。破線は MVP で実装し�
   - [adr/0010](0010-ai-data-boundary.md) の送信境界の理由付けを、送信先がローカルのエージェントである前提に見直す
   - [design/DesignDoc.md](../design/DesignDoc.md): モジュール責務表の adapter/ai を MVP 実装対象外と明記、Container 図から AI サービスへの線を削除、スコープの「AI による要素名、種別、Locator 候補の提案」の位置づけを修正、ADR 表に本 ADR を追加する
   - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) を改訂する (provider 抽象と credential 解決層を落とし、AI Port の実装候補と適用時期の整理へ差し替える)
-  - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する
+  - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する — 実施済み
 - 未確認事項: OpenAI (Codex) のサブスクリプションのプログラム利用規定。将来 adapter/ai を実装する際に確認する。
 
 ## 関連ドキュメント / チケット

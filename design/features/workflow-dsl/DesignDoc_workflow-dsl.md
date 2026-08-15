@@ -79,6 +79,47 @@ DSL は 2 種類の文書からなる。
 
 分離しつつ、**状態遷移のための step は Screen 側にも持つ**。「モーダルを開いた状態」のような画面内の状態は、その画面の関心事であり、Screen 文書内で自己完結して宣言する。
 
+#### Workflow 文書の要素参照
+
+Workflow 文書は**要素定義を持たない**。`click` / `fill` / `hover` / `scroll` は `ref` (要素 ID) を取るため、参照先の解決元を Workflow 側で決める必要がある。
+
+解決元は、その Workflow を参照する Screen 文書の要素定義とする。Workflow は自前の要素定義を持たず、`screen` 引数で受け取った Screen の名前空間で `ref` を解決する。
+
+```yaml
+version: 1
+workflow:
+  id: open-settings
+  params:
+    screen: { type: screen } # 呼び出し側が渡す Screen。ref はこの名前空間で解決する
+  steps:
+    - action: { click: { ref: el-settings } }
+```
+
+解決できない `ref` は正規化の時点で `ref/unresolved` の構造化エラーにする。**実行時まで持ち越さない。**
+
+`open` だけを使う Workflow は要素参照を持たないため `params` を省略できる。
+
+#### 認証は DSL に書かない
+
+DSL は正本としてリポジトリに commit される ([adr/0011](../../../adr/0011-dsl-as-source-of-truth.md))。認証プロファイルは **run の実行時パラメータ**とし、DSL には一切書かない ([adr/0022](../../../adr/0022-auth-state-storage.md))。
+
+書かないことで、**同じ Screen 文書を複数の認証プロファイルで実行できる**。権限ごとに文書を複製せずに済む。
+
+#### 入力値の secret 指定
+
+`fill` の値を DSL に直書きすると、ログインフォームや API キー入力欄の資格情報が平文で commit され、実行イベントとログにも残る。値を DSL に持たない指定を用意する。
+
+```yaml
+- action:
+    fill:
+      ref: el-password
+      secret: login-password # 値は DSL に持たず、実行時に名前で解決する
+```
+
+- `secret` で指定した値は、**StepResult・ExecutionEvent・ログ・成果物のいずれでも伏せる**。実行履歴は永続化されるため、一度入ると後から取り除けない。
+- 解決先の置き場と扱いは [context/infrastructure.md](../../../context/infrastructure.md) を正本とする。
+- `value` と `secret` は排他とする。両方書けると、どちらが使われるか読み手に決められない。
+
 Screen 文書の例 (構造を示すための抜粋。項目名は Schema 確定時に最終化する):
 
 ```yaml
@@ -248,7 +289,21 @@ flowchart TD
     schema --> norm
     norm --> ir
     exec["core/execution"] -- IR を入力に取る --> ir
+    fix["DSL Fix Port<br/>(interface 定義)"]
+    schema -. "修正候補の取得を委任<br/>(将来の経路。MVP では実装しない)" .-> fix
 ```
+
+#### DSL Fix Port の契約
+
+core/workflow が定義する Port で、**検証エラーから修正候補を得る**ためのものである。
+
+| 項目 | 契約                                                                       |
+| ---- | -------------------------------------------------------------------------- |
+| 入力 | 構造化エラー (`code` / `path` / `message`) と、該当箇所の正規化前 DSL 断片 |
+| 出力 | 修正後の DSL 断片の候補列。自由文を返させない (Schema で構造を強制する)    |
+| 制約 | **draft にしか作用しない。** 正本の書き換えも自動適用も行わない            |
+
+**MVP では実装しない** ([adr/0019](../../../adr/0019-agent-led-ai-suggestions.md))。エラーの構造化コードを読んでエージェントが自己修正する経路を主動線とし、Port は型としてのみ残す。実装を伴う判断が必要になった時点で ADR を起こす。
 
 ### フロー / シーケンス (DSL → IR)
 

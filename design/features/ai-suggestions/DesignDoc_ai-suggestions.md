@@ -36,7 +36,7 @@ adapter/ai は、core が定義する Port を実装し、外部 AI サービス
 
 1. **実装する Port** — AI Port (core/element) と DSL Fix Port (core/workflow) の対応。
 2. **provider 抽象と構造化出力** — AI サービス差の閉じ込めと、出力を Schema で強制する仕組み。
-3. **認証** — API キーと OAuth (サブスクリプション連携) の両対応 ([adr/0009](../../../adr/0009-ai-adapter-auth.md))。
+3. **認証** — API キーと OAuth (サブスクリプション連携) の両対応 (ADR-0009。ADR-0019 に置換済み)。
 4. **送信情報の境界** — 既定は Snapshot 断片のみ。設定で明示的に許可したときだけ拡張 ([adr/0010](../../../adr/0010-ai-data-boundary.md))。
 
 adapter/ai の出力はすべて draft への提案であり、DSL・Baseline を直接変更しない (DesignDoc の設計上の前提)。AI サービスへ到達できない場合でも、機械的な候補生成 (core/element の CandidateExtractor) は動作し続ける — AI Port は候補の補強であり、本体機能の前提にしない。
@@ -76,7 +76,7 @@ adapter/ai の出力はすべて draft への提案であり、DSL・Baseline �
 | DSL Fix Port | core/workflow | 検証エラー・実行失敗に対する DSL 修正候補 | 修正案の候補列 (対象箇所 + 変更内容 + 理由)      |
 
 - どちらの Port も出力は draft への提案に限る。adapter/ai が正本 (DSL / Baseline) を書き換える経路は存在しない。
-- DSL Fix Port の契約詳細 (入力に含める検証エラーの形・修正案の Schema) は workflow-dsl feature に定義を追加する (未反映。本書の Open Questions 参照)。
+- DSL Fix Port の契約は [workflow-dsl feature](../workflow-dsl/DesignDoc_workflow-dsl.md) が持つ (反映済み)。
 
 ### provider 抽象と構造化出力
 
@@ -87,7 +87,7 @@ adapter/ai の出力はすべて draft への提案であり、DSL・Baseline �
 
 ### 認証 ([adr/0009](../../../adr/0009-ai-adapter-auth.md))
 
-- API キー (環境変数または設定ファイル) と OAuth (サブスクリプション連携) の両方に対応する。credential の解決は adapter/ai 内の credential 解決層が行い、Port 契約・core・app には露出しない。
+- API キー (環境変数、または `$XDG_STATE_HOME` 配下の設定ファイル。リポジトリ配下には置かない) と OAuth の両方に対応する。credential の解決は adapter/ai 内の credential 解決層が行い、Port 契約・core・app には露出しない。
 - credential は [context/infrastructure.md](../../../context/infrastructure.md) の secret 規約に従って保存し、DSL・ログ・Snapshot・生成成果物へ平文で残さない。
 - OAuth のトークン更新失敗・API キーの認証エラーは「認証エラー」として分類し、再試行しない (エラー分類の節)。
 
@@ -164,7 +164,9 @@ flowchart TD
 
 ## Open Questions
 
-| 未決事項                                  | 選択肢                      | 影響                   | 確認方法                               | 担当               | 期限              |
-| ----------------------------------------- | --------------------------- | ---------------------- | -------------------------------------- | ------------------ | ----------------- |
-| DSL Fix Port の契約の定義先への反映       | workflow-dsl feature へ追記 | Port 契約の正本の所在  | workflow-dsl feature doc の更新で解消  | プロダクト設計担当 | adapter/ai 実装前 |
-| 最初に対応する provider と OAuth 規約確認 | 主要 AI サービスから選定    | 実装順序と利用規約適合 | provider の OAuth 仕様と規約を確認する | プロダクト設計担当 | adapter/ai 実装前 |
+以下はいずれも `adapter/ai` を実装する場合の未決である。**MVP では実装しないため、実装着手の条件にならない** ([adr/0019](../../../adr/0019-agent-led-ai-suggestions.md))。
+DSL Fix Port の契約は [workflow-dsl feature](../workflow-dsl/DesignDoc_workflow-dsl.md) に定義済みで、この表からは解消している。
+
+| 未決事項                                  | 選択肢                   | 影響                   | 確認方法                               | 担当               | 期限              |
+| ----------------------------------------- | ------------------------ | ---------------------- | -------------------------------------- | ------------------ | ----------------- |
+| 最初に対応する provider と OAuth 規約確認 | 主要 AI サービスから選定 | 実装順序と利用規約適合 | provider の OAuth 仕様と規約を確認する | プロダクト設計担当 | adapter/ai 実装前 |

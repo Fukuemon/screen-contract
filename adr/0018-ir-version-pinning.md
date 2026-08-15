@@ -67,8 +67,8 @@ stateDiagram-v2
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「再生中に編集した要素定義の反映タイミング」を削除する
-  - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の実行イベントに `ir-version-changed` を追加し、再開時の version 差し替えを状態遷移に反映する
-  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に、編集後の再開でも前提再検証が走ることの UI 上の明示を追加する
+  - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の実行イベントに `ir-version-changed` を追加し、再開時の version 差し替えを状態遷移に反映する — 実施済み
+  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に、編集後の再開でも前提再検証が走ることの UI 上の明示を追加する — 実施済み
 
 ## 関連ドキュメント / チケット
 

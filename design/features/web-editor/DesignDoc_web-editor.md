@@ -62,7 +62,7 @@ web はドメインロジックを持たず、すべての操作は api 経由�
 - HTTP / WebSocket エンドポイントの定義 → api (本書は接続構成のみ示す)
 - 要素候補の解決規則 → element-mapping feature
 - 差分の分類規則 → change-detection feature
-- 認可・ログイン → Open Question「agent interface の認可方式」と合わせて実装フェーズで扱う (MVP はローカル単一利用者)
+- 認可の実装配置と secret の置き場 → [context/infrastructure.md](../../../context/infrastructure.md) (本書は接続時の要件だけを示す)
 - 視覚デザイン (配色・コンポーネントの見た目) → 実装時に確定する
 
 ## 設計
@@ -101,6 +101,7 @@ URL は `screen / state / run` を表し、リロードしても同じ文脈に�
 
 - 再生中 (running) は viewport への入力を受け付けない (閲覧のみ)。モード切替は一時停止中だけ有効。
 - 操作モード中は「再開時に前提の再検証が走る」ことを UI 上に明示する (黙って巻き戻さない)。
+- **選択モードで要素定義を編集した場合も同じ明示を出す。** 編集した run を再開すると Workflow IR の版が差し替わり、前提の再検証と巻き戻しが起きる ([adr/0018](../../../adr/0018-ir-version-pinning.md))。操作モードだけの注意にすると、編集による巻き戻しが不意打ちになる。
 
 ### 要素選択 → draft → 再採番のフロー
 
@@ -109,10 +110,18 @@ flowchart TD
     A["一時停止 + 選択モードで<br/>viewport をクリック"] --> B["element.candidates で<br/>候補列を取得"]
     B --> C["インスペクタに候補を表示<br/>(最小ノード + 祖先方向の候補)"]
     C --> D["利用者が選択・編集<br/>(名称 / 種別 / Locator)"]
+    C --> S1["候補生成を依頼する<br/>(提案依頼キューへ積む)"]
+    S1 --> S2{"エージェントの応答"}
+    S2 -->|"answered"| D
+    S2 -->|"expired"| D
     D --> E["screen.save_draft で<br/>要素定義を draft 保存"]
     E --> F["element.renumber で<br/>badges の並び直し案を draft へ"]
     F --> G["approval.request または<br/>そのまま編集を継続"]
 ```
+
+候補生成は**人間が依頼を出し、エージェントが取りに来る** pull 型である ([adr/0020](../../../adr/0020-suggestion-pull-queue.md))。Web UI は依頼を積んで状態を表示する。
+
+`expired` になったら、**手動で名付ける導線へ戻す**。待ち続けさせない。AI が居なくても作業が完結することは本プロダクトの要件であり、UI がそれを担保する。
 
 ### 承認と差し戻し
 
@@ -131,6 +140,24 @@ flowchart LR
 
 - web の接続先は Workflow Server (api) の単一エンドポイントのみ ([adr/0008](../../../adr/0008-stream-proxy.md))。agent-browser のポートには接続しない。
 - 映像はフレーム列の中継、入力転送は操作モード時のみ逆方向に流す。
+
+#### 接続時の認証
+
+Web UI もローカルトークンを要求される ([adr/0021](../../../adr/0021-agent-interface-authz.md))。ただし**ブラウザはトークンファイルを読めない**。受け渡しは Workflow Server が配信する HTML への埋め込みで行い、置き場と受け渡しの契約は [context/infrastructure.md](../../../context/infrastructure.md) を正本とする。
+
+**トークンを URL の query に載せない。** URL はブラウザの履歴・`Referer`・サーバのアクセスログに残る。WebSocket は任意のヘッダを付けられないため、接続後の最初のフレームで認証する。
+
+#### 映像と重ね描きの対応付け
+
+bounding box とバッジは映像フレームの上に重ねる。**フレームと Snapshot が別経路で届くため、対応関係を明示的に持つ。**
+
+| 付ける情報                | 用途                                          |
+| ------------------------- | --------------------------------------------- |
+| session / frame の識別子  | どの映像フレームかを一意に決める              |
+| viewport の版と寸法       | 座標系が変わったフレームへ古い box を重ねない |
+| Snapshot が対応する frame | 重ね描きしてよい組み合わせを判定する          |
+
+対応が取れない組み合わせは**描画しない**。持たないと、フレームの欠落や到着順の入れ替わりで、別の画面に box を重ねて誤った要素を選択させる。座標 query も同じ理由で、対応の取れたフレームからのみ発行する。
 
 ### client 状態の持ち方
 

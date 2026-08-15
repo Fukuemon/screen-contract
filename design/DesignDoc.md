@@ -261,16 +261,18 @@ Port は原則、それを使う core が定義する。
 
 ### interface / app / adapter 層
 
-| モジュール      | 責務                                                                                                                          | 実装・依存                             |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                                     | api に依存                             |
-| api             | HTTP API、WebSocket、認可                                                                                                     | app に依存                             |
-| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可             | app に依存                             |
-| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、Store Port の定義                                                     | 各 core に依存。adapter へは依存しない |
-| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                                      | Browser Port を実装                    |
-| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得。**MVP では実装しない** ([adr/0019](../adr/0019-agent-led-ai-suggestions.md)) | AI Port と DSL Fix Port を実装         |
-| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                                           | Store Port を実装                      |
-| 合成ルート      | adapter の具象を選んで app へ注入、api と agent を 1 プロセスへ載せる、起動と終了の管理                                       | 全層に依存してよい                     |
+| モジュール      | 責務                                                                                                                                                 | 実装・依存                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                                                            | api に依存                                          |
+| api             | HTTP API、WebSocket、認可                                                                                                                            | app に依存                                          |
+| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可                                    | app に依存                                          |
+| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、提案依頼キューの保持、外部入力の検証、Store Port の定義                                      | 各 core に依存。adapter と interface へは依存しない |
+| domain          | 全 core が共有する型の定義。**実行時の値を持たない**                                                                                                 | 何にも依存しない                                    |
+| MCP ブリッジ    | stdio とループバックの間で JSON-RPC のフレームを転送し、トークンを付与する。tool 語彙を解釈しない ([adr/0021](../adr/0021-agent-interface-authz.md)) | 何にも依存しない                                    |
+| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                                                             | Browser Port を実装                                 |
+| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得。**MVP では実装しない** ([adr/0019](../adr/0019-agent-led-ai-suggestions.md))                        | AI Port と DSL Fix Port を実装                      |
+| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                                                                  | Store Port を実装                                   |
+| 合成ルート      | adapter の具象を選んで app へ注入、api と agent を 1 プロセスへ載せる、起動と終了の管理                                                              | 全層に依存してよい                                  |
 
 ```mermaid
 flowchart TD
@@ -294,14 +296,17 @@ flowchart TD
         ai["adapter/ai<br/>(MVP 実装なし)"]
         store["adapter/store"]
     end
-    root["合成ルート"]
-    root --> web
+    root["合成ルート (apps/server)"]
+    bridge["MCP ブリッジ (apps/mcp-bridge)<br/>フレームを転送するだけ"]
     root --> api
     root --> agent
     root --> app
     root --> browser
     root --> store
-    web --> api --> app
+    web -. "型のみ" .-> api
+    web -- "HTTP / WebSocket<br/>(別プロセス)" --> root
+    bridge -- "ループバック + トークン" --> root
+    api --> app
     agent --> app
     app --> wf
     app --> exec
@@ -316,6 +321,8 @@ flowchart TD
 
 依存方向は interface → app → core とし、adapter は自身が実装する Port の定義元へ型を通じてのみ依存する。
 実線は実装への依存、破線は Port の型だけへの依存を示す。
+
+**web と MCP ブリッジは合成ルートへ依存しない。** どちらも別プロセスとして起動し、HTTP / WebSocket または stdio で接続する。デプロイ単位 (`apps/`) は互いにコードとして依存しない ([context/architecture.md](../context/architecture.md))。
 
 **adapter を知るのは合成ルートだけである。** app が adapter へ依存すると、Store Port が app にあるため循環し、テスト時の fake 差し替えが実行時分岐になる ([adr/0023](../adr/0023-composition-root.md))。
 
@@ -354,6 +361,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | root task / shared config / quality gate    | [context/engineering.md](../context/engineering.md)       |
 | test 方針                                   | [context/testing.md](../context/testing.md)               |
 | infra / deployment / environment / security | [context/infrastructure.md](../context/infrastructure.md) |
+| 並列で呼ぶ AI エージェントの定義            | [context/ai-agents.md](../context/ai-agents.md)           |
 
 ### Related ADRs / 代替案 (Why: 判断)
 
@@ -397,7 +405,13 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | agent interface の認可方式               | ループバック限定とローカルトークン                         | [adr/0021](../adr/0021-agent-interface-authz.md) |
 | 認証状態の保存方式                       | 暗号化 Storage State と実行時プロファイル参照              | [adr/0022](../adr/0022-auth-state-storage.md)    |
 
-個別の feature や adapter の実装時に判断する事項は、各 ADR の「未確認事項」と [context/engineering.md](../context/engineering.md) に記載する。
+実装着手までに残っているのは次の 1 件で、いずれも着手を止めない。
+
+| 残っている未決                | 現状                                                           | 決める時期                  |
+| ----------------------------- | -------------------------------------------------------------- | --------------------------- |
+| HTTP / WebSocket の framework | [adr/0001](../adr/0001-tech-stack.md) が Hono を第一候補とする | `packages/api` の実装 issue |
+
+個別の feature や adapter の実装時に判断する事項は、各 ADR の「未確認事項」、各 feature doc の Open Questions、[context/engineering.md](../context/engineering.md) に記載する。`adapter/ai` を前提とする未決 ([ai-suggestions feature](features/ai-suggestions/DesignDoc_ai-suggestions.md)) は MVP の対象外であり、着手条件にならない。
 
 ### Future Work
 

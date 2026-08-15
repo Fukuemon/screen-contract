@@ -23,7 +23,7 @@
 - 中間層: 置かない。Workflow Server (api 層) を唯一の backend とし、web 側の server 機能に API ロジックを置かない (規約は [context/architecture.md](../context/architecture.md))
 - lint / format: oxlint + oxfmt。md / yml は oxfmt の対応が安定するまで既存の prettier を併用する
 - unit test: vitest
-- api の HTTP / WebSocket framework は Hono を第一候補とし、確定は feature 設計 (execution / agent-interface) 時に行う
+- api の HTTP / WebSocket framework は Hono を第一候補とする。確定は `packages/api` の実装 issue で行う (feature 設計では判断材料が出なかったため、確定時期を後ろへ移した)
 
 ## 代替案
 
@@ -58,7 +58,8 @@
   - [context/project.yml](../context/project.yml) の commands / naming を確定する
   - [context/toolchain.md](../context/toolchain.md) の標準スタック表を埋める
   - [context/architecture.md](../context/architecture.md) に「web 側 server に API ロジックを置かない」を追記する
-  - monorepo scaffold (pnpm workspace / turborepo / oxlint / oxfmt / vitest 設定) の作成 — 未実施
+  - monorepo scaffold (pnpm workspace / turborepo / oxlint / oxfmt / vitest 設定) の作成 — 実施済み
+  - パッケージの配置 (`apps/` と `packages/` の分け方、合成ルートの位置) は [adr/0023](0023-composition-root.md) で改訂した
 
 ## 関連ドキュメント / チケット
 

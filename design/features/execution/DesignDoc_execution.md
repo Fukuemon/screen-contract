@@ -71,7 +71,7 @@ core/execution は「DSL に書かれたステップ列を、ブラウザ上で�
 
 | 型             | 内容                                                                                                                             | 備考                                          |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Run            | 1 回の実行。workflow 参照、入力、RunStatus、StepResult の列                                                                      | 実行履歴の単位                                |
+| Run            | 1 回の実行。workflow 参照、固定した IR 版、認証コンテキスト、入力、RunStatus、StepResult の列                                    | 実行履歴の単位                                |
 | RunStatus      | `idle → running → paused → (running…) → completed / failed / aborted`                                                            | 遷移は後述の「実行状態と再生制御」            |
 | Step (IR)      | 操作 (action) と期待状態 (expectation) の組。core/workflow が正規化して渡す                                                      | core/execution は IR を変更しない             |
 | Expectation    | 実行後に満たされるべき宣言的条件の集合                                                                                           | 語彙は workflow-dsl が定義。評価は本 feature  |
@@ -89,6 +89,16 @@ core/execution は「DSL に書かれたステップ列を、ブラウザ上で�
 
 Expectation の評価は Snapshot (Accessibility ツリー + 補助情報) を入力とする純粋関数として実装し、Browser Port は Snapshot の取得までを担う。同じ Snapshot に対する評価結果は常に同じである (再現性の要)。
 
+**Expectation を持たないステップは、評価を省いて必ず action を実行する。** 「すべて満たす」を空集合へ素直に適用すると常に真になり、action が一度も実行されないまま `skipped` になる。空集合は「期待状態を宣言していない」ことを意味し、「既に満たしている」ことを意味しない。
+
+### 実行中は Workflow IR の版を固定する
+
+run は開始時に Workflow IR の版を固定し、**実行中は差し替えない** ([adr/0018](../../../adr/0018-ir-version-pinning.md))。固定しないと、途中で要素定義を編集したときにステップ列が入れ替わり、既に記録した StepResult がどの版に対するものか決まらなくなる。
+
+版は Schema のバージョンとは別物で、**正規化した IR の内容から決まる値**とする。編集していなければ同じ値になり、1 文字でも変われば別の値になる。run が使った IR は、後から評価結果を再構成できるよう変更されない形で保存する。
+
+差し替えるのは `resume` と `rerun_step` の直前だけである。差し替えたときは `ir-version-changed` を発行し、前提の再検証と巻き戻しを通常どおり行う。UI はこれを利用者へ明示する (web-editor feature)。
+
 ### 実行状態と再生制御
 
 run の状態遷移を示す。
@@ -100,7 +110,9 @@ stateDiagram-v2
     running --> running : ステップ完了 → 次ステップ
     running --> paused : pause 要求<br/>(実行中ステップの完了後に停止)
     paused --> paused : 要素選択 (座標 query) /<br/>実ページ操作 (許可)
-    paused --> verify : resume / ステップ指定の再実行
+    paused --> pin : resume / ステップ指定の再実行
+    state "IR の版を差し替える<br/>(draft が変わっていれば ir-version-changed)" as pin
+    pin --> verify
     state verify <<choice>>
     verify --> running : 前提をすべて満たす<br/>→ 次ステップから続行
     verify --> rollback : 前提不一致
@@ -120,15 +132,23 @@ stateDiagram-v2
   - すべて満たしていれば次のステップから続行する。
   - 満たさないステップがあれば、**満たさなくなった最初のステップまで巻き戻して再実行する** (冪等スキップがあるため、変わっていない区間は skipped で高速に通過する)。
 - **ステップ単位の再実行**: 利用者は一時停止中に任意の通過済みステップを指定して再実行できる。指定ステップ以降の StepResult は無効化し、そこから再生し直す。
+- **IR の版の差し替えは再検証の前に行う**。差し替えた後の Expectation で前提を評価しないと、古い版の期待状態で巻き戻し先を決めることになる。
 
 ### Browser Port の契約 (core/execution が定義)
 
 | 区分       | 契約                                                                                                                                                                                   |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | セッション | `createSession / closeSession / keepalive`。セッションはページ状態・要素参照を保持する第一級の抽象。一時停止中もセッションを生存させる (keepalive は adapter の責務として契約に含める) |
+| 認証       | `createSession` は**認証コンテキストを必須の引数で受ける** ([adr/0022](../../../adr/0022-auth-state-storage.md))。Storage State の復号と注入は adapter/browser の責務                  |
 | コマンド   | 型付きの action 実行。CLI / SDK の呼び出し形式・JSON パースは adapter 内に閉じ、Port は型付き結果のみ返す                                                                              |
 | 取得       | Snapshot (Accessibility ツリー)、スクリーンショット (バイナリ参照)、現在 URL 等の状態取得                                                                                              |
 | 配信       | ライブ映像ストリームのハンドル取得 (描画は web-editor、転送は adapter/browser の責務)                                                                                                  |
+
+認証コンテキストは省略可能にしない。省略できると「認証なし」が既定になり、意図しないプロファイルでの実行と Baseline の汚染を招く。認証しない場合も匿名であることを明示する。
+
+**復号した Storage State を core / app へ渡さない。** Port が受け取るのはプロファイルの名前だけで、実体の復号と注入は adapter に閉じる。
+
+構造化エラーの語彙に `auth/expired` を持つ。認証状態が失効したときに、呼び出し側が「取り込み直しを促す」判断を機械的にできるようにするためである。
 
 ### コンポーネント構成 (C4 L3)
 
@@ -167,9 +187,13 @@ flowchart TD
 
 発行順序が決定的な append-only のイベント列。web (再生表示の同期)、agent interface (エージェントへの通知)、実行履歴 (永続化) が同じ列を購読する。
 
-`run-started / step-started / expectation-evaluated / step-skipped / step-executed / step-failed / paused / resumed / rolled-back / run-completed / run-failed / run-aborted`
+`run-started / step-started / expectation-evaluated / step-skipped / step-executed / step-failed / paused / ir-version-changed / resumed / rolled-back / run-completed / run-failed / run-aborted`
 
 イベントには step id、Expectation の評価結果、Snapshot / スクリーンショット参照を含め、UI 側が注釈表示に必要な情報をイベントだけで組み立てられるようにする。
+
+`ir-version-changed` は `resume` と `rerun_step` で IR の版を差し替えたときに発行し、差し替え前後の版を含める ([adr/0018](../../../adr/0018-ir-version-pinning.md))。**イベント列だけを読んで、どのステップがどの版に対する結果かを判別できるようにする**ためである。
+
+**秘密情報をイベントへ入れない。** 入力値のうち secret 指定されたものは、イベント・StepResult・ログのいずれでも伏せる ([workflow-dsl feature](../workflow-dsl/DesignDoc_workflow-dsl.md))。実行履歴は永続化されるため、一度入ると後から取り除けない。
 
 ## 主要シナリオ / フロー
 
@@ -187,3 +211,7 @@ flowchart TD
 - 状態遷移: pause 予約がステップ境界まで遅延すること、resume 時の巻き戻し先の決定 (不一致が複数ある場合は最初のステップ)。
 - ステップ再実行: 指定ステップ以降の StepResult 無効化とイベントの整合。
 - イベント: 発行順序の決定性と、履歴から run を再構成できること。
+- IR 版の固定: 実行中に draft を編集しても走行中の run のステップ列が変わらないこと。`resume` で差し替わったとき `ir-version-changed` が発行され、その後の再検証が新しい版で行われること。
+- 認証: `createSession` に認証コンテキストが必ず渡ること。失効時に `auth/expired` の構造化エラーが返ること。
+- Expectation を持たないステップが `skipped` にならず必ず実行されること。
+- secret 指定した入力値が、StepResult・イベント・ログのいずれにも現れないこと。

@@ -71,9 +71,9 @@ MCP 利用者だけがトークンの取り回しを負わない。ブリッジ�
 - spec 更新要否: 不要 (spec 未作成)
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「agent interface の認可方式」を削除する
-  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の「やらないこと」から認可方式の項を外し、決定内容を本文へ反映する
-  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) の「やらないこと」から認可の項を外す
-  - [context/infrastructure.md](../context/infrastructure.md) に bind アドレス、トークンの置き場と権限、Origin 検査を記載する
+  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の「やらないこと」から認可方式の項を外し、決定内容を本文へ反映する — 実施済み
+  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) の「やらないこと」から認可の項を外す — 実施済み
+  - [context/infrastructure.md](../context/infrastructure.md) に bind アドレス、トークンの置き場と権限、Origin 検査を記載する — 実施済み
 
 ## 関連ドキュメント / チケット
 
