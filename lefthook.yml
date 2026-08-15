@@ -3,6 +3,10 @@
 # テンプレ側の lefthook.yml とは別物 (check-skills 等のテンプレ著作用検査は含めない)。
 # 有効化: npx lefthook install
 
+# node を要求するコマンドは scripts/run-with-node.sh 経由で呼ぶ。
+# git hook は mise が activate されていないシェルで動くため、素で叩くと
+# システムの Node が使われ、dependency-cruiser が起動を拒否する。
+
 pre-commit:
   commands:
     protected-branch:
@@ -13,7 +17,7 @@ pre-commit:
     # (配布物はテンプレ側でのみ編集できるため、ここで置き換えている)
     prettier:
       glob: "*.{md,yml,yaml,json,css}"
-      run: pnpm exec prettier --write --ignore-unknown -- {staged_files}
+      run: sh scripts/run-with-node.sh pnpm exec prettier --write --ignore-unknown -- {staged_files}
       stage_fixed: true
     # TypeScript / JavaScript の整形と lint。prettier は .prettierignore で
     # これらを除外しており、ここが担当する (context/engineering.md)。
@@ -24,11 +28,11 @@ pre-commit:
     # `--` はオプション終端。ファイル名がハイフンで始まってもオプションと解釈させない。
     oxfmt:
       glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
-      run: pnpm exec oxfmt --ignore-path .oxfmtignore -- {staged_files}
+      run: sh scripts/run-with-node.sh pnpm exec oxfmt --ignore-path .oxfmtignore -- {staged_files}
       stage_fixed: true
     oxlint:
       glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
-      run: pnpm exec oxlint -- {staged_files}
+      run: sh scripts/run-with-node.sh pnpm exec oxlint -- {staged_files}
 
 pre-push:
   commands:
@@ -37,13 +41,13 @@ pre-push:
     # 秒オーダーの検査はここへ置く (context/engineering.md の Root Task Boundary)。
     # check は lint (oxlint + 型検査) / format / test / build を通す。
     check:
-      run: pnpm check
+      run: sh scripts/run-with-node.sh pnpm check
     # boundaries は内部で build してから走る。dist が無いとパッケージ間の辺が
     # 解決できず、違反ゼロで空振りするためである。
     boundaries:
-      run: pnpm boundaries
+      run: sh scripts/run-with-node.sh pnpm boundaries
     knip:
-      run: pnpm knip
+      run: sh scripts/run-with-node.sh pnpm knip
 
 commit-msg:
   commands:

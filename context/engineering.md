@@ -12,7 +12,7 @@ governs:
   - .prettierignore
   - .dependency-cruiser.cjs
   - knip.json
-verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
+verified_commit: 6422cca632d7f5e4851fb0597cea65904a1ed28d
 ---
 
 # Engineering Conventions
@@ -225,11 +225,14 @@ pre-commit の oxlint には `--type-aware` を付けない。プログラム全
 | 同じく辺が消える (clone 直後 / `dist` 削除後)      | `boundaries` は build してから走らせる                              |
 | `not-unresolvable` と `no-non-package-json` が死ぬ | `includeOnly` で外部依存を絞らない                                  |
 | 型の消えた成果物を二重に辿る                       | 走査の起点は `src` と `packages/config/vitest` に絞る               |
+| **git hook から実行すると常に失敗する**            | hook のコマンドは `scripts/run-with-node.sh` 経由で呼ぶ             |
 
 補足を 2 点。
 
 - パッケージ間の import は `exports` 経由で `packages/<名前>/dist/index.d.ts` に解決される。ルールの `path` はパッケージ名までの前置き一致なので、src と dist のどちらに解決されても判定は変わらない。
 - 解決に失敗した依存の `resolved` はモジュール指定子のまま (例 `"lodash"`) になる。`includeOnly: "^(apps|packages|e2e)/"` を置くと、この辺がルール評価の前に捨てられ、未宣言依存を検出するルールが 1 件も発火しなくなる。
+
+**git hook は対話シェルではない。** mise が activate されていないため PATH にはシステムの Node が乗り、`pnpm boundaries` を素で叩くと Node のバージョン違いで必ず失敗する。手元では通るのに push だけ通らない、という形で出る。hook からのコマンドは `scripts/run-with-node.sh` を経由させ、mise がある環境ではそれ経由で解決する。**mise が無い環境でも hook を壊さない**よう、無ければそのまま実行する。
 
 `not-unresolvable` を最後の砦とする。pnpm は宣言していない依存を解決させないため、**宣言漏れは必ず「解決できない依存」として現れる**。
 
