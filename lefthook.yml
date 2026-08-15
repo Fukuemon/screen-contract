@@ -9,11 +9,35 @@ pre-commit:
       run: python3 hooks/protected-branch/git_hook.py pre-commit
     format:
       run: hooks/format/run_prettier.sh
+    # TypeScript / JavaScript の整形と lint。prettier は .prettierignore で
+    # これらを除外しており、ここが担当する (context/engineering.md)。
+    # 型検査は入れない。TypeScript 7 は tsc にファイルパスを渡せないため、
+    # 変更ファイルだけの型検査が組めない (context/toolchain.md)。
+    # 整形した結果だけを stage_fixed で staging へ戻す。明示的な git add を使うと、
+    # 部分 stage したファイルの未 stage 変更まで commit に巻き込む。
+    # `--` はオプション終端。ファイル名がハイフンで始まってもオプションと解釈させない。
+    oxfmt:
+      glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
+      run: pnpm exec oxfmt --ignore-path .oxfmtignore -- {staged_files}
+      stage_fixed: true
+    oxlint:
+      glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
+      run: pnpm exec oxlint -- {staged_files}
 
 pre-push:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-push
+    # 秒オーダーの検査はここへ置く (context/engineering.md の Root Task Boundary)。
+    # check は lint (oxlint + 型検査) / format / test / build を通す。
+    check:
+      run: pnpm check
+    # boundaries は内部で build してから走る。dist が無いとパッケージ間の辺が
+    # 解決できず、違反ゼロで空振りするためである。
+    boundaries:
+      run: pnpm boundaries
+    knip:
+      run: pnpm knip
 
 commit-msg:
   commands:
