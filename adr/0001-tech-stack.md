@@ -23,7 +23,7 @@
 - 中間層: 置かない。Workflow Server (api 層) を唯一の backend とし、web 側の server 機能に API ロジックを置かない (規約は [context/architecture.md](../context/architecture.md))
 - lint / format: oxlint + oxfmt。md / yml は oxfmt の対応が安定するまで既存の prettier を併用する
 - unit test: vitest
-- api の HTTP / WebSocket framework は Hono を第一候補とする。確定は `packages/api` の実装 issue で行う (feature 設計では判断材料が出なかったため、確定時期を後ろへ移した)
+- api の HTTP / WebSocket framework は Hono とする ([adr/0024](0024-http-framework.md) で確定)
 
 ## 代替案
 

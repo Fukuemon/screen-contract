@@ -38,7 +38,7 @@ repos:
     │   ├── core-*/    #   workflow / execution / element / artifact / diff
     │   ├── app/       #   use case + Store Port
     │   ├── adapter-*/ #   browser / store (ai は MVP 実装なし。ADR-0019)
-    │   ├── api/       #   HTTP 層の組み立て。listen しない (framework 未確定)
+    │   ├── api/       #   Hono app factory (listen しない。ADR-0024)
     │   ├── agent/     #   MCP / JSON-RPC + 共通マッピング層
     │   ├── fixture-app/ # テスト対象アプリ
     │   └── config/    #   tsconfig / vitest の共有設定 (oxlint はルート 1 本)

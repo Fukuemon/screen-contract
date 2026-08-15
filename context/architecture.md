@@ -31,7 +31,7 @@ verified_commit: fdaa1140dbfc2c5d17110470b9ac30f3fb619c16
 
 `apps/` の package.json は `exports` を持たない。パッケージ名では解決できないため、**依存グラフの終端であることが構造として保証される**。`e2e` も server を import せず、ビルド済みの bin をプロセスとして起動する。ビルド順だけ turborepo の `@screen-contract/server#build` で担保する。
 
-`api` と `agent` を `packages/` に置くのは、listen せずアプリケーションとハンドラを組み立てるだけで、プロセスにするのが `apps/server` だからである。HTTP framework は未確定である ([toolchain.md](toolchain.md))。
+`api` と `agent` を `packages/` に置くのは、listen せず Hono のアプリケーションとハンドラを組み立てるだけで、プロセスにするのが `apps/server` だからである ([adr/0024](../adr/0024-http-framework.md))。
 
 ### 依存方向
 

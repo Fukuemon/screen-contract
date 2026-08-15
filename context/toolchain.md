@@ -19,16 +19,18 @@ verified_commit: fdaa1140dbfc2c5d17110470b9ac30f3fb619c16
 
 ## 標準スタック
 
-| 区分            | ツール                  | 備考                                                                     |
-| --------------- | ----------------------- | ------------------------------------------------------------------------ |
-| Package manager | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)     |
-| Task runner     | turborepo               | 依存グラフで層の依存規約を反映する                                       |
-| Language        | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                          |
-| Linter          | oxlint                  |                                                                          |
-| Formatter       | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md) |
-| Unit test       | vitest                  | 統合テストも vitest で書く                                               |
-| E2E             | Playwright              | 責務分担は [testing.md](testing.md)                                      |
-| Runtime 管理    | mise                    | Node を LTS に固定する (後述)                                            |
+| 区分             | ツール                  | 備考                                                                     |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------ |
+| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)     |
+| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                       |
+| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                          |
+| Linter           | oxlint                  |                                                                          |
+| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md) |
+| Unit test        | vitest                  | 統合テストも vitest で書く                                               |
+| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                      |
+| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))    |
+| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))    |
+| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                            |
 
 ### Node のバージョンを LTS に固定する
 
@@ -114,7 +116,7 @@ flowchart LR
 ## 採用方針
 
 - 採用候補を先行固定する場合は、その根拠と確定タイミング (どの issue / ADR で確定するか) を記す。
-- HTTP / WebSocket の framework は未確定。[adr/0001](../adr/0001-tech-stack.md) は Hono を第一候補とし、確定を「feature 設計時」としていた。feature 設計は完了したが framework の判断材料が出なかったため、**確定は `packages/api` の実装 issue とする**。scaffold ではディレクトリだけを切ってある。
+- **現時点で未確定のものは無い。** 標準スタック表の全項目が ADR で確定している。
 
 ## Scaffold Policy
 
