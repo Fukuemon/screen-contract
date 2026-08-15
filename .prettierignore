@@ -12,3 +12,25 @@ CLAUDE.md
 # project.yml とそのテンプレート。値がプレースホルダ (<host> / <path> 等) の間は
 # YAML として解析できず、prettier が parse error で落ちる。
 templates/context/project.yml
+
+# TypeScript / JavaScript は oxfmt が担当する (context/toolchain.md)。
+# hooks/format/run_prettier.sh は上書き配布のため編集できないので、
+# 対象から外すことで oxfmt との二重整形を避ける。
+# oxfmt 側の対象外は .oxfmtignore に分けている
+# (--ignore-path を指定しないと oxfmt がこのファイルを読み、担当の .ts を飛ばすため)。
+*.ts
+*.tsx
+*.js
+*.jsx
+*.cjs
+*.mjs
+
+# ビルド成果物と依存
+dist/
+node_modules/
+.turbo/
+pnpm-lock.yaml
+
+# worktree と エージェントの一時出力
+.wt/
+.ai-out/

@@ -3,17 +3,51 @@
 # テンプレ側の lefthook.yml とは別物 (check-skills 等のテンプレ著作用検査は含めない)。
 # 有効化: npx lefthook install
 
+# node を要求するコマンドは scripts/run-with-node.sh 経由で呼ぶ。
+# git hook は mise が activate されていないシェルで動くため、素で叩くと
+# システムの Node が使われ、dependency-cruiser が起動を拒否する。
+
 pre-commit:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-commit
-    format:
-      run: hooks/format/run_prettier.sh
+    # 配布物の hooks/format/run_prettier.sh は使わない。整形後に
+    # `git add <ファイル全体>` するため、部分 stage したファイルの未 stage 変更まで
+    # commit に巻き込む。lefthook の stage_fixed で同じことを安全に行う。
+    # (配布物はテンプレ側でのみ編集できるため、ここで置き換えている)
+    prettier:
+      glob: "*.{md,yml,yaml,json,css}"
+      run: sh scripts/run-with-node.sh pnpm exec prettier --write --ignore-unknown -- {staged_files}
+      stage_fixed: true
+    # TypeScript / JavaScript の整形と lint。prettier は .prettierignore で
+    # これらを除外しており、ここが担当する (context/engineering.md)。
+    # 型検査は入れない。TypeScript 7 は tsc にファイルパスを渡せないため、
+    # 変更ファイルだけの型検査が組めない (context/toolchain.md)。
+    # 整形した結果だけを stage_fixed で staging へ戻す。明示的な git add を使うと、
+    # 部分 stage したファイルの未 stage 変更まで commit に巻き込む。
+    # `--` はオプション終端。ファイル名がハイフンで始まってもオプションと解釈させない。
+    oxfmt:
+      glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
+      run: sh scripts/run-with-node.sh pnpm exec oxfmt --ignore-path .oxfmtignore -- {staged_files}
+      stage_fixed: true
+    oxlint:
+      glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
+      run: sh scripts/run-with-node.sh pnpm exec oxlint -- {staged_files}
 
 pre-push:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-push
+    # 秒オーダーの検査はここへ置く (context/engineering.md の Root Task Boundary)。
+    # check は lint (oxlint + 型検査) / format / test / build を通す。
+    check:
+      run: sh scripts/run-with-node.sh pnpm check
+    # boundaries は内部で build してから走る。dist が無いとパッケージ間の辺が
+    # 解決できず、違反ゼロで空振りするためである。
+    boundaries:
+      run: sh scripts/run-with-node.sh pnpm boundaries
+    knip:
+      run: sh scripts/run-with-node.sh pnpm knip
 
 commit-msg:
   commands:

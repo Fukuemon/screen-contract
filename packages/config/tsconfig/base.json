@@ -1,0 +1,25 @@
+{
+  // 全パッケージ共通。composite / declaration / declarationMap は
+  // project references の前提 (context/toolchain.md)。
+  "compilerOptions": {
+    "strict": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // TypeScript 7 は types の既定が [] になった。使う型は各パッケージで明示する。
+    "types": []
+  }
+}

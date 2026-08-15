@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - e2e
+
+# postinstall でネイティブバイナリを取得するパッケージを明示的に許可する。
+# 許可しないと pnpm が build script を黙って飛ばし、lefthook install が失敗して
+# git hook が張られない (品質ゲートが無効になる)。
+onlyBuiltDependencies:
+  - lefthook

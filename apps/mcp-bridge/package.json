@@ -1,0 +1,18 @@
+{
+  "name": "@screen-contract/mcp-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "screen-contract-mcp-bridge": "./dist/bin/bridge.js"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@screen-contract/config": "workspace:*",
+    "@types/node": "^24.0.0",
+    "vitest": "^4.1.10"
+  }
+}

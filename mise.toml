@@ -1,0 +1,5 @@
+# Node は LTS を使う (context/toolchain.md)。
+# dependency-cruiser は node.js のリリースサイクルに追随しており、
+# 奇数系 (25 等) では起動しない。LTS 固定はこの制約も満たす。
+[tools]
+node = "24"

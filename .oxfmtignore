@@ -1,0 +1,29 @@
+# oxfmt の対象外。
+# oxfmt は --ignore-path を指定しないと .gitignore と .prettierignore を読む。
+# .prettierignore は TypeScript を除外しているため、そのままでは
+# oxfmt が担当すべき .ts を飛ばして JSON だけを整形してしまう。
+# 担当を分けるため、oxfmt にはこのファイルを渡す (context/toolchain.md)。
+
+# TypeScript / JavaScript 以外は prettier が担当する
+*.json
+*.jsonc
+*.md
+*.yml
+*.yaml
+
+# 依存とビルド成果物
+node_modules/
+dist/
+build/
+.turbo/
+
+# rulesync 生成物 (正本は .rulesync/)
+.agents/
+.claude/
+.codex/
+.cursor/
+
+# worktree と エージェントの一時出力
+.wt/
+.ai-out/
+.rulesync/

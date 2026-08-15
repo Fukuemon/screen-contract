@@ -1,0 +1,23 @@
+{
+  // solution tsconfig。型を持たず参照だけを並べる。tsc --build の入口。
+  "files": [],
+  "references": [
+    { "path": "packages/config" },
+    { "path": "packages/domain" },
+    { "path": "packages/core-workflow" },
+    { "path": "packages/core-execution" },
+    { "path": "packages/core-element" },
+    { "path": "packages/core-artifact" },
+    { "path": "packages/core-diff" },
+    { "path": "packages/app" },
+    { "path": "packages/adapter-browser" },
+    { "path": "packages/adapter-store" },
+    { "path": "packages/api" },
+    { "path": "packages/agent" },
+    { "path": "packages/fixture-app" },
+    { "path": "apps/server" },
+    { "path": "apps/web" },
+    { "path": "apps/mcp-bridge" },
+    { "path": "e2e" }
+  ]
+}

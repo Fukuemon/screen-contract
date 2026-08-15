@@ -1,0 +1,65 @@
+{
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/.turbo/**"],
+  "overrides": [
+    {
+      "files": ["apps/web/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "@screen-contract/core-*",
+              "@screen-contract/app",
+              "@screen-contract/adapter-*",
+              "@screen-contract/agent",
+              "@screen-contract/domain"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/api/**", "packages/agent/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "@screen-contract/core-*",
+              "@screen-contract/adapter-*",
+              "@screen-contract/domain"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/app/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          { "patterns": ["@screen-contract/adapter-*"] }
+        ]
+      }
+    },
+    {
+      "files": ["packages/core-*/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              "@screen-contract/app",
+              "@screen-contract/api",
+              "@screen-contract/agent",
+              "@screen-contract/adapter-*"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+.env
+.DS_Store
+
+# ローカル状態 (トークン / 暗号化した認証状態 / secret) は $XDG_STATE_HOME 配下に
+# 置く契約であり、リポジトリ配下には作らない (context/infrastructure.md)。
+# 実装が誤って repo 配下へ書いた場合に commit されないよう、契約が定める
+# 実際の生成物名を防御的に無視する。
+.screen-contract/
+/token
+/runtime.json
+auth/
+*.enc
+*.storage-state.json
+*.log
+*.tmp
+*.swp
+*~
+.ai-out/*
+node_modules/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+
+# 共有プロセス層の正本は sdd-template repo (消費 repo では local symlink のみ。commit しない)
+.rulesync/
+rulesync.jsonc
+scripts/link.sh

@@ -1,0 +1,122 @@
+# 読み取り索引 (impact-index) — 「何を読めば足りるか」のルーティング表
+#
+# 目的: 実装・設計セッションが巨大な文書やコードを全文読みせず、
+# 「小さい索引 → 該当 feature の read: が指すファイルだけ」を読めるようにする (token 最小化)。
+#
+# 読み取り順序 (実装ガード):
+# 1. 本ファイルを読み、今回触る feature / キーワードで該当エントリを引く
+# 2. エントリの read: が指すファイルだけを読む (初回はこれ以外を全文読みしない)
+# 3. source_refs: (specs / ADR) は大きいので、判断が付かないときだけ読む
+# 4. 該当エントリが無い場合: repo 全体の探索へ逃げず、新規 feature なら
+#    先に仮エントリ (coverage: partial) を足してから作業に入る
+#
+# 育て方: spec-lifecycle の sync phase と context-harvest skill が
+# feature の追加・変更時にエントリを更新する。coverage: partial は未整備の印。
+
+features:
+  - name: workflow-dsl
+    keywords: ["DSL", "YAML", "Schema", "Workflow IR", "core/workflow"]
+    read:
+      - context/architecture.md
+      - design/features/workflow-dsl/DesignDoc_workflow-dsl.md
+      - context/infrastructure.md
+    source_refs:
+      - adr/0011-dsl-as-source-of-truth.md
+      - adr/0022-auth-state-storage.md
+    coverage: full
+
+  - name: execution
+    keywords:
+      [
+        "冪等実行",
+        "期待状態",
+        "再生",
+        "一時停止",
+        "Browser Port",
+        "core/execution",
+      ]
+    read:
+      - context/architecture.md
+      - design/features/execution/DesignDoc_execution.md
+      - context/infrastructure.md
+    source_refs:
+      - adr/0018-ir-version-pinning.md
+      - adr/0022-auth-state-storage.md
+    coverage: full
+
+  - name: element-mapping
+    keywords: ["永続要素 ID", "構成番号", "Locator", "採番", "core/element"]
+    read:
+      - context/architecture.md
+      - design/features/element-mapping/DesignDoc_element-mapping.md
+    source_refs:
+      - adr/0019-agent-led-ai-suggestions.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
+
+  - name: artifact-generation
+    keywords:
+      [
+        "注釈画像",
+        "Markdown テーブル",
+        "Playwright",
+        "POM",
+        "決定的生成",
+        "core/artifact",
+      ]
+    read:
+      - context/architecture.md
+      - design/features/artifact-generation/DesignDoc_artifact-generation.md
+    source_refs:
+      - adr/0022-auth-state-storage.md
+    coverage: full
+
+  - name: change-detection
+    keywords: ["差分", "Baseline", "Visual Diff", "core/diff"]
+    read:
+      - context/architecture.md
+      - design/features/change-detection/DesignDoc_change-detection.md
+    source_refs:
+      - adr/0022-auth-state-storage.md
+    coverage: full
+
+  - name: web-editor
+    keywords:
+      [
+        "Web UI",
+        "ライブ表示",
+        "live viewport",
+        "再生制御",
+        "要素選択",
+        "dashboard",
+      ]
+    read:
+      - context/architecture.md
+      - design/features/web-editor/DesignDoc_web-editor.md
+      - context/infrastructure.md
+    source_refs:
+      - adr/0021-agent-interface-authz.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
+
+  - name: agent-interface
+    keywords:
+      ["MCP", "App Server", "JSON-RPC", "AI エージェント", "draft", "agent"]
+    read:
+      - context/architecture.md
+      - design/features/agent-interface/DesignDoc_agent-interface.md
+      - context/infrastructure.md
+    source_refs:
+      - adr/0021-agent-interface-authz.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
+
+  - name: ai-suggestions
+    keywords: ["AI 候補", "AI Port", "adapter/ai", "Locator 候補"]
+    read:
+      - context/architecture.md
+      - design/features/ai-suggestions/DesignDoc_ai-suggestions.md
+    source_refs:
+      - adr/0019-agent-led-ai-suggestions.md
+      - adr/0010-ai-data-boundary.md
+    coverage: full
