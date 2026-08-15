@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "screen-contract-mcp-bridge": "./dist/bin/bridge.js"
+  },
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run --passWithNoTests"

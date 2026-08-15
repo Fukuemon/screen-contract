@@ -7,6 +7,7 @@
 # 実際の生成物名を防御的に無視する。
 .screen-contract/
 /token
+/runtime.json
 auth/
 *.enc
 *.storage-state.json
