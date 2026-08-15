@@ -17,6 +17,7 @@
 
 - **MVP のブラウザ実行基盤に agent-browser を使用する**。対応ブラウザは agent-browser が対応する Chromium 系とする。
 - agent-browser は core/execution が定義する Browser Port の背後の内部実装とし、本システムが同梱して adapter/browser が管理する。利用者は agent-browser を直接導入・操作しない。
+  - 同梱の手段は npm 依存とする ([adr/0027](0027-agent-browser-bundling.md))。**ブラウザ本体の取得だけは利用者の 1 回の明示操作を残す。** 「直接導入・操作しない」は、日常の操作に agent-browser が現れないという意味に限定する。
 - 利用者の資産 (DSL・仕様書・POM) は実行基盤に依存しない語彙で書き、Browser Port の別実装で実行基盤を差し替えても引き継がれるようにする。
 
 ## 代替案

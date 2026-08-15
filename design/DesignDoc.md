@@ -396,6 +396,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0024](../adr/0024-http-framework.md)               | HTTP / WebSocket framework に Hono を採用する判断                                 | web-editor / agent-interface |
 | [adr/0025](../adr/0025-image-diff-library.md)           | 画像差分に pixelmatch と ssim.js を採用する判断                                   | change-detection             |
 | [adr/0026](../adr/0026-operation-recording.md)          | 操作の記録を DSL の draft を書く手段として提供する判断                            | web-editor / workflow-dsl    |
+| [adr/0027](../adr/0027-agent-browser-bundling.md)       | agent-browser を npm 依存として同梱しブラウザは起動時に検査する判断               | execution                    |
 
 ## Open Questions / Future Work
 

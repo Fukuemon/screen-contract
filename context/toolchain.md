@@ -19,18 +19,19 @@ verified_commit: f0e228a2d8dc16cb24b8d36710cfd27a271b594f
 
 ## 標準スタック
 
-| 区分             | ツール                  | 備考                                                                     |
-| ---------------- | ----------------------- | ------------------------------------------------------------------------ |
-| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)     |
-| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                       |
-| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                          |
-| Linter           | oxlint                  |                                                                          |
-| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md) |
-| Unit test        | vitest                  | 統合テストも vitest で書く                                               |
-| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                      |
-| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))    |
-| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))    |
-| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                            |
+| 区分             | ツール                  | 備考                                                                                 |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)                 |
+| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                                   |
+| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                                      |
+| Linter           | oxlint                  |                                                                                      |
+| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md)             |
+| Unit test        | vitest                  | 統合テストも vitest で書く                                                           |
+| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                                  |
+| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))                |
+| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))                |
+| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                                        |
+| ブラウザ実行基盤 | agent-browser           | npm 依存として同梱し版を固定する ([adr/0027](../adr/0027-agent-browser-bundling.md)) |
 
 ### Node のバージョンを LTS に固定する
 
