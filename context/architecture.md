@@ -23,29 +23,34 @@ verified_commit: fdaa1140dbfc2c5d17110470b9ac30f3fb619c16
 
 配置の基準は「再利用できるか」ではなく **デプロイされるか**とする。Turborepo は Application Package を「will be deployed from your workspace」、Library Package を「aren't independently deployable」と定義し、Application Package が他から依存されないことを求めている。
 
-| 置き場      | 入るもの                                                   | 制約                               |
-| ----------- | ---------------------------------------------------------- | ---------------------------------- |
-| `apps/`     | デプロイ単位 (合成ルート、Web UI、bin を持つプロセス)      | **他のパッケージから依存されない** |
-| `packages/` | それ以外のすべて (core / app / adapter / api / agent / 型) | デプロイ単位にならない             |
-| `e2e/`      | Playwright                                                 | `apps/` に依存してよい唯一の例外   |
+| 置き場      | 入るもの                                                   | 制約                                                |
+| ----------- | ---------------------------------------------------------- | --------------------------------------------------- |
+| `apps/`     | デプロイ単位 (合成ルート、Web UI、MCP ブリッジ)            | **他のパッケージからも他の app からも依存されない** |
+| `packages/` | それ以外のすべて (core / app / adapter / api / agent / 型) | デプロイ単位にならない                              |
+| `e2e/`      | Playwright                                                 | `apps/` を**プロセスとして起動する**。import しない |
+
+`apps/` の package.json は `exports` を持たない。パッケージ名では解決できないため、**依存グラフの終端であることが構造として保証される**。`e2e` も server を import せず、ビルド済みの bin をプロセスとして起動する。ビルド順だけ turborepo の `@screen-contract/server#build` で担保する。
 
 `api` と `agent` を `packages/` に置くのは、listen せずアプリケーションとハンドラを組み立てるだけで、プロセスにするのが `apps/server` だからである。HTTP framework は未確定である ([toolchain.md](toolchain.md))。
 
 ### 依存方向
 
-- interface (web / api / agent) → app のみに依存する。core / adapter へ直接依存しない。
-- app → core に依存する。**adapter へは依存しない**。Port の実装は合成ルートから注入される ([adr/0023](../adr/0023-composition-root.md))。
+- interface (web / api / agent) → app のみに依存する。core / adapter / domain へ直接依存しない。
+- app → core に依存する。**adapter と interface へは依存しない**。Port の実装は合成ルートから注入される ([adr/0023](../adr/0023-composition-root.md))。
 - core → 他の core と domain へは型の参照のみ許可する。app / adapter / interface へ依存しない。
-- adapter → 自身が実装する Port を定義するモジュール (core または app) と domain の型を通じてのみ依存する。
+- domain → **何にも依存しない。** 依存グラフの起点であり、実行時の値も持たない。
+- adapter → 自身が実装する Port を定義するモジュール (core または app) と domain の型を通じてのみ依存する。interface と他の adapter へは依存しない。
 - 合成ルート (`apps/server`) → 全層に依存してよい。**adapter の具象を選ぶ唯一の場所**とする。
+- `apps/mcp-bridge` → **何にも依存しない。** JSON-RPC のフレームを転送するだけで、tool 語彙を解釈しない ([adr/0021](../adr/0021-agent-interface-authz.md))。
 
 実線は値を含む依存、破線は**型だけ**の依存を表す。
 
 ```mermaid
 flowchart TD
-    subgraph apps["apps/ — デプロイ単位"]
+    subgraph apps["apps/ — デプロイ単位 (互いに依存しない)"]
         server["server<br/>合成ルート"]
         web["web<br/>Web UI"]
+        bridge["mcp-bridge<br/>stdio ↔ ループバックの転送"]
     end
 
     subgraph iface["packages/ — interface"]
@@ -82,21 +87,23 @@ flowchart TD
     app --> core
 
     core -.->|"型のみ"| domain
-    app --> domain
     ab -.->|"Port の型のみ"| ce
-    ab -.->|"型のみ"| domain
     as -.->|"Port の型のみ"| app
 ```
 
-`apps/server` だけが adapter へ実線で届く。ここが Port の実装を選ぶ唯一の場所である。
+`apps/server` だけが adapter へ実線で届く。ここが Port の実装を選ぶ唯一の場所である。`mcp-bridge` はどこへも辺を持たない。
 
 ### 禁止経路
 
-- interface から core / adapter への直接依存 (use case を経由せず境界が崩れるため)
+- interface から core / adapter / domain への直接依存 (use case を経由せず境界が崩れるため)
 - core から adapter への依存 (Port の逆流。差し替え可能性が失われるため)
 - core 同士のロジック共有 (共有したくなったら domain へ型として切り出すか、app 層の use case に置く)
+- **domain への値の設置** (core → domain は型のみのため、値を置くと core から呼べない API になる)
 - **app から adapter への依存** (Store Port が app にあるため循環し、fake の差し替えが実行時分岐になるため。[adr/0023](../adr/0023-composition-root.md))
+- **app から interface への依存** (依存は interface → app の一方向であるため)
+- **adapter から interface / 他の adapter への依存** (adapter は Port を実装するだけであるため)
 - **`packages/` から `apps/` への依存** (`apps/` は依存グラフの終端であるため)
+- **`apps/` 同士の依存** (デプロイ単位は独立したプロセスであり、繋ぐと片方の変更が他方の配布物へ波及するため)
 
 ### Port の定義場所と参照元
 

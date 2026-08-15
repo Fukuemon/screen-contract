@@ -108,13 +108,13 @@ root の `test` から外すもの:
 
 | 実行点     | 通すもの                                                         | 理由                              |
 | ---------- | ---------------------------------------------------------------- | --------------------------------- |
-| pre-commit | oxfmt、oxlint (型情報を使わないルール)                           | 数百ミリ秒で終わる                |
+| pre-commit | oxfmt、prettier、oxlint (型情報を使わないルール)                 | 数百ミリ秒で終わる                |
 | pre-push   | `check` (lint + format + test + build)、dependency-cruiser、knip | 秒オーダー。commit のたびには重い |
 
 ```mermaid
 flowchart LR
     edit["編集"] --> commit{{"git commit"}}
-    commit -->|"数百ミリ秒"| pc["oxfmt (stage_fixed)<br/>oxlint"]
+    commit -->|"数百ミリ秒"| pc["oxfmt / prettier (stage_fixed)<br/>oxlint"]
     pc --> push{{"git push"}}
     push -->|"秒オーダー"| pp1["check<br/>lint + format + test + build"]
     pp1 --> pp2["boundaries<br/>build してから依存グラフを見る"]
@@ -130,6 +130,10 @@ flowchart LR
 `typecheck` の実体は solution tsconfig に対する `tsc --build` である。composite なプロジェクトでは型検査と `.d.ts` の生成が同じ処理であり、別に `--noEmit` を走らせても同じ仕事を 2 度行うだけになる。
 
 pre-commit で整形した結果は lefthook の `stage_fixed` で staging へ戻す。`git add` を明示的に書くと、部分 stage したファイルの**未 stage の変更まで commit に巻き込む**。
+
+このため、sdd-template が配布する `hooks/format/run_prettier.sh` は**使わない**。整形後に `git add <ファイル全体>` を行うためである。配布物はテンプレ側でしか編集できないので、`lefthook.yml` (消費 repo 所有) で prettier を直接呼ぶ形に置き換えている。
+
+なお **prettier は明示的にパスを渡しても `.prettierignore` を尊重する。** 実際に規則から外れた `.ts` を渡して書き換えられないことを確認した。したがって prettier と oxfmt が TypeScript を二重に整形する事故は起きない。
 
 ## Repository Quality Gate
 
@@ -162,21 +166,24 @@ pre-commit の oxlint には `--type-aware` を付けない。プログラム全
 
 ルールは [architecture.md](architecture.md) の禁止経路と 1 対 1 で対応させる。
 
-| ルール名                        | from                        | to                                                                       |
-| ------------------------------- | --------------------------- | ------------------------------------------------------------------------ |
-| `no-circular`                   | 全体                        | `circular: true`                                                         |
-| `packages-not-to-apps`          | `^packages/`                | `^apps/`                                                                 |
-| `interface-not-to-core-adapter` | `^packages/(api\|agent)/`   | `^packages/(core-\|adapter-\|domain)`                                    |
-| `web-not-to-inner`              | `^apps/web/`                | `^packages/(core-\|app/\|adapter-\|agent/\|domain)`                      |
-| `web-to-api-type-only`          | `^apps/web/`                | `^packages/api/` + `dependencyTypesNot: ["type-only"]`                   |
-| `app-not-to-adapter`            | `^packages/app/`            | `^packages/adapter-`                                                     |
-| `core-not-outward`              | `^packages/core-`           | `^packages/(adapter-\|app/\|api/\|agent/)`                               |
-| `core-cross-module-type-only`   | `^packages/core-([a-z-]+)/` | `^packages/(core-\|domain/)` + `dependencyTypesNot: ["type-only"]`       |
-| `domain-not-outward`            | `^packages/domain/`         | 自身を除く `^(packages\|apps)/`                                          |
-| `adapter-only-port-types`       | `^packages/adapter-`        | `^packages/(core-\|app/\|domain/)` + `dependencyTypesNot: ["type-only"]` |
-| `not-unresolvable`              | 全体                        | `couldNotResolve: true`                                                  |
-| `no-non-package-json`           | 全体                        | 未宣言の外部依存                                                         |
-| `not-to-dev-dep`                | ランタイムコード            | devDependencies                                                          |
+| ルール名                        | from                           | to                                                                       |
+| ------------------------------- | ------------------------------ | ------------------------------------------------------------------------ |
+| `no-circular`                   | 全体                           | `circular: true`                                                         |
+| `packages-not-to-apps`          | `^packages/`                   | `^apps/`                                                                 |
+| `apps-not-to-apps`              | `^apps/([a-z-]+)/`             | 自身を除く `^apps/`                                                      |
+| `interface-not-to-core-adapter` | `^packages/(api\|agent)/`      | `^packages/(core-\|adapter-\|domain)`                                    |
+| `web-not-to-inner`              | `^apps/web/`                   | `^packages/(core-\|app/\|adapter-\|agent/\|domain)`                      |
+| `web-to-api-type-only`          | `^apps/web/`                   | `^packages/api/` + `dependencyTypesNot: ["type-only"]`                   |
+| `app-not-to-adapter`            | `^packages/app/`               | `^packages/adapter-`                                                     |
+| `core-not-outward`              | `^packages/core-`              | `^packages/(adapter-\|app/\|api/\|agent/)`                               |
+| `core-cross-module-type-only`   | `^packages/core-([a-z-]+)/`    | `^packages/(core-\|domain/)` + `dependencyTypesNot: ["type-only"]`       |
+| `domain-not-outward`            | `^packages/domain/`            | 自身を除く `^(packages\|apps)/`                                          |
+| `adapter-only-port-types`       | `^packages/adapter-`           | `^packages/(core-\|app/\|domain/)` + `dependencyTypesNot: ["type-only"]` |
+| `not-unresolvable`              | 全体                           | `couldNotResolve: true`                                                  |
+| `no-non-package-json`           | 全体                           | 未宣言の外部依存                                                         |
+| `app-not-to-interface`          | `^packages/app/`               | `^packages/(api/\|agent/)`                                               |
+| `adapter-not-outward`           | `^packages/adapter-([a-z-]+)/` | 自身を除く `^packages/(api/\|agent/\|fixture-app/\|adapter-)`            |
+| `not-to-dev-dep`                | ランタイムコード               | devDependencies                                                          |
 
 `no-restricted-imports` による層別の禁止を oxlint 側にも書く。エディタ上で即座に赤くなる一次防御であり、**正本は dependency-cruiser 側**とする。したがって **oxlint にしか無いルールを作らない**。`no-restricted-imports` はパッケージ名しか見ないため、相対パスで隣のパッケージへ潜る経路を止められない。
 
@@ -197,9 +204,14 @@ pre-commit の oxlint には `--type-aware` を付けない。プログラム全
 | dependency-cruiser の pnpm workspace 対応        | 機能する。`node_modules` の symlink を辿って実体へ解決する |
 | oxlint の `overrides` と `no-restricted-imports` | 併用できる。層別のパターン指定がそのまま効く               |
 
-意図的な違反で落ちることを確認したルールは次の 7 つ。後方参照が機能したため、core モジュールごとにルールを展開する必要はなくなった。
+意図的な違反で落ちることを確認したルールは次の 11 個。後方参照が機能したため、core モジュールごとにルールを展開する必要はなくなった。
 
-`app-not-to-adapter` / `core-cross-module-type-only` / `adapter-only-port-types` / `web-not-to-inner` / `web-to-api-type-only` / `domain-not-outward` / `not-unresolvable`
+`app-not-to-adapter` / `app-not-to-interface` / `adapter-only-port-types` / `adapter-not-outward` / `apps-not-to-apps` / `core-cross-module-type-only` / `domain-not-outward` / `not-to-dev-dep` / `not-unresolvable` / `web-not-to-inner` / `web-to-api-type-only`
+
+確認の過程で分かったことを 2 つ残す。
+
+- **`not-to-dev-dep` は workspace 依存には発火しない。** pnpm の workspace link は `dependencyTypes` が `["undetermined", "type-only", "import"]` になり、`npm-dev` が付かない。発火するのは実際の npm パッケージを devDependencies から参照したときだけである。したがって `apps/web` が型でしか使わない `@screen-contract/api` を devDependencies に置いていても本ルールには掛からない。**型限定の強制は `web-to-api-type-only` が担う。**
+- **`apps-not-to-apps` はパッケージ名の import では発火しない。** `apps/` の package.json は `exports` を持たないため、そもそもパッケージ名で解決できず `not-unresolvable` が先に落ちる。本ルールが効くのは相対パスで隣の app へ潜ったときである。`exports` を持たないこと自体が、デプロイ単位を依存グラフの終端に保つ構造上の保証になっている。
 
 ### 検査を成立させるための前提
 

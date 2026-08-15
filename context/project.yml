@@ -42,7 +42,7 @@ repos:
     │   ├── agent/     #   MCP / JSON-RPC + 共通マッピング層
     │   ├── fixture-app/ # テスト対象アプリ
     │   └── config/    #   tsconfig / vitest の共有設定 (oxlint はルート 1 本)
-    └── e2e/           # Playwright。apps に依存してよい唯一の例外
+    └── e2e/           # Playwright。server をプロセスとして起動する (import しない)
 
 # Naming Conventions
 naming:
@@ -58,15 +58,18 @@ commit:
 
 # Quick Commands (dev-commands skill が読むコマンド契約)
 commands:
-  dev: pnpm dev # 開発起動 (turborepo 経由)
+  dev: pnpm dev # tsc --build --watch。app の開発サーバは実装時に足す
   build: pnpm build
-  lint: pnpm lint # oxlint + typecheck
+  lint: pnpm lint # oxlint (type-aware) + typecheck
   format: pnpm format # oxfmt (確認)。md / yml は prettier
   test: pnpm test # vitest (unit のみ)
   test-integration: pnpm test:integration # vitest。agent-browser を実起動するため test から分離
   e2e: pnpm e2e # Playwright。責務分担は context/testing.md
   check: pnpm check # lint + format + test + build
   add-dep: pnpm add --filter <package> # 依存追加
+  typecheck: pnpm typecheck # solution tsconfig への tsc --build
+  boundaries: pnpm boundaries # dependency-cruiser。build してから走る
+  knip: pnpm knip # 未使用の export / 依存 / ファイル
 
 tracker:
   type: github
@@ -182,11 +185,11 @@ glossary:
   - term: 構成番号
     def: 画面仕様書の画像とテーブルで要素を参照するための表示用番号。状態単位で 1 から振り、state の badges 順序リストを正本に読み順の再採番で管理する (ADR-0005)
   - term: Baseline
-    def: 人間が承認した時点の実行結果セット (生スクリーンショット・Snapshot・badges・DSL 版)。差分比較の基準で、承認によってのみ更新される
+    def: 人間が承認した時点の実行結果セット (生スクリーンショット・Snapshot・badges・Screen IR)。(screen, state, authProfile) で識別する。差分比較の基準で、承認によってのみ更新される
   - term: draft
-    def: 承認前の作業状態。エージェントと利用者が自由に作成・編集でき、正本 (Baseline・確定済み構成番号) には反映されない
+    def: 承認前の作業状態。エージェントと利用者が自由に作成・編集でき、正本 (確定済み DSL・構成番号・Baseline) には反映されない
   - term: 確定
-    def: 人間の承認により draft を正本へ反映する操作。Baseline 確定と構成番号確定が対象
+    def: 人間の承認により draft を正本へ反映する操作。対象は DSL 変更・構成番号 (NumberingPlan)・Baseline 更新の 3 つ
   - term: agent interface
     def: AI エージェントが use case を操作するための interface (MCP server / App Server 型 JSON-RPC)
   - term: POM (Page Object Model)
@@ -201,3 +204,11 @@ glossary:
     def: 継続的インテグレーション。MVP では対象外で、差分検知の CI 実行は Future Work に置く
   - term: C4 モデル
     def: システムを Context / Container / Component / Code の 4 階層で描く図法。DesignDoc では L1 (System Context) と L2 (Container) の 2 段を使う
+  - term: Screen IR
+    def: Screen 文書を正規化した内部表現。要素定義と状態・構成番号を持ち、成果物生成と差分検知の入力になる
+  - term: 認証プロファイル
+    def: 対象アプリへログインした状態に付ける名前。run の実行時パラメータで指定し、DSL には書かない (ADR-0022)
+  - term: 提案依頼キュー
+    def: 人間が候補生成を依頼し、エージェントが取りに来る pull 型のキュー。排他的な割り当てをせず、期限超過は expired として手動の導線へ戻す (ADR-0020)
+  - term: 合成ルート
+    def: adapter の具象を選んで use case へ注入する唯一の場所。apps/server が担う (ADR-0023)

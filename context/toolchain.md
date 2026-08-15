@@ -114,7 +114,7 @@ flowchart LR
 ## 採用方針
 
 - 採用候補を先行固定する場合は、その根拠と確定タイミング (どの issue / ADR で確定するか) を記す。
-- HTTP / WebSocket の framework は未確定。[adr/0001](../adr/0001-tech-stack.md) が Hono を第一候補としつつ確定を feature 設計時としている。scaffold では `packages/api` のディレクトリだけ切る。
+- HTTP / WebSocket の framework は未確定。[adr/0001](../adr/0001-tech-stack.md) は Hono を第一候補とし、確定を「feature 設計時」としていた。feature 設計は完了したが framework の判断材料が出なかったため、**確定は `packages/api` の実装 issue とする**。scaffold ではディレクトリだけを切ってある。
 
 ## Scaffold Policy
 

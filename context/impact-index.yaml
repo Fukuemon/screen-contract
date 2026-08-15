@@ -19,8 +19,11 @@ features:
     read:
       - context/architecture.md
       - design/features/workflow-dsl/DesignDoc_workflow-dsl.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+      - context/infrastructure.md
+    source_refs:
+      - adr/0011-dsl-as-source-of-truth.md
+      - adr/0022-auth-state-storage.md
+    coverage: full
 
   - name: execution
     keywords:
@@ -35,16 +38,21 @@ features:
     read:
       - context/architecture.md
       - design/features/execution/DesignDoc_execution.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+      - context/infrastructure.md
+    source_refs:
+      - adr/0018-ir-version-pinning.md
+      - adr/0022-auth-state-storage.md
+    coverage: full
 
   - name: element-mapping
     keywords: ["永続要素 ID", "構成番号", "Locator", "採番", "core/element"]
     read:
       - context/architecture.md
       - design/features/element-mapping/DesignDoc_element-mapping.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+    source_refs:
+      - adr/0019-agent-led-ai-suggestions.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
 
   - name: artifact-generation
     keywords:
@@ -59,16 +67,18 @@ features:
     read:
       - context/architecture.md
       - design/features/artifact-generation/DesignDoc_artifact-generation.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+    source_refs:
+      - adr/0022-auth-state-storage.md
+    coverage: full
 
   - name: change-detection
     keywords: ["差分", "Baseline", "Visual Diff", "core/diff"]
     read:
       - context/architecture.md
       - design/features/change-detection/DesignDoc_change-detection.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+    source_refs:
+      - adr/0022-auth-state-storage.md
+    coverage: full
 
   - name: web-editor
     keywords:
@@ -83,8 +93,11 @@ features:
     read:
       - context/architecture.md
       - design/features/web-editor/DesignDoc_web-editor.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+      - context/infrastructure.md
+    source_refs:
+      - adr/0021-agent-interface-authz.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
 
   - name: agent-interface
     keywords:
@@ -92,13 +105,18 @@ features:
     read:
       - context/architecture.md
       - design/features/agent-interface/DesignDoc_agent-interface.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+      - context/infrastructure.md
+    source_refs:
+      - adr/0021-agent-interface-authz.md
+      - adr/0020-suggestion-pull-queue.md
+    coverage: full
 
   - name: ai-suggestions
     keywords: ["AI 候補", "AI Port", "adapter/ai", "Locator 候補"]
     read:
       - context/architecture.md
       - design/features/ai-suggestions/DesignDoc_ai-suggestions.md
-    source_refs: []
-    coverage: partial # feature doc 未作成
+    source_refs:
+      - adr/0019-agent-led-ai-suggestions.md
+      - adr/0010-ai-data-boundary.md
+    coverage: full
