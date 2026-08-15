@@ -1,6 +1,44 @@
 import type { Snapshot } from "@screen-contract/domain";
 
 /**
+ * Windows が予約しているデバイス名。**拡張子を付けても予約されたまま**である
+ * (`con.txt` も作れない)。
+ */
+const WINDOWS_RESERVED_NAMES = new Set([
+  "con",
+  "prn",
+  "aux",
+  "nul",
+  ...Array.from({ length: 10 }, (_, i) => `com${i}`),
+  ...Array.from({ length: 10 }, (_, i) => `lpt${i}`),
+]);
+
+/**
+ * パスの 1 セグメントとして、どのプラットフォームでも安全に使えるか。
+ *
+ * 識別子 (run / 認証プロファイル / 保存の鍵) はいずれもファイルパスの
+ * セグメントになるため、**文字種の検査だけでは足りない**。
+ *
+ * - Windows は末尾のドットと空白を落とす。`a.` と `a` が同じファイルを指し、
+ *   別の run の結果が衝突する
+ * - Windows の予約デバイス名はファイルとして作れない。保存が実行時に失敗する
+ *
+ * core-execution に置くのは、`RunId` と `AuthProfileName` をここで定義しており、
+ * `app` の `StoreKey` からも参照できる唯一の位置だからである
+ * (`core` は `app` を参照できない)。
+ */
+export function isPortablePathSegment(segment: string): boolean {
+  if (segment.length === 0) {
+    return false;
+  }
+  if (/[. ]$/.test(segment)) {
+    return false;
+  }
+  const base = segment.split(".")[0] ?? "";
+  return !WINDOWS_RESERVED_NAMES.has(base.toLowerCase());
+}
+
+/**
  * 認証プロファイルの名前。
  *
  * 復号した Storage State を引く索引になるため、検証していない文字列を
@@ -21,9 +59,13 @@ const RESERVED_AUTH_PROFILE_NAMES = new Set(["anonymous"]);
 export function parseAuthProfileName(raw: string): AuthProfileName {
   // 小文字だけを許す。macOS と Windows の既定ファイルシステムは大文字小文字を
   // 区別しないため、Admin と admin が同じ auth/<name>.enc を指してしまう。
-  if (!AUTH_PROFILE_NAME.test(raw) || RESERVED_AUTH_PROFILE_NAMES.has(raw)) {
+  if (
+    !AUTH_PROFILE_NAME.test(raw) ||
+    RESERVED_AUTH_PROFILE_NAMES.has(raw) ||
+    !isPortablePathSegment(raw)
+  ) {
     throw new Error(
-      "認証プロファイル名の規則に合いません (小文字英数と . _ - のみ、64 文字以内、予約語を除く)",
+      "認証プロファイル名の規則に合いません (小文字英数と . _ - のみ、64 文字以内、予約語とプラットフォーム予約名を除く)",
     );
   }
   return raw as AuthProfileName;
@@ -58,8 +100,10 @@ export type RunId = string & { readonly __brand: "RunId" };
 const RUN_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 
 export function parseRunId(raw: string): RunId {
-  if (!RUN_ID.test(raw)) {
-    throw new Error("run の識別子の規則に合いません (小文字英数と . _ - のみ、64 文字以内)");
+  if (!RUN_ID.test(raw) || !isPortablePathSegment(raw)) {
+    throw new Error(
+      "run の識別子の規則に合いません (小文字英数と . _ - のみ、64 文字以内、プラットフォーム予約名を除く)",
+    );
   }
   return raw as RunId;
 }

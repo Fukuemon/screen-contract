@@ -20,6 +20,10 @@ describe("parseStoreKey", () => {
     ["先頭が記号", "-run/001"],
     ["ホームディレクトリ", "~/.zshrc"],
     ["バックスラッシュ区切り", "run\\..\\etc"],
+    // Windows は末尾のドットを落とすため run/a. が run/a と衝突する。
+    ["セグメント末尾がドット", "run/a."],
+    ["予約デバイス名を含む", "run/con/snapshot"],
+    ["予約デバイス名 + 拡張子", "run/nul.json"],
   ])("パスの脱出につながる鍵を拒否する: %s", (_name, raw) => {
     expect(() => parseStoreKey(raw)).toThrow();
   });

@@ -17,7 +17,8 @@ export function createApiApp(useCases: UseCases): ApiApp {
     async startRun(raw: unknown): Promise<void> {
       // 認可はここに入る。ローカルトークンの検証と Origin 検査を通してから
       // use case を呼ぶ (ADR-0021 / context/infrastructure.md)。
-      // HTTP framework が未確定のため、検証は listen の実装と同時に入れる。
+      // framework は Hono に確定しており (ADR-0024)、認可はそのミドルウェアとして
+      // 実装する。**未確定だから保留しているのではない。**
 
       // 外部入力は必ず parseStartRunInput を通す。branded type は実行時の
       // 保証を持たないため、型アサーションで持ち上げると未検証の文字列が

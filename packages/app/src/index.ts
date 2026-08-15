@@ -1,5 +1,6 @@
 import {
   authContextKey,
+  isPortablePathSegment,
   parseAuthProfileName,
   parseRunId,
   type AuthContext,
@@ -21,8 +22,15 @@ export type StoreKey = string & { readonly __brand: "StoreKey" };
 const STORE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export function parseStoreKey(raw: string): StoreKey {
-  if (!raw.split("/").every((segment) => STORE_KEY_SEGMENT.test(segment))) {
-    throw new Error("保存の鍵の規則に合いません (英数字で始まるセグメントを / で連結する)");
+  // 文字種の検査だけでは足りない。Windows は末尾のドットを落とすため `a.` が
+  // `a` と衝突し、予約デバイス名 (`con` 等) はそもそもファイルにできない。
+  const ok = raw
+    .split("/")
+    .every((segment) => STORE_KEY_SEGMENT.test(segment) && isPortablePathSegment(segment));
+  if (!ok) {
+    throw new Error(
+      "保存の鍵の規則に合いません (英数字で始まるセグメントを / で連結する。末尾のドットとプラットフォーム予約名は使えない)",
+    );
   }
   return raw as StoreKey;
 }
