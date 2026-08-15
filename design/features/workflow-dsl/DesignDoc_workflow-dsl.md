@@ -18,7 +18,7 @@ keywords:
 governs:
   - packages/core-workflow/
   - packages/domain/
-verified_commit: unverified
+verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
 ---
 
 # Feature 設計: ワークフロー定義 (core/workflow)

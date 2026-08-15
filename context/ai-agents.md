@@ -5,7 +5,7 @@ description: 非対話で並列起動できる CLI エージェントの一覧�
 keywords: [ai agent, cli, orchestration, review, codex, cursor-agent, opencode]
 governs:
   - .ai-out/
-verified_commit: unverified
+verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
 ---
 
 # AI Agent Registry

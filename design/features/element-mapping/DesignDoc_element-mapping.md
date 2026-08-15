@@ -16,7 +16,7 @@ keywords:
   ]
 governs:
   - packages/core-element/
-verified_commit: unverified
+verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
 ---
 
 # Feature 設計: 画面要素マッピング (core/element)

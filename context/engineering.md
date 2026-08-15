@@ -12,7 +12,7 @@ governs:
   - .prettierignore
   - .dependency-cruiser.cjs
   - knip.json
-verified_commit: fdaa1140dbfc2c5d17110470b9ac30f3fb619c16
+verified_commit: 06294328869e7cee3dcd9a1f51659dff7edf05d7
 ---
 
 # Engineering Conventions
