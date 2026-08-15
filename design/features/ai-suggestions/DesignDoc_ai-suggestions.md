@@ -1,8 +1,8 @@
 ---
 type: feature-design
 title: AI 候補生成 (ai-suggestions)
-description: adapter/ai が実装する Port (AI Port / DSL Fix Port)、provider 抽象と構造化出力の強制、API キーと OAuth の両対応認証、送信情報の境界とエラー分類
-status: 進行中
+description: 改訂待ち。ADR-0019 で候補生成をエージェント主導に変更し adapter/ai を MVP 対象外としたため、本書の provider 抽象・認証・送信境界は実装しない
+status: 改訂待ち (MVP 実装なし)
 keywords:
   [
     AI 候補生成,
@@ -14,16 +14,21 @@ keywords:
     API キー,
     送信境界,
   ]
-governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の adapter/ai)>
+governs: [] # 実装対象を持たない。AI Port は element-mapping、DSL Fix Port は workflow-dsl の feature doc が持つ
 verified_commit: unverified
 ---
 
 # Feature 設計: AI 候補生成 (adapter/ai)
 
+> **本書は改訂待ちである。** [adr/0019](../../../adr/0019-agent-led-ai-suggestions.md) で候補生成を
+> **エージェント主導**に変更し、`adapter/ai` を実用最小限の製品 (MVP) の対象外とした。
+> そのため本書が書く provider 抽象・認証・送信境界は、現時点では**実装しない**。
+> 有効なのは core 側に残る Port の定義 (AI Port / DSL Fix Port) だけである。
+> 認証を扱う [adr/0009](../../../adr/0009-ai-adapter-auth.md) も ADR-0019 に置換済み。
+
 Feature 単位の設計 doc。仕様 (What) をどう実現するか (How) を、データ構造・フロー単位で記述する。責務・範囲・方針の層に留め、実装レベルの手順は spec へ委譲する。全体像は [design/DesignDoc.md](../../DesignDoc.md)、横断規約は [context/](../../../context/) を参照する。
 
-**現在の設計だけを書く。** 判断の経緯は ADR を参照する (認証は [adr/0009](../../../adr/0009-ai-adapter-auth.md)、送信境界は [adr/0010](../../../adr/0010-ai-data-boundary.md))。
+**現在の設計だけを書く。** 判断の経緯は ADR を参照する (候補生成の方式は [adr/0019](../../../adr/0019-agent-led-ai-suggestions.md)、送信境界は [adr/0010](../../../adr/0010-ai-data-boundary.md))。以下の本文は ADR-0019 より前の設計であり、改訂するまで実装の根拠にしない。
 
 ## 概要
 

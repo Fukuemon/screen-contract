@@ -6,7 +6,8 @@ status: 進行中
 keywords:
   [agent interface, MCP, App Server, JSON-RPC, tool, 実行イベント, draft, 承認]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の interface/agent)>
+  - packages/agent/
+  - apps/mcp-bridge/
 verified_commit: unverified
 ---
 

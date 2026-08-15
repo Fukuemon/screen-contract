@@ -15,7 +15,7 @@ keywords:
     core/diff,
   ]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の core/diff)>
+  - packages/core-diff/
 verified_commit: unverified
 ---
 

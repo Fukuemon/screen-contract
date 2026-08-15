@@ -15,7 +15,7 @@ keywords:
     core/element,
   ]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の core/element)>
+  - packages/core-element/
 verified_commit: unverified
 ---
 
@@ -62,7 +62,7 @@ core/element は純粋ロジックであり、ブラウザや AI サービスへ
 - 番号・要素定義を DSL のどこに書くか → workflow-dsl feature ([DesignDoc_workflow-dsl.md](../workflow-dsl/DesignDoc_workflow-dsl.md))
 - Locator 解決の実行時評価 (Expectation の評価) → execution feature
 - Snapshot・DOM・座標の取得方法 → adapter/browser (core/element は入力値として受け取る)
-- AI サービスの選定・認証 → adapter/ai ([DesignDoc_ai-suggestions.md](../ai-suggestions/DesignDoc_ai-suggestions.md)、[adr/0009](../../../adr/0009-ai-adapter-auth.md))
+- AI サービスの選定・認証 → 実用最小限の製品 (MVP) では扱わない。候補生成はエージェント主導とし、`adapter/ai` を実装しない ([adr/0019](../../../adr/0019-agent-led-ai-suggestions.md))
 - 番号バッジの描画・テーブル出力 → artifact-generation feature
 - 要素差分の分類 (Role 変更・文言変更等) → change-detection feature
 

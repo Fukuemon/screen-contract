@@ -6,7 +6,7 @@ status: 進行中
 keywords:
   [注釈画像, Markdown テーブル, 決定的生成, バッジ, 書き換え抑止, core/artifact]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の core/artifact)>
+  - packages/core-artifact/
 verified_commit: unverified
 ---
 

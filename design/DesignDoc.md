@@ -10,7 +10,7 @@ keywords:
 # Screen Contract Design Doc
 
 **Document Status:** Draft
-**Development Status:** TBD
+**Development Status:** scaffold 完了・実装未着手 (monorepo の構成と検査だけが入っている)
 
 本 Design Doc は、ブラウザ操作の再現、画面要素と仕様書構成番号の対応管理、注釈付き画面画像と Markdown テーブルの生成、画面変更差分の検知を行うシステムの全体像を扱う。
 

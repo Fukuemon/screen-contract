@@ -15,7 +15,8 @@ keywords:
     core/execution,
   ]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の core/execution)>
+  - packages/core-execution/
+  - packages/adapter-browser/
 verified_commit: unverified
 ---
 

@@ -15,7 +15,8 @@ keywords:
     web,
   ]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の interface/web)>
+  - apps/web/
+  - packages/api/
 verified_commit: unverified
 ---
 

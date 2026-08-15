@@ -16,7 +16,8 @@ keywords:
     core/workflow,
   ]
 governs:
-  - <実装ディレクトリ確定後に記入 (packages/ の core/workflow)>
+  - packages/core-workflow/
+  - packages/domain/
 verified_commit: unverified
 ---
 
