@@ -13,7 +13,7 @@ keywords:
     DSL Fix Port,
   ]
 governs: [] # 実装対象のディレクトリを持たない。キューは app、Port の型は core が持つ
-verified_commit: f0e228a2d8dc16cb24b8d36710cfd27a271b594f
+verified_commit: ed339e9fb684cc46ebcb7ceea48567202de46c3d
 ---
 
 # Feature 設計: AI 候補生成
