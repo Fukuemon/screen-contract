@@ -4,7 +4,8 @@ title: Codebase Architecture
 description: interface / app / core / adapter の 4 層構造と依存方向、Port 境界、draft-確定の状態境界の規約
 keywords: [architecture, 依存方向, Port, core, adapter, draft, 冪等実行]
 governs:
-  - <実装ディレクトリ確定後に記入>
+  - apps/
+  - packages/
 verified_commit: unverified
 ---
 
@@ -12,7 +13,7 @@ verified_commit: unverified
 
 コードベースの **package / runtime / state boundary と依存方向**。全体像 (system landscape, モジュール責務) は [design/DesignDoc.md](../design/DesignDoc.md) を正本とし、本書は境界規約を扱う。プロジェクト固有の構成は [context/project.yml](project.yml) を参照する。
 
-実装言語・パッケージ構成は技術スタック ADR (未作成) の確定後に追記する。本書の規約は実装技術に依存しない。
+実装技術は [adr/0001-tech-stack.md](../adr/0001-tech-stack.md) で確定済みで、パッケージの実体は `apps/` / `packages/` / `e2e/` にある。本書の規約自体は実装技術に依存しない。
 
 ## Package Boundary
 
@@ -28,15 +29,66 @@ verified_commit: unverified
 | `packages/` | それ以外のすべて (core / app / adapter / api / agent / 型) | デプロイ単位にならない             |
 | `e2e/`      | Playwright                                                 | `apps/` に依存してよい唯一の例外   |
 
-`api` と `agent` を `packages/` に置くのは、listen せず Hono インスタンスとハンドラを組み立てるだけで、プロセスにするのが `apps/server` だからである。
+`api` と `agent` を `packages/` に置くのは、listen せずアプリケーションとハンドラを組み立てるだけで、プロセスにするのが `apps/server` だからである。HTTP framework は未確定である ([toolchain.md](toolchain.md))。
 
 ### 依存方向
 
 - interface (web / api / agent) → app のみに依存する。core / adapter へ直接依存しない。
 - app → core に依存する。**adapter へは依存しない**。Port の実装は合成ルートから注入される ([adr/0023](../adr/0023-composition-root.md))。
 - core → 他の core と domain へは型の参照のみ許可する。app / adapter / interface へ依存しない。
-- adapter → 自身が実装する Port を定義するモジュール (core または app) の型を通じてのみ依存する。
+- adapter → 自身が実装する Port を定義するモジュール (core または app) と domain の型を通じてのみ依存する。
 - 合成ルート (`apps/server`) → 全層に依存してよい。**adapter の具象を選ぶ唯一の場所**とする。
+
+実線は値を含む依存、破線は**型だけ**の依存を表す。
+
+```mermaid
+flowchart TD
+    subgraph apps["apps/ — デプロイ単位"]
+        server["server<br/>合成ルート"]
+        web["web<br/>Web UI"]
+    end
+
+    subgraph iface["packages/ — interface"]
+        api["api"]
+        agent["agent"]
+    end
+
+    app["packages/app<br/>use case + Store Port"]
+
+    subgraph core["packages/ — core"]
+        cw["core-workflow"]
+        ce["core-execution"]
+        cel["core-element"]
+        ca["core-artifact"]
+        cd["core-diff"]
+    end
+
+    domain["packages/domain<br/>共有する型のみ"]
+
+    subgraph adapters["packages/ — adapter"]
+        ab["adapter-browser"]
+        as["adapter-store"]
+    end
+
+    server --> api
+    server --> agent
+    server --> app
+    server --> ab
+    server --> as
+    web -.->|"型のみ"| api
+
+    api --> app
+    agent --> app
+    app --> core
+
+    core -.->|"型のみ"| domain
+    app --> domain
+    ab -.->|"Port の型のみ"| ce
+    ab -.->|"型のみ"| domain
+    as -.->|"Port の型のみ"| app
+```
+
+`apps/server` だけが adapter へ実線で届く。ここが Port の実装を選ぶ唯一の場所である。
 
 ### 禁止経路
 
@@ -68,7 +120,7 @@ Store Port を app に置くのは保存が機能横断のためであり、**�
 
 Nx が「an application project contains the deployable shell: entry point, configuration, and composition of features」「the majority of your code in `libs/`, with `apps/` reduced to wiring」と定める形に一致する。
 
-循環依存・未宣言依存・上記の禁止経路は [engineering.md](engineering.md) の quality gate で検査する (検査コマンドは scaffold 作成時に定義)。
+循環依存・未宣言依存・上記の禁止経路は [engineering.md](engineering.md) の quality gate で検査する。検査コマンドは `pnpm boundaries` (dependency-cruiser) で、pre-push で通す。
 
 参考: [Turborepo Package types](https://turborepo.dev/docs/core-concepts/package-types) / [Turborepo best practices](https://github.com/vercel/turborepo/blob/main/skills/turborepo/references/best-practices/RULE.md) / [Nx Folder Structure](https://nx.dev/docs/kb/folder-structure)
 
@@ -78,7 +130,7 @@ Nx が「an application project contains the deployable shell: entry point, conf
 - Workflow Server (api 層) を唯一の backend とする。web 側の server 機能 (TanStack Start の server function 等) に API ロジックを置かない。中間層 (BFF / 別言語 backend) を追加しない判断は [adr/0001-tech-stack.md](../adr/0001-tech-stack.md)。
 - agent-browser は Workflow Server の子プロセスとして adapter/browser が起動・管理する。
 - AI エージェント (Claude Code / Codex 等) は interface/agent (MCP server / App Server 型 JSON-RPC) からのみ接続する。
-- ライブ映像は agent-browser の WebSocket ストリーミングを Workflow Server 経由で配信する。公開方式は DesignDoc の Open Question (Browser Stream の公開方式) を参照。
+- ライブ映像は agent-browser の WebSocket ストリーミングを Workflow Server 経由で配信する ([adr/0008](../adr/0008-stream-proxy.md))。
 - 秘密情報 (認証情報・トークン) を client / DSL / 成果物へ露出させない ([infrastructure.md](infrastructure.md))。
 
 ## State Boundary

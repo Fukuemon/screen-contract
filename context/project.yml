@@ -9,7 +9,7 @@
 # - 値を変えたら meta.updated を更新し、依存する context/*.md との整合を確認する。
 
 meta:
-  updated: 2026-08-13
+  updated: 2026-08-15
 
 product:
   name: Screen Contract # 製品の通称 (例: 備品管理)
@@ -21,7 +21,7 @@ repos:
   app: "." # 実装 repo。単一 repo 構成なら "."
   docs: "." # 設計文書 repo (app と同一なら ".")
   infra: null # 別管理の infra repo。無ければ null
-  layout: | # 主要ディレクトリ構成 (実装は scaffold 未作成)
+  layout: | # 主要ディレクトリ構成
     screen-contract/
     ├── design/        # 全体像 (landscape) と feature 設計
     ├── context/       # 技術規約 / codebase architecture / 運用契約
@@ -38,10 +38,10 @@ repos:
     │   ├── core-*/    #   workflow / execution / element / artifact / diff
     │   ├── app/       #   use case + Store Port
     │   ├── adapter-*/ #   browser / store (ai は MVP 実装なし。ADR-0019)
-    │   ├── api/       #   Hono app factory (listen しない)
+    │   ├── api/       #   HTTP 層の組み立て。listen しない (framework 未確定)
     │   ├── agent/     #   MCP / JSON-RPC + 共通マッピング層
     │   ├── fixture-app/ # テスト対象アプリ
-    │   └── config/    #   tsconfig / oxlint / vitest の共有設定
+    │   └── config/    #   tsconfig / vitest の共有設定 (oxlint はルート 1 本)
     └── e2e/           # Playwright。apps に依存してよい唯一の例外
 
 # Naming Conventions

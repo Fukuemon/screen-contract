@@ -1,10 +1,13 @@
 ---
 type: context
 title: Toolchain
-description: 標準 toolchain (package manager / task runner / linter 等) の一覧。現在は技術スタック ADR 待ちで未確定
+description: 標準 toolchain (package manager / task runner / linter 等) の一覧と、TypeScript 7 併置とビルド戦略
 keywords: [toolchain, package manager, task runner, linter, formatter]
 governs:
-  - <実装ディレクトリ確定後に記入>
+  - mise.toml
+  - tsconfig.json
+  - pnpm-workspace.yaml
+  - packages/config/tsconfig/
 verified_commit: unverified
 ---
 
@@ -16,15 +19,22 @@ verified_commit: unverified
 
 ## 標準スタック
 
-| 区分            | ツール                  | 備考                                                                 |
-| --------------- | ----------------------- | -------------------------------------------------------------------- |
-| Package manager | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md) |
-| Task runner     | turborepo               | 依存グラフで層の依存規約を反映する                                   |
-| Language        | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                      |
-| Linter          | oxlint                  |                                                                      |
-| Formatter       | oxfmt                   | md / yml は oxfmt 安定まで prettier 併用                             |
-| Unit test       | vitest                  | 統合テストも vitest で書く                                           |
-| E2E             | Playwright              | 責務分担は [testing.md](testing.md)                                  |
+| 区分            | ツール                  | 備考                                                                     |
+| --------------- | ----------------------- | ------------------------------------------------------------------------ |
+| Package manager | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)     |
+| Task runner     | turborepo               | 依存グラフで層の依存規約を反映する                                       |
+| Language        | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                          |
+| Linter          | oxlint                  |                                                                          |
+| Formatter       | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md) |
+| Unit test       | vitest                  | 統合テストも vitest で書く                                               |
+| E2E             | Playwright              | 責務分担は [testing.md](testing.md)                                      |
+| Runtime 管理    | mise                    | Node を LTS に固定する (後述)                                            |
+
+### Node のバージョンを LTS に固定する
+
+Node のバージョンは `mise.toml` で **24 (LTS)** に固定する。宣言の正本を 1 つにするため `.nvmrc` は置かない。
+
+固定する理由は再現性だけではない。dependency-cruiser は node.js のリリースサイクルに追随しており、**奇数系 (25 等) では起動を拒否する**。LTS に揃えると依存境界の検査がそのまま通る。
 
 ### TypeScript 7 の併置構成
 
@@ -63,11 +73,33 @@ declarationMap: true   境界を越えた定義ジャンプと rename
 outDir: dist
 ```
 
+import から実体までの解決経路を示す。依存側が見るのは常に `dist` であり、`src` を直接見ない。
+
+```mermaid
+flowchart LR
+    imp["packages/core-execution/src/index.ts<br/>import ... from '@screen-contract/domain'"]
+    pkg["packages/domain/package.json<br/>exports['.']"]
+    dts["packages/domain/dist/index.d.ts"]
+    js["packages/domain/dist/index.js"]
+    src["packages/domain/src/index.ts"]
+
+    imp --> pkg
+    pkg -->|"types"| dts
+    pkg -->|"default"| js
+    src -->|"tsc --build"| dts
+    src -->|"tsc --build"| js
+    dts -.->|"declarationMap で定義へ戻る"| src
+```
+
+依存境界の検査も同じ経路を辿るため、`dist` が無いとパッケージ間の辺が消える ([engineering.md](engineering.md))。
+
 ビルドしない構成 (Just-in-Time Package) を採らない理由は 3 つ。
 
 - **consumer が 2 系統ある。** `apps/server` は Node、`apps/web` は Vite で動く。ビルドしないと Node 側がトランスパイル層を必要とし、解決経路が 2 本になる。再現性・決定性を最優先とする方針 ([project.yml](project.yml) の `decision_priority`) と合わない
 - **パッケージが 13 個ある。** ビルドしない構成では依存側の型エラーが consumer へ伝播し、発生元の特定に手間がかかる
 - **turborepo のキャッシュが効かない。** ビルド step がないためである
+
+現時点で `pnpm dev` が起動するのは `tsc --build --watch` だけである。`apps/server` と `apps/web` の開発サーバは実装時に足す。
 
 代償は watch が 3 つ走ること (`tsc -b --watch` / `apps/server` / `apps/web`)。TypeScript 7 の `tsc --build` は `--builders` で参照プロジェクトを並列ビルドでき、公式が「monorepo で特に有効」としているため、全体の再ビルドにはならない。定義へのジャンプは `declarationMap` で元ソースへ飛ぶ。
 

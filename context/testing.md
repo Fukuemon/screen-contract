@@ -4,7 +4,11 @@ title: Testing Conventions
 description: テスト 3 層 (unit / 統合 / E2E) の責務分担、fixture 対象アプリ、実行時の起動契約
 keywords: [testing, unit test, 統合テスト, e2e, fixture, テスト方針]
 governs:
-  - <実装ディレクトリ確定後に記入>
+  - packages/*/src/**/*.test.ts
+  - apps/server/src/**/*.integration.test.ts
+  - packages/config/vitest/
+  - packages/fixture-app/
+  - e2e/
 verified_commit: unverified
 ---
 
@@ -16,13 +20,40 @@ verified_commit: unverified
 
 3 層に分ける。層の境界は **agent-browser を実起動するか** で引く。
 
-| 種別 | ツール     | 配置                         | 主担当範囲                                                                    | agent-browser |
-| ---- | ---------- | ---------------------------- | ----------------------------------------------------------------------------- | ------------- |
-| unit | vitest     | 各 package 内                | core 5 モジュールの純粋ロジック、web の表示ロジック、agent の共通マッピング層 | 使わない      |
-| 統合 | vitest     | `packages/app/` 配下のテスト | app + adapter の結線。実行系を api から直接叩く                               | **実起動**    |
-| E2E  | Playwright | リポジトリルートの `e2e/`    | Web UI からの通し操作。要素選択、採番、承認、成果物の受け取り                 | fake で置換   |
+| 種別 | ツール     | 配置                                       | 主担当範囲                                                                    | agent-browser |
+| ---- | ---------- | ------------------------------------------ | ----------------------------------------------------------------------------- | ------------- |
+| unit | vitest     | `packages/*/src/**/*.test.ts`              | core 5 モジュールの純粋ロジック、web の表示ロジック、agent の共通マッピング層 | 使わない      |
+| 統合 | vitest     | `apps/server/src/**/*.integration.test.ts` | app + adapter の結線。実行系を api から直接叩く                               | **実起動**    |
+| E2E  | Playwright | `e2e/src/`                                 | Web UI からの通し操作。要素選択、採番、承認、成果物の受け取り                 | fake で置換   |
 
-配置の具体パスは scaffold 作成時に確定する。
+```mermaid
+flowchart TD
+    subgraph unit["unit — agent-browser を使わない"]
+        u1["core 5 モジュールの純粋ロジック"]
+        u2["Port の相手は fake"]
+    end
+
+    subgraph integ["統合 — agent-browser を実起動する"]
+        i1["apps/server で app + adapter を結線"]
+        i2["api から直接叩く"]
+        i3["fixture 対象アプリを操作する"]
+    end
+
+    subgraph e2e["E2E — Browser Port を fake で置換する"]
+        e1["Playwright が Web UI を操作する"]
+        e2["入れ子ブラウザを避ける"]
+    end
+
+    unit --> integ --> e2e
+    i1 -.->|"中核ロジックの検証はここ"| note["冪等スキップ / 前提の再検証<br/>Locator の解決 / Snapshot 取得"]
+```
+
+unit と統合はディレクトリを分けず、**ファイル名の規約で振り分ける**。テスト対象のソースと離れると参照が追いにくくなるためである。振り分けの実体は `packages/config/vitest/` の 2 つの共有設定が持ち、各パッケージの `vitest.config.ts` はそれを参照するだけに留める。
+
+| コマンド                | 参照する共有設定                        | 対象                     |
+| ----------------------- | --------------------------------------- | ------------------------ |
+| `pnpm test`             | `packages/config/vitest/base.ts`        | `*.test.ts` (統合を除く) |
+| `pnpm test:integration` | `packages/config/vitest/integration.ts` | `*.integration.test.ts`  |
 
 ### unit test
 
@@ -35,6 +66,8 @@ Port の相手は fake 実装を使う。Browser Port は fake、AI Port は fak
 **本プロダクトの中核ロジックはここで検証する。** 冪等スキップ、前提の再検証と巻き戻し、Locator の解決、Snapshot の取得を、実際の agent-browser を起動して確かめる。
 
 Web UI を介さず api から直接叩く。ブラウザスタックが 1 段で済み、実行系の挙動を直接観察できる。
+
+置き場は**合成ルートの `apps/server`** とする。app と adapter を結線したものを検証する以上、テスト自身が両方を参照する。`packages/app` に置くと、`app → adapter` を禁じる依存境界の検査に落ちる。adapter の具象を選んでよい唯一の場所は合成ルートである ([adr/0023](../adr/0023-composition-root.md))。
 
 ### E2E
 
@@ -56,7 +89,7 @@ Playwright を採るのは、Web UI が TanStack Start であること、およ�
 
 ## テスト runtime contract
 
-起動時に次を与える。具体値は scaffold 作成時に確定する。
+起動時に次を与える。具体値は各実装 issue で確定する。
 
 | 対象             | 与えるもの                                                         |
 | ---------------- | ------------------------------------------------------------------ |
@@ -66,7 +99,13 @@ Playwright を採るのは、Web UI が TanStack Start であること、およ�
 
 Workflow Server は 127.0.0.1 のみに bind し、トークンを要求する ([adr/0021](../adr/0021-agent-interface-authz.md))。テストもこの契約に従う。
 
-新しい対象を追加する手順は scaffold 作成時に書く。
+### scaffold 時点で未着手のもの
+
+- **fixture 対象アプリの中身**。`packages/fixture-app` は枠だけで、対象アプリの実体を持たない
+- **E2E の実行系**。`e2e/` の枠はあるが Playwright を依存に入れていない。`pnpm e2e` は理由を出して**失敗する**。黙って成功させると、導入し忘れたまま検査が緑になるためである。Web UI の実装が動いてから入れる
+- **テストコードそのもの**。`*.test.ts` は 1 件も無い。各パッケージの `test` は `--passWithNoTests` で通っている
+
+いずれも実装 issue で埋める。新しい fixture 対象を追加する手順は、対象アプリの実体が入った時点で本節に書く。
 
 ## 横断テスト方針
 
