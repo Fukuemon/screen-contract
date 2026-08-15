@@ -6,7 +6,7 @@ keywords: [architecture, 依存方向, Port, core, adapter, draft, 冪等実行]
 governs:
   - apps/
   - packages/
-verified_commit: unverified
+verified_commit: fdaa1140dbfc2c5d17110470b9ac30f3fb619c16
 ---
 
 # Codebase Architecture
