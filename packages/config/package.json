@@ -1,0 +1,22 @@
+{
+  "name": "@screen-contract/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/*": "./tsconfig/*",
+    "./vitest/*": {
+      "types": "./dist/vitest/*.d.ts",
+      "default": "./dist/vitest/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "peerDependencies": {
+    "vitest": "^4.1.10"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
+  }
+}

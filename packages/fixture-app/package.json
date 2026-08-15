@@ -1,0 +1,20 @@
+{
+  "name": "@screen-contract/fixture-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@screen-contract/config": "workspace:*",
+    "@types/node": "^24.0.0"
+  }
+}

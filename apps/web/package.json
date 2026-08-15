@@ -1,0 +1,14 @@
+{
+  "name": "@screen-contract/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@screen-contract/api": "workspace:*",
+    "@screen-contract/config": "workspace:*"
+  }
+}

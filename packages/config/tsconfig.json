@@ -1,0 +1,10 @@
+{
+  // 共有 vitest 設定も他パッケージと同じく build する (context/toolchain.md のビルド戦略)。
+  // exports を dist に向けることで、型検査の対象から外れる経路を作らない。
+  "extends": "./tsconfig/base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": ["vitest"]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@screen-contract/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "screen-contract-server": "./dist/bin/serve.js"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
+  },
+  "dependencies": {
+    "@screen-contract/adapter-browser": "workspace:*",
+    "@screen-contract/adapter-store": "workspace:*",
+    "@screen-contract/agent": "workspace:*",
+    "@screen-contract/api": "workspace:*",
+    "@screen-contract/app": "workspace:*",
+    "@screen-contract/core-execution": "workspace:*"
+  },
+  "devDependencies": {
+    "@screen-contract/config": "workspace:*",
+    "@types/node": "^24.0.0"
+  }
+}

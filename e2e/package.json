@@ -1,0 +1,17 @@
+{
+  "name": "@screen-contract/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "e2e": "node scripts/not-ready.mjs"
+  },
+  "dependencies": {
+    "@screen-contract/server": "workspace:*"
+  },
+  "devDependencies": {
+    "@screen-contract/config": "workspace:*",
+    "@types/node": "^24.0.0"
+  }
+}

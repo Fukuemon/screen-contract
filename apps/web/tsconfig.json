@@ -1,0 +1,13 @@
+{
+  "extends": "@screen-contract/config/tsconfig/browser.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../../packages/api"
+    }
+  ]
+}

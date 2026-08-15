@@ -1,0 +1,35 @@
+{
+  "name": "screen-contract",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": "^24"
+  },
+  "scripts": {
+    "dev": "tsc --build --watch",
+    "build": "turbo run build",
+    "typecheck": "tsc --build",
+    "lint": "oxlint --type-aware && pnpm typecheck",
+    "format": "oxfmt --check --ignore-path .oxfmtignore . && prettier --check \"**/*.{md,yml,yaml,json}\"",
+    "format:write": "oxfmt --ignore-path .oxfmtignore . && prettier --write \"**/*.{md,yml,yaml,json}\"",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "e2e": "turbo run e2e",
+    "check": "pnpm lint && pnpm format && pnpm test && pnpm build",
+    "boundaries": "turbo run build && depcruise apps/*/src packages/*/src packages/config/vitest e2e/src",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "dependency-cruiser": "^18.2.0",
+    "knip": "^6.32.2",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "prettier": "^3.6.2",
+    "turbo": "^2.10.9",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^4.1.10"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "@screen-contract/config/tsconfig/base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../core-execution"
+    },
+    {
+      "path": "../domain"
+    }
+  ]
+}
