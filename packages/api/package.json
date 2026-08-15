@@ -17,6 +17,7 @@
     "@screen-contract/app": "workspace:*"
   },
   "devDependencies": {
-    "@screen-contract/config": "workspace:*"
+    "@screen-contract/config": "workspace:*",
+    "vitest": "^4.1.10"
   }
 }

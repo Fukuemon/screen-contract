@@ -35,9 +35,6 @@ importers:
       typescript:
         specifier: npm:@typescript/typescript6@^6.0.2
         version: '@typescript/typescript6@6.0.2'
-      vitest:
-        specifier: ^4.1.10
-        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   apps/mcp-bridge:
     devDependencies:
@@ -47,6 +44,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   apps/server:
     dependencies:
@@ -75,6 +75,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   apps/web:
     devDependencies:
@@ -84,12 +87,11 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../../packages/config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   e2e:
-    dependencies:
-      '@screen-contract/server':
-        specifier: workspace:*
-        version: link:../apps/server
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
@@ -103,9 +105,6 @@ importers:
       '@screen-contract/core-execution':
         specifier: workspace:*
         version: link:../core-execution
-      '@screen-contract/domain':
-        specifier: workspace:*
-        version: link:../domain
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
@@ -113,6 +112,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/adapter-store:
     dependencies:
@@ -126,6 +128,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/agent:
     dependencies:
@@ -136,6 +141,9 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/api:
     dependencies:
@@ -146,19 +154,22 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/app:
     dependencies:
       '@screen-contract/core-execution':
         specifier: workspace:*
         version: link:../core-execution
-      '@screen-contract/domain':
-        specifier: workspace:*
-        version: link:../domain
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/config:
     devDependencies:
@@ -175,12 +186,18 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core-diff:
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core-element:
     dependencies:
@@ -191,6 +208,9 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core-execution:
     dependencies:
@@ -201,18 +221,27 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/core-workflow:
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/domain:
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../config
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/fixture-app:
     devDependencies:
@@ -222,6 +251,9 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.7.0)(yaml@2.9.0))
 
 packages:
 

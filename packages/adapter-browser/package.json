@@ -14,11 +14,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@screen-contract/core-execution": "workspace:*",
-    "@screen-contract/domain": "workspace:*"
+    "@screen-contract/core-execution": "workspace:*"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "vitest": "^4.1.10"
   }
 }

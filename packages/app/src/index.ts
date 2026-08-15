@@ -1,5 +1,11 @@
-import type { AuthContext } from "@screen-contract/domain";
-import type { BrowserPort } from "@screen-contract/core-execution";
+import {
+  authContextKey,
+  parseAuthProfileName,
+  parseRunId,
+  type AuthContext,
+  type BrowserPort,
+  type RunId,
+} from "@screen-contract/core-execution";
 
 /**
  * 保存の鍵。
@@ -11,15 +17,12 @@ import type { BrowserPort } from "@screen-contract/core-execution";
  */
 export type StoreKey = string & { readonly __brand: "StoreKey" };
 
+// 先頭を英数字に縛ることで `.` と `..` のセグメントも同時に弾く。
 const STORE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 export function parseStoreKey(raw: string): StoreKey {
-  const segments = raw.split("/");
-  const ok =
-    segments.length > 0 &&
-    segments.every((s) => STORE_KEY_SEGMENT.test(s) && s !== "." && s !== "..");
-  if (!ok) {
-    throw new Error(`保存の鍵として使えない文字列です: ${JSON.stringify(raw)}`);
+  if (!raw.split("/").every((segment) => STORE_KEY_SEGMENT.test(segment))) {
+    throw new Error("保存の鍵の規則に合いません (英数字で始まるセグメントを / で連結する)");
   }
   return raw as StoreKey;
 }
@@ -40,7 +43,36 @@ export interface UseCaseDeps {
 }
 
 export interface StartRunInput {
+  readonly runId: RunId;
   readonly auth: AuthContext;
+}
+
+/**
+ * interface 層 (api / agent) が外部入力を use case の入力へ変換する唯一の経路。
+ *
+ * **interface 層で必ずこれを通す。** branded type は実行時の保証を持たないため、
+ * 型アサーションで持ち上げると `{kind:"profile", name:"../../.ssh/id_rsa"}` が
+ * そのまま保存先のパス組み立てまで届く。
+ *
+ * interface 層は core / domain を参照できない (context/architecture.md) ため、
+ * AuthContext を自力で組み立てられない。app がこの変換を提供する。
+ */
+export function parseStartRunInput(raw: unknown): StartRunInput {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error("run の開始入力がオブジェクトではありません");
+  }
+  const { runId, authProfile } = raw as { runId?: unknown; authProfile?: unknown };
+  if (typeof runId !== "string") {
+    throw new Error("run の開始入力に runId がありません");
+  }
+  if (authProfile !== undefined && authProfile !== null && typeof authProfile !== "string") {
+    throw new Error("認証プロファイル名は文字列で指定します");
+  }
+  const auth: AuthContext =
+    authProfile === undefined || authProfile === null
+      ? { kind: "anonymous" }
+      : { kind: "profile", name: parseAuthProfileName(authProfile) };
+  return { runId: parseRunId(runId), auth };
 }
 
 export interface UseCases {
@@ -52,13 +84,17 @@ export function createUseCases(deps: UseCaseDeps): UseCases {
   return {
     async startRun(input: StartRunInput): Promise<void> {
       const session = await deps.browser.createSession(input.auth);
-      // finally で必ず閉じる。session は復号した認証状態を保持するため、
-      // 異常終了で生き残らせない。
       try {
         const snapshot = await session.snapshot();
-        await deps.store.save(parseStoreKey("run/latest"), JSON.stringify(snapshot));
+        // 鍵に run と認証コンテキストを含める。含めないと権限の異なる実行結果が
+        // 同じ場所へ混ざり、Baseline を (screen, state, authProfile) で
+        // 識別する前提が壊れる (ADR-0022)。
+        const key = parseStoreKey(`run/${input.runId}/${authContextKey(input.auth)}/snapshot`);
+        await deps.store.save(key, JSON.stringify(snapshot));
       } finally {
-        await session.close();
+        // close の失敗で元のエラーを握り潰さない。finally 内で reject すると
+        // try 内の例外が置き換わり、本当の失敗理由が消える。
+        await session.close().catch(() => undefined);
       }
     },
   };

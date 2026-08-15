@@ -1,5 +1,4 @@
-import type { BrowserPort, BrowserSession } from "@screen-contract/core-execution";
-import type { AuthContext } from "@screen-contract/domain";
+import type { AuthContext, BrowserPort, BrowserSession } from "@screen-contract/core-execution";
 
 /**
  * agent-browser を子プロセスとして駆動する。CLI の呼び出しは本 adapter に閉じる。
