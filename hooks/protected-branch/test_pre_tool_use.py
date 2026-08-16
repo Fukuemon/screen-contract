@@ -112,6 +112,19 @@ def run_in(
     return result.returncode
 
 
+def run_raw(payload: dict) -> int:
+    """payload をそのまま渡す。表記ゆれの吸収を検査するために使う。"""
+    env = {k: v for k, v in os.environ.items() if k != "PROTECTED_BRANCH_GUARD_BRANCH"}
+    result = subprocess.run(
+        [sys.executable, str(HOOK)],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    return result.returncode
+
+
 def git(*args: str, cwd: pathlib.Path) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
@@ -161,6 +174,24 @@ def worktree_cases() -> list[str]:
             actual = run_in("", root, tool_name="Edit", file_path=target)
             if actual != expected:
                 failures.append(f"expect={expected} got={actual}  Edit {label}")
+
+        # 編集先 path の表記ゆれを吸収する。1 形だけ見ると path を取り落とし、
+        # session の cwd (= 作業ブランチ) で判定して保護ブランチ上の編集が素通りする。
+        # 認識する形は hooks/lib/tool_use_input.sh と揃える。
+        protected_file = str(root / "a.md")
+        shapes = [
+            ({"tool_name": "Edit", "tool_input": {"file_path": protected_file}}, "tool_input.file_path"),
+            ({"tool_name": "Edit", "tool_input": {"filePath": protected_file}}, "tool_input.filePath"),
+            ({"tool_name": "Edit", "tool_input": {"path": protected_file}}, "tool_input.path"),
+            ({"tool_name": "Edit", "toolInput": {"filePath": protected_file}}, "toolInput.filePath"),
+            ({"tool_name": "Edit", "file_path": protected_file}, "top-level file_path"),
+            ({"tool_name": "Edit", "filePath": protected_file}, "top-level filePath"),
+        ]
+        for payload, label in shapes:
+            # session の cwd は作業ブランチの worktree。path を取れなければ ALLOW に落ちる。
+            actual = run_raw({**payload, "cwd": str(tree)})
+            if actual != DENY:
+                failures.append(f"expect={DENY} got={actual}  Edit via {label}")
 
         git("worktree", "remove", "--force", str(tree), cwd=root)
     return failures

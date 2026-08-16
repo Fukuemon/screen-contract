@@ -181,6 +181,27 @@ def nearest_existing_dir(path: str) -> str | None:
     return None
 
 
+def resolve_edit_path(payload: dict[str, object], tool_input: dict[str, object]) -> str:
+    """編集先の path。payload の表記ゆれを吸収する。
+
+    呼び出し元によって snake_case と camelCase、tool_input 内と top-level が
+    混在する。1 形だけ見ると path を取り落とし、session の cwd で判定して
+    しまうため、保護ブランチ上のファイルへの編集が素通りする。
+    認識する形は hooks/lib/tool_use_input.sh と揃える。
+    """
+    candidates = [
+        tool_input.get("file_path"),
+        tool_input.get("filePath"),
+        tool_input.get("path"),
+        payload.get("file_path"),
+        payload.get("filePath"),
+    ]
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return ""
+
+
 def split_git_command(argv: list[str]) -> tuple[str, list[str]]:
     """global option を読み飛ばして (subcommand, args) を返す。
 
@@ -350,8 +371,8 @@ def main() -> int:
     # session の cwd で判定すると、作業ブランチの worktree にあるファイルや
     # 別 repo のファイルまで巻き添えで塞がる。
     if tool_name in EDIT_TOOLS:
-        file_path = tool_input.get("file_path") or tool_input.get("path")
-        if isinstance(file_path, str) and file_path:
+        file_path = resolve_edit_path(payload, tool_input)
+        if file_path:
             # 相対パスは payload の cwd を基準に解く。hook 自身の cwd で解くと
             # 別 repo を指してしまう。
             if not os.path.isabs(file_path) and cwd:
