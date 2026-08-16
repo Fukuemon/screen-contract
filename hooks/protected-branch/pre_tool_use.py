@@ -77,6 +77,36 @@ CHECKOUT_FLAGS_WITH_VALUE = {
     "-B",
     "-b",
 }
+# git 本体の global option。subcommand の手前に置けるため、読み飛ばさないと
+# `git -C <path> commit` の subcommand を `-C` と誤読してガードが素通りする。
+GIT_GLOBAL_FLAGS = {
+    "--bare",
+    "--literal-pathspecs",
+    "--no-optional-locks",
+    "--no-pager",
+    "--no-replace-objects",
+    "--paginate",
+    "-p",
+}
+GIT_GLOBAL_FLAGS_WITH_VALUE = {
+    "--exec-path",
+    "--git-dir",
+    "--namespace",
+    "--work-tree",
+    "-C",
+    "-c",
+}
+# push に付けても宛先と結果が変わらない修飾だけを許す。
+# `--force` / `--force-with-lease` / `--mirror` / `--no-verify` は含めない。
+PUSH_SAFE_FLAGS = {
+    "--dry-run",
+    "--porcelain",
+    "--quiet",
+    "--verbose",
+    "-n",
+    "-q",
+    "-v",
+}
 
 
 def strip_wrappers(argv: list[str]) -> list[str]:
@@ -135,6 +165,98 @@ def is_readonly_branch_command(args: list[str]) -> bool:
         return False
 
     return True
+
+
+def split_git_command(argv: list[str]) -> tuple[str, list[str]]:
+    """global option を読み飛ばして (subcommand, args) を返す。
+
+    `git -C <path> push` のように subcommand の手前へ option を置けるため、
+    argv[1] をそのまま subcommand とみなすとガードが素通りする。
+    なお `-C` で別 repo を指しても、判定に使うブランチは
+    CLAUDE_PROJECT_DIR のものである。厳しい側に倒れるので許容する。
+    """
+    index = 1
+    while index < len(argv):
+        arg = argv[index]
+        if arg in GIT_GLOBAL_FLAGS:
+            index += 1
+            continue
+        if arg in GIT_GLOBAL_FLAGS_WITH_VALUE:
+            index += 2
+            continue
+        if arg.startswith("--") and arg.split("=", 1)[0] in GIT_GLOBAL_FLAGS_WITH_VALUE:
+            index += 1
+            continue
+        return arg, argv[index + 1 :]
+    return "", []
+
+
+def is_allowed_branch_delete(args: list[str], branch: str, cwd: str | None) -> bool:
+    """マージ済みブランチの後片付けを許すか。
+
+    保護ブランチ上でも、**別の**ブランチを消す操作は保護ブランチを変更しない。
+    PR マージ後の後片付けがガードで止まると、作業ブランチへ切り替えるためだけの
+    無意味な往復が生まれる。
+
+    許すのは安全側の `-d` / `--delete` だけとする。`-D` は未マージでも消すため、
+    取り戻せない削除になる。
+    """
+    safe_delete = {"-d", "--delete"}
+    if not any(arg in safe_delete for arg in args):
+        return False
+
+    targets: list[str] = []
+    for arg in args:
+        if arg in safe_delete:
+            continue
+        if arg.startswith("-"):
+            return False
+        targets.append(arg)
+
+    if not targets:
+        return False
+    return all(
+        target != branch and not is_protected_branch(target, cwd) for target in targets
+    )
+
+
+def is_allowed_push_delete(args: list[str], cwd: str | None) -> bool:
+    """リモートの作業ブランチ削除を許すか。
+
+    `git push origin --delete <branch>` と `git push origin :<branch>` に限る。
+    保護ブランチを宛先にした削除と、`--force` 系の修飾は許さない。
+    """
+    saw_delete = False
+    positionals: list[str] = []
+
+    for arg in args:
+        if arg in {"--delete", "-d"}:
+            saw_delete = True
+            continue
+        if arg in PUSH_SAFE_FLAGS:
+            continue
+        if arg.startswith("-"):
+            return False
+        positionals.append(arg)
+
+    # 宛先 remote と ref が最低 1 つずつ必要。remote を省いた形は許さない。
+    if len(positionals) < 2:
+        return False
+    refs = positionals[1:]
+
+    if not saw_delete:
+        # refspec 形式は左辺が空 (`:<ref>`) のときだけ削除になる。
+        if not all(ref.startswith(":") for ref in refs):
+            return False
+    elif any(ref.startswith(":") for ref in refs):
+        return False
+
+    names = [ref.lstrip(":") for ref in refs]
+    if not all(names):
+        return False
+    return all(
+        not is_protected_branch(name.removeprefix("refs/heads/"), cwd) for name in names
+    )
 
 
 def is_allowed_checkout_command(args: list[str]) -> bool:
@@ -201,8 +323,20 @@ def main() -> int:
     else:
         argv = []
 
-    branch = current_branch()
-    if not is_protected_branch(branch):
+    # 判定は **コマンドが実際に走る作業ツリー** で行う。
+    # git worktree では作業ツリーごとにブランチが違うため、常に
+    # CLAUDE_PROJECT_DIR で判定すると作業ブランチの worktree でも
+    # 保護ブランチとみなされ、commit が一切できなくなる。
+    # cwd が repo の外なら判定できないので、従来どおりプロセスの cwd に委ねる。
+    cwd = payload.get("cwd")
+    if not isinstance(cwd, str):
+        cwd = None
+    branch = current_branch(cwd)
+    if not branch:
+        cwd = None
+        branch = current_branch()
+
+    if not is_protected_branch(branch, cwd):
         return 0
 
     if tool_name in EDIT_TOOLS:
@@ -211,14 +345,15 @@ def main() -> int:
             "Switch to a work branch first, for example: git switch -c feature/<issue-number>"
         )
 
-    subcommand = argv[1] if len(argv) > 1 else ""
-    args = argv[2:]
+    subcommand, args = split_git_command(argv)
 
     if subcommand in READONLY_GIT:
         return 0
 
     if subcommand == "branch":
         if is_readonly_branch_command(args):
+            return 0
+        if is_allowed_branch_delete(args, branch, cwd):
             return 0
         return deny(
             f"Mutating git branch command is blocked on protected branch '{branch}': {command}"
@@ -241,6 +376,9 @@ def main() -> int:
         return deny(
             f"Git worktree mutation is blocked on protected branch '{branch}': {command}"
         )
+
+    if subcommand == "push" and is_allowed_push_delete(args, cwd):
+        return 0
 
     if subcommand in MUTATING_GIT:
         return deny(
