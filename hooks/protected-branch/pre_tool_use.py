@@ -7,7 +7,7 @@ import os
 import shlex
 import sys
 
-from common import current_branch, is_protected_branch
+from common import current_branch, is_protected_branch, upstream_of
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit"}
 WRAPPERS = {"rtk"}
@@ -308,16 +308,17 @@ def is_allowed_push_delete(args: list[str], cwd: str | None) -> bool:
     )
 
 
-def is_allowed_pull(args: list[str]) -> bool:
-    """上流への早送りだけを許すか。
+def is_allowed_pull(args: list[str], branch: str, cwd: str | None) -> bool:
+    """設定済みの上流への早送りだけを許すか。
 
-    `--ff-only` を明示した pull は、分岐していれば中止する。したがって
-    保護ブランチ上に新しい commit を作れない。ref を上流に合わせて進める
-    だけなので、ローカル由来の変更は一切生まれない。
+    `--ff-only` は「早送りできなければ中止する」だけであり、**取り込み元は
+    制限しない**。`git pull --ff-only . feature` は保護ブランチを feature の
+    commit へ直接早送りするため、PR を経由しない保護ブランチの変更が成立する。
+    したがって `--ff-only` の確認だけでは足りず、取り込み元が設定済みの上流で
+    あることまで確かめる。
 
     `--ff-only` の無い pull は、分岐時にマージ commit を作るか rebase で
-    履歴を書き換える。これは作業ブランチと PR を経由しない保護ブランチの
-    変更そのものなので許さない。
+    履歴を書き換えるため、そもそも許さない。
     """
     if "--ff-only" not in args:
         return False
@@ -330,54 +331,85 @@ def is_allowed_pull(args: list[str]) -> bool:
             return False
         positionals.append(arg)
 
-    # 受け付けるのは省略形と `<remote> <branch>` まで。refspec は宛先が
-    # 読み取りにくいので許さない。
+    # 引数なしの形は設定済みの上流をそのまま使う。git 側が解決するため素通しでよい。
+    if not positionals:
+        return True
+
+    upstream = upstream_of(branch, cwd)
+    if upstream is None:
+        return False
+    remote, merge_ref = upstream
+
+    if positionals[0] != remote:
+        return False
+    if len(positionals) == 1:
+        return True
     if len(positionals) > 2:
         return False
-    return all(":" not in positional for positional in positionals)
+
+    # 上流の ref は `refs/heads/<name>` 形式。短い形での指定も受ける。
+    return positionals[1] in {merge_ref, merge_ref.removeprefix("refs/heads/")}
 
 
 def is_allowed_restore(args: list[str]) -> bool:
-    """作業ツリーを commit 済みの状態へ戻す操作を許すか。
+    """作業ツリーを HEAD の内容へ戻す操作を許すか。
 
     保護ブランチ上では編集自体をガードが禁じているため、そこに残る未 commit の
-    変更は事故か配布由来である。破棄は保護ブランチを commit 済みの状態へ戻す
-    操作であり、ガードが目指す状態そのものなので塞がない。
+    変更は事故か配布由来である。HEAD へ戻すのは保護ブランチを commit 済みの
+    状態へ近づける操作なので塞がない。
 
-    ただし戻す先は HEAD に限る。`--source` で任意の commit の内容を持ち込む形は、
-    保護ブランチの作業ツリーを別の状態へ**変更する**操作なので許さない。
-    index を触る `--staged` も、commit の下準備なので許さない。
+    ただし復元元の明示を必須にする。`--source` を省いた `git restore <path>` は
+    **HEAD ではなく index** を復元元にするため、staged の内容がそのまま残る。
+    これでは「commit 済みの状態へ戻す」という許可の根拠が成り立たない。
+    index を書き換える `--staged` も、commit の下準備なので許さない。
     """
     if not args:
         return False
 
     positionals: list[str] = []
-    for arg in args:
+    saw_head_source = False
+    index = 0
+    while index < len(args):
+        arg = args[index]
         if arg in {"--worktree", "-W", "--quiet", "-q", "--progress", "--no-progress"}:
+            index += 1
             continue
         if arg == "--":
+            index += 1
+            continue
+        if arg in {"--source", "-s"}:
+            if index + 1 >= len(args) or args[index + 1] != "HEAD":
+                return False
+            saw_head_source = True
+            index += 2
+            continue
+        if arg.startswith("--source="):
+            if arg.split("=", 1)[1] != "HEAD":
+                return False
+            saw_head_source = True
+            index += 1
             continue
         if arg.startswith("-"):
             return False
         positionals.append(arg)
+        index += 1
 
-    return bool(positionals)
+    return saw_head_source and bool(positionals)
 
 
 def is_allowed_checkout_restore(args: list[str]) -> bool:
-    """`git checkout -- <path>` を許すか。
+    """`git checkout HEAD -- <path>` を許すか。
 
-    `--` より後ろだけを対象にする。区切りの無い `git checkout <name>` は
-    ブランチ切り替えとパス復元のどちらにも解釈できるため、ここでは扱わない。
+    復元元に HEAD の明示を求める。`git checkout -- <path>` は index を
+    復元元にするため、staged の内容が残り「commit 済みの状態へ戻す」に
+    ならない。HEAD 以外の tree-ish は別 commit の内容を持ち込む変更なので
+    許さない。
     """
     if "--" not in args:
         return False
 
     separator = args.index("--")
-    if any(arg.startswith("-") for arg in args[:separator]):
-        return False
-    # `git checkout <tree-ish> -- <path>` は別 commit の内容を持ち込むので許さない。
-    if separator != 0:
+    if args[:separator] != ["HEAD"]:
         return False
     return bool(args[separator + 1 :])
 
@@ -518,7 +550,7 @@ def main() -> int:
     if subcommand == "push" and is_allowed_push_delete(args, cwd):
         return 0
 
-    if subcommand == "pull" and is_allowed_pull(args):
+    if subcommand == "pull" and is_allowed_pull(args, branch, cwd):
         return 0
 
     if subcommand == "restore" and is_allowed_restore(args):
