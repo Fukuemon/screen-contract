@@ -79,3 +79,28 @@ def protected_branches(cwd: str | None = None) -> set[str]:
 
 def is_protected_branch(branch: str, cwd: str | None = None) -> bool:
     return branch in protected_branches(cwd)
+
+
+def _git_config(key: str, cwd: str | None) -> str:
+    result = subprocess.run(
+        ["git", "config", "--get", key],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=_usable_cwd(cwd),
+    )
+    return result.stdout.strip()
+
+
+def upstream_of(branch: str, cwd: str | None = None) -> tuple[str, str] | None:
+    """branch に設定された上流。(remote, ref) を返す。未設定なら None。
+
+    ref は `refs/heads/<name>` 形式。`git rev-parse @{upstream}` の出力を
+    分解する方法は取らない。`origin/feature/x` のようにブランチ名へ `/` が
+    入ると remote 名との境界を決められないためである。
+    """
+    remote = _git_config(f"branch.{branch}.remote", cwd)
+    merge = _git_config(f"branch.{branch}.merge", cwd)
+    if not remote or not merge:
+        return None
+    return remote, merge

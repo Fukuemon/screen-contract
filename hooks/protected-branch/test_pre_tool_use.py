@@ -54,6 +54,28 @@ CASES: list[tuple[int, str]] = [
     (DENY, "git -C /tmp/other commit -m x"),
     (DENY, "git --no-pager push origin develop"),
     (ALLOW, "git -C /tmp/other status"),
+    # 引数なしの形は設定済みの上流をそのまま使う
+    (ALLOW, "git pull --ff-only"),
+    (ALLOW, "git pull --quiet --ff-only"),
+    # --ff-only の無い pull は分岐時に commit を作るので塞ぐ
+    (DENY, "git pull"),
+    (DENY, "git pull origin develop"),
+    (DENY, "git pull --rebase --ff-only"),
+    (DENY, "git pull --ff-only --autostash"),
+    # 作業ツリーを HEAD の内容へ戻す操作は通す
+    (ALLOW, "git restore --source=HEAD hooks/"),
+    (ALLOW, "git restore -s HEAD --worktree hooks/ scripts/"),
+    (ALLOW, "git checkout HEAD -- hooks/"),
+    # 復元元を省いた形は index が復元元になり、staged の内容が残るので塞ぐ
+    (DENY, "git restore hooks/"),
+    (DENY, "git checkout -- hooks/"),
+    # 別 commit の内容を持ち込む形と index を触る形は塞ぐ
+    (DENY, "git restore --source=HEAD~1 hooks/"),
+    (DENY, "git restore --staged --source=HEAD hooks/"),
+    (DENY, "git restore --source=HEAD"),
+    (DENY, "git restore"),
+    (DENY, "git checkout HEAD~1 -- hooks/"),
+    (DENY, "git checkout --"),
     # ラッパー前置を剥がさないと素通りする
     (DENY, "rtk git commit -m x"),
 ]
@@ -127,6 +149,45 @@ def run_raw(payload: dict) -> int:
 
 def git(*args: str, cwd: pathlib.Path) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+def pull_upstream_cases() -> list[str]:
+    """取り込み元が設定済みの上流であることまで確かめる。
+
+    `--ff-only` は早送りできなければ中止するだけで、取り込み元は制限しない。
+    ここが壊れると `git pull --ff-only . feature` で保護ブランチを feature の
+    commit へ直接早送りでき、PR を経由しない変更が通ってしまう。
+    """
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        origin = pathlib.Path(tmp) / "origin.git"
+        git("init", "-q", "--bare", "-b", "develop", str(origin), cwd=pathlib.Path(tmp))
+
+        root = pathlib.Path(tmp) / "repo"
+        root.mkdir()
+        git("init", "-q", "-b", "develop", cwd=root)
+        git("-c", "user.email=t@example.com", "-c", "user.name=t",
+            "commit", "-q", "--allow-empty", "-m", "init", cwd=root)
+        git("remote", "add", "origin", str(origin), cwd=root)
+        git("push", "-q", "-u", "origin", "develop", cwd=root)
+        git("branch", "feature/x", cwd=root)
+
+        checks = [
+            (ALLOW, "git pull --ff-only"),
+            (ALLOW, "git pull --ff-only origin"),
+            (ALLOW, "git pull --ff-only origin develop"),
+            (ALLOW, "git pull --ff-only origin refs/heads/develop"),
+            # 上流以外からの取り込みは、早送りでも PR を経由しない変更になる
+            (DENY, "git pull --ff-only . feature/x"),
+            (DENY, "git pull --ff-only origin feature/x"),
+            (DENY, "git pull --ff-only /tmp/elsewhere develop"),
+            (DENY, "git pull --ff-only origin develop extra"),
+        ]
+        for expected, command in checks:
+            actual = run_in(command, root)
+            if actual != expected:
+                failures.append(f"expect={expected} got={actual}  upstream: {command}")
+    return failures
 
 
 def worktree_cases() -> list[str]:
@@ -226,6 +287,7 @@ def main() -> int:
             if actual != ALLOW:
                 failures.append(f"expect={ALLOW} got={actual}  unprotected: {tool_name}")
 
+    failures.extend(pull_upstream_cases())
     failures.extend(worktree_cases())
 
     for line in failures:
