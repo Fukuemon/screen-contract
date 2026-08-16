@@ -54,6 +54,26 @@ CASES: list[tuple[int, str]] = [
     (DENY, "git -C /tmp/other commit -m x"),
     (DENY, "git --no-pager push origin develop"),
     (ALLOW, "git -C /tmp/other status"),
+    # 上流への早送りは通す。分岐していれば git 自身が中止するため commit を作れない
+    (ALLOW, "git pull --ff-only"),
+    (ALLOW, "git pull --ff-only origin develop"),
+    (ALLOW, "git pull --quiet --ff-only"),
+    # --ff-only の無い pull は分岐時に commit を作るので塞ぐ
+    (DENY, "git pull"),
+    (DENY, "git pull origin develop"),
+    (DENY, "git pull --rebase --ff-only"),
+    (DENY, "git pull --ff-only --autostash"),
+    (DENY, "git pull --ff-only origin +develop:develop"),
+    # 作業ツリーを commit 済みの状態へ戻す操作は通す
+    (ALLOW, "git restore hooks/"),
+    (ALLOW, "git restore --worktree hooks/ scripts/"),
+    (ALLOW, "git checkout -- hooks/"),
+    # 別 commit の内容を持ち込む形と index を触る形は塞ぐ
+    (DENY, "git restore --source=HEAD~1 hooks/"),
+    (DENY, "git restore --staged hooks/"),
+    (DENY, "git restore"),
+    (DENY, "git checkout HEAD~1 -- hooks/"),
+    (DENY, "git checkout --"),
     # ラッパー前置を剥がさないと素通りする
     (DENY, "rtk git commit -m x"),
 ]

@@ -108,6 +108,20 @@ PUSH_SAFE_FLAGS = {
     "-q",
     "-v",
 }
+# pull に付けても「上流へ早送りする」以上のことをしない修飾だけを許す。
+# `--rebase` / `--no-ff` / `--autostash` / `--allow-unrelated-histories` は含めない。
+PULL_SAFE_FLAGS = {
+    "--no-stat",
+    "--no-tags",
+    "--prune",
+    "--quiet",
+    "--stat",
+    "--tags",
+    "--verbose",
+    "-n",
+    "-q",
+    "-v",
+}
 
 
 def strip_wrappers(argv: list[str]) -> list[str]:
@@ -294,6 +308,80 @@ def is_allowed_push_delete(args: list[str], cwd: str | None) -> bool:
     )
 
 
+def is_allowed_pull(args: list[str]) -> bool:
+    """上流への早送りだけを許すか。
+
+    `--ff-only` を明示した pull は、分岐していれば中止する。したがって
+    保護ブランチ上に新しい commit を作れない。ref を上流に合わせて進める
+    だけなので、ローカル由来の変更は一切生まれない。
+
+    `--ff-only` の無い pull は、分岐時にマージ commit を作るか rebase で
+    履歴を書き換える。これは作業ブランチと PR を経由しない保護ブランチの
+    変更そのものなので許さない。
+    """
+    if "--ff-only" not in args:
+        return False
+
+    positionals: list[str] = []
+    for arg in args:
+        if arg == "--ff-only" or arg in PULL_SAFE_FLAGS:
+            continue
+        if arg.startswith("-"):
+            return False
+        positionals.append(arg)
+
+    # 受け付けるのは省略形と `<remote> <branch>` まで。refspec は宛先が
+    # 読み取りにくいので許さない。
+    if len(positionals) > 2:
+        return False
+    return all(":" not in positional for positional in positionals)
+
+
+def is_allowed_restore(args: list[str]) -> bool:
+    """作業ツリーを commit 済みの状態へ戻す操作を許すか。
+
+    保護ブランチ上では編集自体をガードが禁じているため、そこに残る未 commit の
+    変更は事故か配布由来である。破棄は保護ブランチを commit 済みの状態へ戻す
+    操作であり、ガードが目指す状態そのものなので塞がない。
+
+    ただし戻す先は HEAD に限る。`--source` で任意の commit の内容を持ち込む形は、
+    保護ブランチの作業ツリーを別の状態へ**変更する**操作なので許さない。
+    index を触る `--staged` も、commit の下準備なので許さない。
+    """
+    if not args:
+        return False
+
+    positionals: list[str] = []
+    for arg in args:
+        if arg in {"--worktree", "-W", "--quiet", "-q", "--progress", "--no-progress"}:
+            continue
+        if arg == "--":
+            continue
+        if arg.startswith("-"):
+            return False
+        positionals.append(arg)
+
+    return bool(positionals)
+
+
+def is_allowed_checkout_restore(args: list[str]) -> bool:
+    """`git checkout -- <path>` を許すか。
+
+    `--` より後ろだけを対象にする。区切りの無い `git checkout <name>` は
+    ブランチ切り替えとパス復元のどちらにも解釈できるため、ここでは扱わない。
+    """
+    if "--" not in args:
+        return False
+
+    separator = args.index("--")
+    if any(arg.startswith("-") for arg in args[:separator]):
+        return False
+    # `git checkout <tree-ish> -- <path>` は別 commit の内容を持ち込むので許さない。
+    if separator != 0:
+        return False
+    return bool(args[separator + 1 :])
+
+
 def is_allowed_checkout_command(args: list[str]) -> bool:
     if not args or "--" in args:
         return False
@@ -411,6 +499,8 @@ def main() -> int:
         return 0
 
     if subcommand == "checkout":
+        if is_allowed_checkout_restore(args):
+            return 0
         if is_allowed_checkout_command(args):
             return 0
         return deny(
@@ -426,6 +516,12 @@ def main() -> int:
         )
 
     if subcommand == "push" and is_allowed_push_delete(args, cwd):
+        return 0
+
+    if subcommand == "pull" and is_allowed_pull(args):
+        return 0
+
+    if subcommand == "restore" and is_allowed_restore(args):
         return 0
 
     if subcommand in MUTATING_GIT:
