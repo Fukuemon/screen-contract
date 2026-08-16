@@ -87,12 +87,18 @@ def run_tool(tool_name: str, branch: str, cwd: pathlib.Path) -> int:
     return result.returncode
 
 
-def run_in(command: str, cwd: pathlib.Path, tool_name: str = "Bash") -> int:
+def run_in(
+    command: str,
+    cwd: pathlib.Path,
+    tool_name: str = "Bash",
+    file_path: pathlib.Path | None = None,
+) -> int:
     """payload の cwd で判定させる (PROTECTED_BRANCH_GUARD_BRANCH を使わない)。"""
     env = {k: v for k, v in os.environ.items() if k != "PROTECTED_BRANCH_GUARD_BRANCH"}
-    tool_input = (
-        {"command": command} if tool_name == "Bash" else {"file_path": "a.md"}
-    )
+    if tool_name == "Bash":
+        tool_input: dict[str, str] = {"command": command}
+    else:
+        tool_input = {"file_path": str(file_path) if file_path else "a.md"}
     payload = json.dumps(
         {"tool_name": tool_name, "tool_input": tool_input, "cwd": str(cwd)}
     )
@@ -142,6 +148,19 @@ def worktree_cases() -> list[str]:
             actual = run_in("", cwd, tool_name="Edit")
             if actual != expected:
                 failures.append(f"expect={expected} got={actual}  Edit in {label} worktree")
+
+        # 編集先が属する作業ツリーで判定する。session の cwd は保護ブランチのままでも、
+        # 作業ブランチの worktree にあるファイルは編集できる。
+        edit_checks = [
+            (DENY, root / "a.md", "protected worktree file"),
+            (ALLOW, tree / "a.md", "feature worktree file"),
+            # 未作成のファイルも親ディレクトリで判定できる
+            (ALLOW, tree / "sub" / "new.md", "feature worktree new file"),
+        ]
+        for expected, target, label in edit_checks:
+            actual = run_in("", root, tool_name="Edit", file_path=target)
+            if actual != expected:
+                failures.append(f"expect={expected} got={actual}  Edit {label}")
 
         git("worktree", "remove", "--force", str(tree), cwd=root)
     return failures

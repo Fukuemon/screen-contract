@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import sys
 
@@ -165,6 +166,19 @@ def is_readonly_branch_command(args: list[str]) -> bool:
         return False
 
     return True
+
+
+def nearest_existing_dir(path: str) -> str | None:
+    """path を含む、実在する最も近いディレクトリ。
+
+    新規作成の Write では path 自体がまだ無いため、親を遡って探す。
+    """
+    current = os.path.dirname(os.path.abspath(path))
+    while current and current != os.path.dirname(current):
+        if os.path.isdir(current):
+            return current
+        current = os.path.dirname(current)
+    return None
 
 
 def split_git_command(argv: list[str]) -> tuple[str, list[str]]:
@@ -331,6 +345,19 @@ def main() -> int:
     cwd = payload.get("cwd")
     if not isinstance(cwd, str):
         cwd = None
+
+    # ファイル編集は **編集先が属する作業ツリー** で判定する。
+    # session の cwd で判定すると、作業ブランチの worktree にあるファイルや
+    # 別 repo のファイルまで巻き添えで塞がる。
+    if tool_name in EDIT_TOOLS:
+        file_path = tool_input.get("file_path") or tool_input.get("path")
+        if isinstance(file_path, str) and file_path:
+            # 相対パスは payload の cwd を基準に解く。hook 自身の cwd で解くと
+            # 別 repo を指してしまう。
+            if not os.path.isabs(file_path) and cwd:
+                file_path = os.path.join(cwd, file_path)
+            cwd = nearest_existing_dir(file_path) or cwd
+
     branch = current_branch(cwd)
     if not branch:
         cwd = None
