@@ -20,7 +20,7 @@
 | 3   | 上位文書突合                | 完了       | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context) |
 | 4   | 論点整理                    | 完了       | 2026-08-22 | D1〜D12 を起票                                      |
 | 5   | 論点解決                    | レビュー済 | 2026-08-23 | D1〜D23 を確定。clarify gate PASS (6 回目)          |
-| 6   | Interface / Routing 設計    | 未着手     |            |                                                     |
+| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | diagram phase で 3 図を起こし実レンダリングで検証   |
 | 7   | Content / Data 設計         | 未着手     |            |                                                     |
 | 8   | Performance / Security 設計 | 未着手     |            |                                                     |
 | 9   | Test / Metrics 設計         | 未着手     |            |                                                     |
@@ -464,18 +464,118 @@ diagram phase で確定させる。現時点で必要と見込む面を列挙す
 
 ## フロー / シーケンス
 
-diagram phase で生成する。現時点では枠のみを置く。
+skeleton が通す経路を 3 つの図で示す。1 つ目は利用者の操作起点の全体、2 つ目は記録の 1 クリック、3 つ目は再現と冪等スキップである。
 
 ### Flowchart (ユーザー操作起点)
 
 ```mermaid
 flowchart TD
+    start["Workflow Server を起動"] --> check{"起動時検査 3 件"}
+    check -->|"いずれか不成立"| abort["理由と対処を出して中止"]
+    check -->|"すべて成立"| authoring["Screen 文書の骨格と<br/>entry の Workflow 文書を手で書く"]
+    authoring --> runstart["run を開始 (pause を予約)"]
+    runstart --> paused1["entry の完了時に paused"]
+    paused1 --> opmode["操作モードへ切替 → 記録開始"]
+    opmode --> opclick["viewport でボタンをクリック"]
+    opclick --> resolve{"座標を一意な<br/>Semantic Locator へ解決できるか"}
+    resolve -->|"できる"| stepref["click の step (ref) と<br/>要素定義を draft へ"]
+    resolve -->|"できない"| steppoint["clickPoint として残し警告"]
+    stepref --> stop["記録を停止"]
+    steppoint --> stop
+    stop --> cand["操作の前後で変化した項目から<br/>Expectation 候補を提示"]
+    cand --> pick["候補を選び step の expect へ"]
+    pick --> req["承認依頼 (draft の内容ハッシュを固定)"]
+    req --> staleq{"承認待ちの間に draft を編集したか"}
+    staleq -->|"編集した"| stale["stale として確定しない"]
+    staleq -->|"編集していない"| commit["正本の置き場へ確定"]
+    commit --> replay["run.start<br/>(別の run / 新しいセッション / pause を予約)"]
+    replay --> paused2["全ステップの完了時に paused"]
+    paused2 --> rerun["同じセッションで<br/>最初のステップから rerun_step"]
+    rerun --> skipped["全ステップが skipped → completed"]
+    skipped --> gen["成果物を生成<br/>(注釈画像 SVG / 生スクリーンショット / テーブル)"]
+    gen --> gen2["同じ入力でもう一度生成"]
+    gen2 --> nochange["書き換えない (mtime も変わらない)"]
 ```
 
-### Sequence
+### Sequence — 記録の 1 クリック
+
+入力転送の前に box 付き要素一覧を取る (D5)。中継条件の検証は server 側で行う (ADR-0008)。
 
 ```mermaid
 sequenceDiagram
+    actor User as 利用者
+    participant Web as Web UI
+    participant API as api (Stream Proxy)
+    participant App as app (use case)
+    participant Elem as core/element
+    participant AB as adapter/browser
+    participant Browser as agent-browser
+
+    User->>Web: viewport をクリック
+    Web->>API: input_mouse (x, y)
+    API->>API: 中継条件を検証 (paused / 操作モード / 要求元の run)
+    alt 条件を満たさない
+        API-->>Web: 破棄し、破棄をイベントに残す
+    else 条件を満たす
+        API->>App: 記録中の入力として渡す
+        App->>AB: box 付き要素一覧を要求
+        AB->>Browser: --annotate screenshot --json
+        Browser-->>AB: annotations (ref / role / name / box)
+        AB-->>App: 要素一覧 (注釈済み画像は保存しない)
+        App->>Elem: 座標と要素一覧から候補を解決
+        alt 一意に解決できる
+            Elem-->>App: role+name の Locator
+            App->>App: click の step と要素定義を draft へ
+        else 一意にならない
+            Elem-->>App: 解決不能
+            App->>App: clickPoint として残し警告を付ける
+        end
+        App->>AB: 入力を転送
+        AB->>Browser: input_mouse を中継
+    end
+```
+
+### Sequence — 再現と冪等スキップ
+
+`run.start` は新しいセッションで `open` から実行する。`rerun_step` は同じセッションの `paused` から掛ける (D22)。
+
+```mermaid
+sequenceDiagram
+    actor User as 利用者
+    participant API as api
+    participant App as app (use case)
+    participant Exec as core/execution
+    participant AB as adapter/browser
+    participant Browser as agent-browser
+
+    User->>API: run.start (pause を予約)
+    API->>App: run を開始
+    App->>Exec: 実行ステップ列を渡す
+    Exec->>AB: createSession (匿名)
+    AB->>Browser: 新しいセッションを開く
+    loop 各ステップ
+        Exec->>AB: Snapshot を取得
+        AB-->>Exec: Snapshot
+        Exec->>Exec: Expectation を評価
+        alt すべて満たす
+            Exec-->>App: step-skipped
+        else 満たさない
+            Exec->>AB: action を実行
+            Exec->>AB: Snapshot を再取得
+            Exec->>Exec: Expectation を再評価
+            Exec-->>App: step-executed または step-failed
+        end
+    end
+    Note over Exec: 最終ステップの完了と pause 予約が重なったら pause を優先する
+    Exec-->>App: paused
+    User->>API: rerun_step (最初のステップ / 同じセッション)
+    API->>Exec: 指定ステップ以降を再実行
+    loop 各ステップ
+        Exec->>AB: Snapshot を取得
+        Exec->>Exec: Expectation はすべて満たされている
+        Exec-->>App: step-skipped
+    end
+    Exec-->>App: run-completed
 ```
 
 ## 実装分割
@@ -613,6 +713,7 @@ D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | 4 回目の指摘を反映。ADR 3 行を影響表へ移し整合表を 3 列へ戻した。D7 / D13 に反映先を付けた       |
 | 2026-08-23 | Fukuemon | 5 回目の指摘を反映。判定表の帰属を揃え、D7 / D13 の根拠を既存 ADR へ寄せた                       |
 | 2026-08-23 | Fukuemon | clarify gate が PASS。非ブロッキング推奨 2 件を反映し、issue の受け入れ条件と突合した            |
+| 2026-08-23 | Fukuemon | diagram phase で flowchart 1 / sequence 2 を起こし、実レンダリングで検証した                     |
 
 ## 備考
 
