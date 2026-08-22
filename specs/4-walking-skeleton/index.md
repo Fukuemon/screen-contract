@@ -508,31 +508,31 @@ diagram phase の図を経てから確定する。現時点の見込みを置く
 
 D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉じるものを分けた。sync phase はこの判定に従う。判定は `phase-sync.md` の ADR 化基準 (選択肢を比較して決めた判断は ADR 化を既定とし、spec で閉じられるのは選択の余地がなかった作業上の決定のみ) に照らして付けている。**spec で閉じる**としたものは、いずれも skeleton の範囲判断か既存契約の適用であり、issue が閉じれば判断そのものが意味を失う。
 
-| 判断 | 反映先                                                                                                                      |
-| ---- | --------------------------------------------------------------------------------------------------------------------------- |
-| D1   | feature doc: element-mapping                                                                                                |
-| D2   | ADR-0027 / context: infrastructure.md / context: toolchain.md                                                               |
-| D3   | ADR-0027                                                                                                                    |
-| D4   | feature doc: execution                                                                                                      |
-| D5   | ADR-0026                                                                                                                    |
-| D6   | context: testing.md                                                                                                         |
-| D7   | **spec で閉じる** (置き場の分割は adapter/store の実装詳細。`context/architecture.md` の「draft と確定を分離する」の範囲内) |
-| D8   | **spec で閉じる** (skeleton の実装範囲の判断)                                                                               |
-| D9   | ADR-0017                                                                                                                    |
-| D10  | context: testing.md                                                                                                         |
-| D11  | Design Doc: Why/What → 成功条件 / feature doc: artifact-generation / ADR (新規)                                             |
-| D12  | ADR-0026                                                                                                                    |
-| D13  | **spec で閉じる** (設定ファイルの配置の実装詳細)                                                                            |
-| D14  | feature doc: workflow-dsl                                                                                                   |
-| D15  | ADR-0002 / feature doc: execution                                                                                           |
-| D16  | **spec で閉じる** (`context/infrastructure.md` の既存契約に従うだけで、契約自体は変えない)                                  |
-| D17  | **spec で閉じる** (skeleton の範囲判断。導線の追加は次の issue へ)                                                          |
-| D18  | feature doc: element-mapping                                                                                                |
-| D19  | ADR-0002 / feature doc: execution                                                                                           |
-| D20  | **spec で閉じる** (skeleton の範囲判断)                                                                                     |
-| D21  | context: toolchain.md                                                                                                       |
-| D22  | **spec で閉じる** (D19 の規則の適用。上位文書の追加変更なし)                                                                |
-| D23  | **spec で閉じる** (DSL の書き方。語彙は既存)                                                                                |
+| 判断 | 反映先                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------ |
+| D1   | feature doc: element-mapping                                                               |
+| D2   | ADR-0027 / context: infrastructure.md / context: toolchain.md                              |
+| D3   | ADR-0027                                                                                   |
+| D4   | feature doc: execution                                                                     |
+| D5   | ADR-0026                                                                                   |
+| D6   | context: testing.md                                                                        |
+| D7   | context: architecture.md                                                                   |
+| D8   | **spec で閉じる** (skeleton の実装範囲の判断)                                              |
+| D9   | ADR-0017                                                                                   |
+| D10  | context: testing.md                                                                        |
+| D11  | Design Doc: Why/What → 成功条件 / feature doc: artifact-generation / ADR (新規)            |
+| D12  | ADR-0026                                                                                   |
+| D13  | context: toolchain.md                                                                      |
+| D14  | feature doc: workflow-dsl                                                                  |
+| D15  | ADR-0002 / feature doc: execution                                                          |
+| D16  | **spec で閉じる** (`context/infrastructure.md` の既存契約に従うだけで、契約自体は変えない) |
+| D17  | **spec で閉じる** (skeleton の範囲判断。導線の追加は次の issue へ)                         |
+| D18  | feature doc: element-mapping                                                               |
+| D19  | ADR-0002 / feature doc: execution                                                          |
+| D20  | **spec で閉じる** (skeleton の範囲判断)                                                    |
+| D21  | context: toolchain.md                                                                      |
+| D22  | **spec で閉じる** (D19 の規則の適用。上位文書の追加変更なし)                               |
+| D23  | **spec で閉じる** (DSL の書き方。語彙は既存)                                               |
 
 ### PRD への影響
 
