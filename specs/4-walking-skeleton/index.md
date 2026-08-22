@@ -20,7 +20,7 @@
 | 3   | 上位文書突合                | 完了       | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context)             |
 | 4   | 論点整理                    | 完了       | 2026-08-22 | D1〜D12 を起票                                                  |
 | 5   | 論点解決                    | レビュー済 | 2026-08-23 | D1〜D23 を確定。clarify gate PASS (6 回目)                      |
-| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | diagram phase で 3 図を起こし実レンダリングで検証               |
+| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | 図と発行イベント (D24 / D25) を確定                             |
 | 7   | Content / Data 設計         | 完了       | 2026-08-23 | clarify で D7 / D9 / D13 を確定済み                             |
 | 8   | Performance / Security 設計 | 完了       | 2026-08-23 | clarify で D3 / D5 / D16 を確定済み                             |
 | 9   | Test / Metrics 設計         | 完了       | 2026-08-23 | clarify で D10 を確定し、テスト観点を全受け入れ条件に対応させた |
@@ -32,33 +32,33 @@
 正本 ([Design Doc](../../design/DesignDoc.md) / [feature doc](../../design/features/) / [context](../../context/) / ADR) のどの節と、どう整合させたかを記録する。PRD は統合モードのため Design Doc の Why/What 節が該当する。
 
 - PRD 更新要否: **要**。統合モードのため対象は Design Doc の Why/What 節。成功条件「構成番号付き PNG 画像」の一般化 (D11)
-- Design Doc 更新要否: **要**。成功条件「構成番号付き PNG 画像」の一般化 (D11) と、Runtime Boundary の記述 (context/architecture.md 起因) の 2 件
+- Design Doc 更新要否: **要**。成功条件「構成番号付き PNG 画像」の一般化 (D11) と、モジュール責務 → 合成ルートの「起動と終了の管理」の範囲を限る記述 (F10 起因) の 2 件
 - ADR 起票要否: **要**。注釈画像の形式を SVG とする判断 (D11) を新規 ADR とする。既存 ADR は 0002 (D15 / D19 / D22) / 0017 (D7 / D9) / 0026 (D1 / D5 / D12) / 0027 (D2 / D3 / D13) を改訂する
 
-| 上位文書                         | 節 / 該当箇所                                                                  | 整合方針 (継承 / 補足 / 変更提案)                                             |
-| -------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
-| Design Doc                       | スコープ → 冪等実行 / 要素同一性 / 成果物生成 / 記録                           | 継承                                                                          |
-| Design Doc                       | モジュール責務 → core 層 / adapter/browser / 合成ルート                        | 継承                                                                          |
-| Design Doc                       | モジュール責務 → 合成ルート                                                    | 変更提案 (F10 の daemon の生存期間と読み合わせる)                             |
-| Design Doc                       | Non Goals → 任意 JS の無制限実行                                               | 継承 (D1 の選択肢が接触する)                                                  |
-| Design Doc                       | Why/What → 成功条件「構成番号付き PNG 画像」                                   | **変更提案** (D11 が SVG へ変える)                                            |
-| feature doc: workflow-dsl        | 文書構造 / 状態モデル / action 語彙 / Expectation 語彙                         | 補足 (skeleton の最小部分集合)                                                |
-| feature doc: execution           | ステップ実行のルール / Browser Port の契約 / 実行イベント / 実行状態と再生制御 | 変更提案 (D4 が Port の語彙を足し、D15 / D19 / D22 が pause の優先順位を足す) |
-| feature doc: element-mapping     | 座標からの要素解決と候補の正規化                                               | 変更提案 (D1 が取得手段、D18 が適用範囲を定める)                              |
-| feature doc: artifact-generation | 注釈画像の描画規則 / 書き換え抑止                                              | 補足 (D11 が描画手段を確定する)                                               |
-| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成                                | 継承                                                                          |
-| context: architecture            | Package Boundary / 依存方向 / Port の定義場所                                  | 継承                                                                          |
-| context: architecture            | Runtime Boundary → agent-browser の起動と管理                                  | 変更提案 (実測と生存期間がずれる)                                             |
-| context: architecture            | State Boundary → draft と確定の分離                                            | 変更提案 (D7 が置き場の分割を足す)                                            |
-| context: testing                 | テスト責務の分担 / fixture 対象アプリ / runtime contract                       | 補足 (D10 が隔離手段を確定する)                                               |
-| context: infrastructure          | 起動時に検査するもの                                                           | 変更提案 (D2 が案内文を変える)                                                |
-| context: toolchain               | 標準スタック / 採用方針                                                        | 変更提案 (D2 / D13 / D21 が項目を足す)                                        |
-| ADR-0002                         | pause の意味論 (ステップ境界 / 完了後停止の予約)                               | 変更提案 (D15 / D19 / D22 が拡張する)                                         |
-| ADR-0008                         | Stream Proxy の経路と入力転送の検証                                            | 継承 (実測で裏付け済み)                                                       |
-| ADR-0012                         | 永続要素 ID と構成番号の分離                                                   | 継承 (実測で必要性を再確認)                                                   |
-| ADR-0017                         | draft と確定の境界 / revision 固定                                             | 変更提案 (D9 が revision の方式、D7 が置き場の分割を足す)                     |
-| ADR-0026                         | 操作の記録 / 座標を残さない / 未確認事項                                       | 変更提案 (D1 / D5 / D12 が手段と範囲を定める)                                 |
-| ADR-0027                         | agent-browser の同梱 / ブラウザの起動時検査 / 未確認事項                       | 変更提案 (根拠と手段が実測と違う。D13 が版の置き場を足す)                     |
+| 上位文書                         | 節 / 該当箇所                                                                  | 整合方針 (継承 / 補足 / 変更提案)                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Design Doc                       | スコープ → 冪等実行 / 要素同一性 / 成果物生成 / 記録                           | 継承                                                                                          |
+| Design Doc                       | モジュール責務 → core 層 / adapter/browser                                     | 継承                                                                                          |
+| Design Doc                       | モジュール責務 → 合成ルート                                                    | 変更提案 (F10 の daemon の生存期間と読み合わせる)                                             |
+| Design Doc                       | Non Goals → 任意 JS の無制限実行                                               | 継承 (D1 の選択肢が接触する)                                                                  |
+| Design Doc                       | Why/What → 成功条件「構成番号付き PNG 画像」                                   | **変更提案** (D11 が SVG へ変える)                                                            |
+| feature doc: workflow-dsl        | 文書構造 / 状態モデル / action 語彙 / Expectation 語彙                         | 補足 (skeleton の最小部分集合)                                                                |
+| feature doc: execution           | ステップ実行のルール / Browser Port の契約 / 実行イベント / 実行状態と再生制御 | 変更提案 (D4 が Port の語彙、D25 がイベントの語彙、D15 / D19 / D22 が pause の優先順位を足す) |
+| feature doc: element-mapping     | 座標からの要素解決と候補の正規化                                               | 変更提案 (D1 が取得手段、D18 が適用範囲を定める)                                              |
+| feature doc: artifact-generation | 注釈画像の描画規則 / 書き換え抑止                                              | 補足 (D11 が描画手段を確定する)                                                               |
+| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成                                | 継承                                                                                          |
+| context: architecture            | Package Boundary / 依存方向 / Port の定義場所                                  | 継承                                                                                          |
+| context: architecture            | Runtime Boundary → agent-browser の起動と管理                                  | 変更提案 (実測と生存期間がずれる)                                                             |
+| context: architecture            | State Boundary → draft と確定の分離                                            | 変更提案 (D7 が置き場の分割を足す)                                                            |
+| context: testing                 | テスト責務の分担 / fixture 対象アプリ / runtime contract                       | 補足 (D10 が隔離手段を確定する)                                                               |
+| context: infrastructure          | 起動時に検査するもの                                                           | 変更提案 (D2 が案内文を変える)                                                                |
+| context: toolchain               | 標準スタック / 採用方針                                                        | 変更提案 (D2 / D13 / D21 が項目を足す)                                                        |
+| ADR-0002                         | pause の意味論 (ステップ境界 / 完了後停止の予約)                               | 変更提案 (D15 / D19 / D22 が拡張する)                                                         |
+| ADR-0008                         | Stream Proxy の経路と入力転送の検証                                            | 継承 (実測で裏付け済み)                                                                       |
+| ADR-0012                         | 永続要素 ID と構成番号の分離                                                   | 継承 (実測で必要性を再確認)                                                                   |
+| ADR-0017                         | draft と確定の境界 / revision 固定                                             | 変更提案 (D9 が revision の方式、D7 が置き場の分割を足す)                                     |
+| ADR-0026                         | 操作の記録 / 座標を残さない / 未確認事項                                       | 変更提案 (D1 / D5 / D12 が手段と範囲を定める)                                                 |
+| ADR-0027                         | agent-browser の同梱 / ブラウザの起動時検査 / 未確認事項                       | 変更提案 (根拠と手段が実測と違う。D13 が版の置き場を足す)                                     |
 
 > 変更提案は clarify で結論が出ている。durable な反映は `spec-lifecycle` の sync phase で行う。
 
@@ -182,7 +182,7 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-**未決の論点は無い。** D1〜D23 はすべて「解決済みの論点」へ移した。新たな論点が出たら本節に表を作り直す。
+**未決の論点は無い。** D1〜D25 はすべて「解決済みの論点」へ移した。新たな論点が出たら本節に表を作り直す。
 
 ## 解決済みの論点
 
@@ -310,11 +310,23 @@ EARS 風で振る舞いを記述する。
   - 根拠: execution feature は「**Expectation を持たないステップは、評価を省いて必ず action を実行する**」と定める。`expect` が無いと `open` が毎回実行され、受け入れ条件「全ステップが `skipped`」が成立しない。
   - `default` 状態の `expect` を空のままにする D20 とは衝突しない。`default` は遷移 step を持たない状態であり、実行対象ではないためである。
 
+- **D24: skeleton が発行する実行イベントは、受け入れ条件の再構成に必要な 10 件に限る。**
+  - 対象: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `resumed` / `run-completed` / `run-failed`。
+  - 根拠: 受け入れ条件は「イベント列だけを読んで、どのステップがどの結果になったかを再構成できる」ことを求める。ステップの開始・評価・結果と run の終端があれば再構成できる。`paused` と `resumed` は D15 / D22 の記録と再現の境界を読むために要る。
+  - 除く 3 件: `ir-version-changed` は skeleton が記録と再現の間に draft を編集しないため発行機会が無い。`rolled-back` は前提が崩れる経路を skeleton が通らない。`run-aborted` は中断要求を持たない。
+  - 却下した代替案: 語彙を全件実装する案は、skeleton で発行されないイベントの経路が未検証のまま残るため却下。5 件へ絞る案は `paused` が落ち、記録と再現の境界がイベントから読めなくなるため却下。
+
+- **D25: `session-recreated` と `input-discarded` の 2 件をイベントの語彙へ足す。**
+  - 根拠: 上位文書が「イベントに残す」と定めながら語彙を持っていない箇所が 2 つある。D4 は「セッションを再作成した場合はページ状態を失ったことをイベントに残す」、ADR-0008 は「破棄した入力をイベントとして残す」と定める。既存の語彙ではどちらも表せない。
+  - `session-recreated`: 再作成の理由 (構造化エラー) と、失われたページ状態の範囲を含む。**失敗ではない**ため `run-failed` では表せない。
+  - `input-discarded`: 破棄の理由 (run が `paused` でない / 操作モードでない / 要求元の run でない) を含む。ADR-0008 は「黙って捨てると UI 側の不具合と迂回の試みを区別できない」ことを理由に挙げている。
+  - 却下した代替案: 既存イベントのフィールドで表す案は語彙を増やさずに済むが、**再作成して続行したケース (失敗ではない) を表せない**ため却下。`input-discarded` を範囲外にする案は ADR-0008 の要求を満たさないため却下。
+
 ## 未確定事項
 
 - entry の Workflow 文書と Screen 文書の骨格は手書きが残る (D17 / D20)。「URL を入力すると entry の draft を作る」導線は `#3` の厚くする段階へ送る。**判断者は本 repo の owner、判断時期は skeleton 完了後の次の issue 起票時**とする。
 - 上位文書への変更提案 3 件 (ADR-0026 / ADR-0027 / context/architecture.md) のうち、context/architecture.md の反映内容は D4 で確定した。ADR-0027 は D2 と D3 で反映内容が確定した。ADR-0026 は D1 が `eval` を選ばなかったため、未確認事項の解決記録だけを反映する。
-- **未決の論点は無い。** D1〜D23 をすべて確定した。
+- **未決の論点は無い。** D1〜D25 をすべて確定した。
 - F9 の詰まりの再現条件が特定できていない (F12)。原因が agent-browser 側か利用側かを切り分けられていないため、上流への報告は行わない。**判断者は本 repo の owner、判断時期は skeleton の統合テストで再発したとき**とする。再発しなければ持ち越さない。
 - 入力転送で `hover` と `scroll` が扱えるかは未検証である。`input_mouse` の `mouseMoved` / `mouseWheel` で表現できる見込みだが、実測していない。skeleton は `click` だけで足りるため、確認は厚くする段階に送る。**判断者は本 repo の owner、判断時期は `#3` の「状態遷移と Expectation」を厚くする回**とする (その回の issue 起票時に確認事項として引き継ぐ)。
 
@@ -390,15 +402,16 @@ EARS 風で振る舞いを記述する。
 
 ### UI / API / Event Interface
 
-diagram phase で確定させる。現時点で必要と見込む面を列挙する。
-
-- HTTP: 記録の開始・停止、draft の取得、承認依頼、承認、`run.start`、`rerun_step`、成果物生成。
-- WebSocket: Stream Proxy (映像フレームの中継と入力転送)、実行イベントの購読。
-- 実行イベント: `run-started / step-started / expectation-evaluated / step-skipped / step-executed / paused / resumed / run-completed` のうち skeleton で発行するものを diagram phase で確定する。セッション再作成を行った場合は、ページ状態を失ったことがイベント列から読めるようにする (D4)。
+- **HTTP**: 記録の開始・停止、draft の取得、承認依頼、承認、`run.start`、`rerun_step`、成果物生成。endpoint の形は実装時に確定する。
+- **WebSocket**: Stream Proxy (映像フレームの中継と入力転送)、実行イベントの購読。web の接続先は Workflow Server の単一エンドポイントのみとする (ADR-0008)。
+- **実行イベント (D24)**: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `resumed` / `run-completed` / `run-failed` の 10 件を発行する。`ir-version-changed` / `rolled-back` / `run-aborted` は skeleton で発行機会が無いため実装しない。
+- **追加するイベント (D25)**: `session-recreated` (再作成の理由と失われたページ状態の範囲を含む) と `input-discarded` (破棄の理由を含む) を語彙へ足す。どちらも上位文書が「イベントに残す」と定めながら語彙を持っていなかったものである。
+- イベントは append-only で発行順序が決定的であり、web と実行履歴が同じ列を購読する (execution feature)。
 
 ### Props / Request / Response
 
-- diagram phase で図を起こしてから記述する。
+- 実装時に確定する。skeleton の範囲では、上記の面が存在することと、イベントの語彙が上記で閉じることまでを契約とする。
+- **秘密情報をイベントへ入れない** (execution feature)。skeleton は匿名実行のみだが、`runtime.json` のトークンをイベント・ログ・成果物のいずれにも出さない。
 
 ## Content / Data 設計
 
@@ -430,15 +443,15 @@ diagram phase で確定させる。現時点で必要と見込む面を列挙す
 
 ### エラーケース
 
-| #   | ケース                                        | ユーザーへの見せ方                                                                                                                            | リカバリ                                                             |
-| --- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 1   | ブラウザ本体が見つからない                    | 本リポジトリの導入コマンドを案内して起動を中止する                                                                                            | 利用者が導入コマンド (暫定名 `pnpm browser:install`) を 1 回実行する |
-| 1b  | 実行してよい origin が 1 つも列挙されていない | 設定への追記を案内して起動を中止する                                                                                                          | 利用者が fixture-app の origin を設定に足す                          |
-| 1c  | 常駐サーバが二重起動である                    | 既存の `runtime.json` が指すプロセスの停止を案内して中止する                                                                                  | 利用者が既存プロセスを止める                                         |
-| 2   | 記録した操作を一意な Locator へ解決できない   | `clickPoint` として残し警告を出す。記録は止めない                                                                                             | 利用者が要素定義を手で整える                                         |
-| 3   | 承認待ちの間に対象 draft が編集された         | `stale` として表示し確定させない                                                                                                              | 依頼を出し直す                                                       |
-| 4   | 実行後も Expectation を満たさない             | 失敗ステップと評価結果をイベントで提示し run を `failed` にする                                                                               | DSL か要素定義を直して再実行する                                     |
-| 5   | daemon またはセッションが応答しない (F9)      | Browser Port が構造化エラーを返し、run を止めるか再作成するかを core/execution が決める。再作成した場合はページ状態を失うことをイベントに残す | 利用者が run をやり直す                                              |
+| #   | ケース                                        | ユーザーへの見せ方                                                                                                                                           | リカバリ                                                             |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 1   | ブラウザ本体が見つからない                    | 本リポジトリの導入コマンドを案内して起動を中止する                                                                                                           | 利用者が導入コマンド (暫定名 `pnpm browser:install`) を 1 回実行する |
+| 1b  | 実行してよい origin が 1 つも列挙されていない | 設定への追記を案内して起動を中止する                                                                                                                         | 利用者が fixture-app の origin を設定に足す                          |
+| 1c  | 常駐サーバが二重起動である                    | 既存の `runtime.json` が指すプロセスの停止を案内して中止する                                                                                                 | 利用者が既存プロセスを止める                                         |
+| 2   | 記録した操作を一意な Locator へ解決できない   | `clickPoint` として残し警告を出す。記録は止めない                                                                                                            | 利用者が要素定義を手で整える                                         |
+| 3   | 承認待ちの間に対象 draft が編集された         | `stale` として表示し確定させない                                                                                                                             | 依頼を出し直す                                                       |
+| 4   | 実行後も Expectation を満たさない             | 失敗ステップと評価結果をイベントで提示し run を `failed` にする                                                                                              | DSL か要素定義を直して再実行する                                     |
+| 5   | daemon またはセッションが応答しない (F9)      | Browser Port が構造化エラーを返し、run を止めるか再作成するかを core/execution が決める。再作成した場合は `session-recreated` でページ状態の喪失を残す (D25) | 利用者が run をやり直す                                              |
 
 ### Fallback
 
@@ -452,6 +465,7 @@ diagram phase で確定させる。現時点で必要と見込む面を列挙す
 - 記録の前提: pause を予約した run が entry の完了時に `paused` で止まること (**最終ステップの完了で `completed` に倒れないこと**。D19)。`paused` でない run への入力転送が破棄され、破棄がイベントに残ること (ADR-0008)。
 - 記録: 解決した step が `ref` を指すこと。要素定義が同時に draft へ入ること。既存定義に一致する場合に重複定義を作らないこと。
 - 承認: draft と正本が別のものとして保存されていること。承認前の draft を承認後の正本が上書きしないこと。`stale` 判定が効くこと。
+- イベント: 発行するのは D24 の 10 件と D25 の 2 件に限ること。イベント列だけからステップ結果を再構成できること。
 - 再現: 再現の run が全ステップ完了時に `paused` で止まること (D22)。同一セッションでの `rerun_step` で全ステップが `skipped` になり `completed` で終わること。`open` が `url` の Expectation を持つため `skipped` になること (D23)。イベント列だけからステップ結果を再構成できること。
 - 成果物: 同一入力での再生成でファイルの mtime が変わらないこと。バッジ位置とテーブル内容の決定性。SVG が完全一致で判定できること (D11)。
 - Expectation 候補: 操作の前後で変化した項目だけが候補に出ること (D12)。変化していない項目が候補に混ざらないこと。
@@ -516,7 +530,8 @@ sequenceDiagram
     Web->>API: input_mouse (x, y)
     API->>API: 中継条件を検証 (paused / 操作モード / 要求元の run)
     alt 条件を満たさない
-        API-->>Web: 破棄し、破棄をイベントに残す
+        API-->>Web: 破棄する
+        API-->>App: input-discarded (破棄の理由を含む)
     else 条件を満たす
         API->>App: 記録中の入力として渡す
         App->>AB: box 付き要素一覧を要求
@@ -556,7 +571,14 @@ sequenceDiagram
     AB->>Browser: 新しいセッションを開く
     loop 各ステップ
         Exec->>AB: Snapshot を取得
-        AB-->>Exec: Snapshot
+        alt セッションが応答しない
+            AB-->>Exec: 構造化エラー (browser/unresponsive)
+            Exec->>Exec: 再作成するかを決める
+            Exec->>AB: createSession をやり直す
+            Exec-->>App: session-recreated (ページ状態の喪失を含む)
+        else 応答する
+            AB-->>Exec: Snapshot
+        end
         Exec->>Exec: Expectation を評価
         alt すべて満たす
             Exec-->>App: step-skipped
@@ -564,7 +586,12 @@ sequenceDiagram
             Exec->>AB: action を実行
             Exec->>AB: Snapshot を再取得
             Exec->>Exec: Expectation を再評価
-            Exec-->>App: step-executed または step-failed
+            alt 満たす
+                Exec-->>App: step-executed
+            else 満たさない
+                Exec-->>App: step-failed
+                Exec-->>App: run-failed
+            end
         end
     end
     Note over Exec: 最終ステップの完了と pause 予約が重なったら pause を優先する
@@ -607,7 +634,7 @@ diagram phase の図を経てから確定する。現時点の見込みを置く
 
 ### 確定判断の反映先判定
 
-D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉じるものを分けた。sync phase はこの判定に従う。判定は `phase-sync.md` の ADR 化基準 (選択肢を比較して決めた判断は ADR 化を既定とし、spec で閉じられるのは選択の余地がなかった作業上の決定のみ) に照らして付けている。**spec で閉じる**としたものは、いずれも skeleton の範囲判断か既存契約の適用であり、issue が閉じれば判断そのものが意味を失う。**(規則) / (判断)** と 2 段に書いた行は、規則を context へ、却下案と理由を ADR へ分けて置くことを表す。`spec-contract.md` が「design 側は現在の設計だけを持ち、なぜ変えたかは書かない」と定めるためである。
+D1〜D25 を全行走査し、durable な反映先を持つものと spec で閉じるものを分けた。sync phase はこの判定に従う。判定は `phase-sync.md` の ADR 化基準 (選択肢を比較して決めた判断は ADR 化を既定とし、spec で閉じられるのは選択の余地がなかった作業上の決定のみ) に照らして付けている。**spec で閉じる**としたものは、いずれも skeleton の範囲判断か既存契約の適用であり、issue が閉じれば判断そのものが意味を失う。**(規則) / (判断)** と 2 段に書いた行は、規則を context へ、却下案と理由を ADR へ分けて置くことを表す。`spec-contract.md` が「design 側は現在の設計だけを持ち、なぜ変えたかは書かない」と定めるためである。
 
 | 判断 | 反映先                                                                                     |
 | ---- | ------------------------------------------------------------------------------------------ |
@@ -634,6 +661,8 @@ D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉
 | D21  | context: toolchain.md                                                                      |
 | D22  | ADR-0002 / feature doc: execution                                                          |
 | D23  | **spec で閉じる** (DSL の書き方。語彙は既存)                                               |
+| D24  | **spec で閉じる** (skeleton の実装範囲の判断。語彙は既存)                                  |
+| D25  | feature doc: execution                                                                     |
 
 ### PRD への影響
 
@@ -655,6 +684,7 @@ D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉
 | 対象 doc / 節                                                                               | 変更内容                                                                                                                                                                                                                 | 理由                                                                                                                                                                       |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | execution → Browser Port の契約                                                             | セッションの不応答を表す構造化エラーを Port の語彙に足し、再作成の判断が core にあることを明記する (source: clarify)                                                                                                     | セッションは部分的に壊れ、生存確認では検出できない (F9)。再現条件も特定できていない (F12)                                                                                  |
+| execution → 実行イベント                                                                    | `session-recreated` と `input-discarded` の 2 件を語彙へ足す (source: track)                                                                                                                                             | 上位文書が「イベントに残す」と定めながら語彙を持っていない (D4 / ADR-0008 → D25)。既存イベントでは再作成して続行したケースを表せない                                       |
 | execution → 実行状態と再生制御                                                              | run 開始時に pause を予約し完了時に `paused` で止める使い方を明記する。**最終ステップの完了と pause 予約が重なったときは pause を優先する**優先順位と、**pause 予約が 1 回で消費される**ことを書き足す (source: clarify) | 記録を run の枠内で行い (D15)、再現後の `rerun_step` も `paused` から掛けるため (D22)。優先順位が無いと 1 ステップの run で `completed` に倒れ、記録経路が成立しない (D19) |
 | element-mapping → 座標からの要素解決                                                        | 座標解決の入力となる bounding box を `--annotate screenshot` から得ることを明示する。祖先方向の候補列と `label` / `testid` は要素選択の機能であり記録では使わないことを書き分ける (source: clarify)                      | `snapshot` の応答に box が含まれない (F7)。`--annotate` の応答に祖先関係と `label` / `testid` が無い (D1 / D18)                                                            |
 | web-editor → 映像と重ね描きの対応付け                                                       | フレームと Snapshot を結ぶ識別子が agent-browser から得られないことを制約として明記する (source: clarify)                                                                                                                | 応答にフレーム識別子が無い (F14)。「対応が取れない組み合わせは描画しない」の判定材料を時刻の近似に頼ることになる                                                           |
@@ -692,7 +722,8 @@ D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-22 | NEEDS_WORK               | 3 回目。2 回目の指摘は 6 件解消・1 件一部。観点別 PASS が 5 つ。新規指摘 4 件。Flow 10 の `rerun_step` が `completed` の run に掛かる点が最大           | 全 4 件を反映。D22 / D23 を確定し ADR-0002 を整合表と ADR 影響表へ追加。確定判断の反映先判定を全行付けた                                   |
 | 2026-08-23 | NEEDS_WORK               | 4 回目。D22 / D23 は解消。ADR 3 行が誤った表にあり整合表の列も崩れていた。D7 の「spec で閉じる」判定に疑義                                              | 全 4 件を反映。3 行を ADR 影響表へ移し整合表を 3 列形式へ戻した。D7 は context/architecture.md、D13 は context/toolchain.md を反映先にした |
 | 2026-08-23 | NEEDS_WORK               | 5 回目。設計内容の矛盾は無し。反映先判定表の 2 セルと整合表の 1 行が他表と食い違い、D7 / D13 の根拠の置き場が spec-contract と噛み合わない              | 全 2 件を反映。判定表の D1 / D22 と整合表の execution 行を揃え、D7 の判断を ADR-0017、D13 の判断を ADR-0027 へ寄せた                       |
-| 2026-08-23 | PASS                     | 6 回目。1〜5 回目の指摘 27 件すべて解消。全 8 観点で PASS または N/A。非ブロッキング推奨 2 件 (整合表の D 番号の粒度 / context への判断正本の 1 行参照) | 推奨 2 件も反映。issue #4 の受け入れ条件 21 件との突合も実施し、差異なしを確認                                                             |
+| 2026-08-23 | PASS                     | 6 回目。1〜5 回目の指摘 27 件すべて解消。全 8 観点で PASS または N/A。非ブロッキング推奨 2 件 (整合表の D 番号の粒度 / context への判断正本の 1 行参照) | 推奨 2 件も反映。issue #4 の受け入れ条件 20 件との突合も実施。差異は成果物の形式 1 点のみで、issue は形式を指定していないため条件は満たす  |
+| 2026-08-23 | NEEDS_WORK               | track gate (diagram + track を累積)。図は 8 項目が一致したが D4 が図に無い。Interface 設計が未記入のまま phase 6 を完了にしていた。メタの同期漏れ 3 件  | 全 5 件を反映。D24 / D25 を確定して Interface 設計を埋め、図に D4 の分岐を足した。受け入れ条件は 20 件が正しい                             |
 
 ## 変更履歴
 
@@ -716,6 +747,7 @@ D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | clarify gate が PASS。非ブロッキング推奨 2 件を反映し、issue の受け入れ条件と突合した            |
 | 2026-08-23 | Fukuemon | diagram phase で flowchart 1 / sequence 2 を起こし、実レンダリングで検証した                     |
 | 2026-08-23 | Fukuemon | track phase で変更点表を突合。ADR-0002 行の退行を復元し、Design Doc の反映先を実態へ直した       |
+| 2026-08-23 | Fukuemon | track gate の指摘を反映。D24 / D25 を確定し Interface 設計を埋め、図に D4 の分岐を足した         |
 
 ## 備考
 
