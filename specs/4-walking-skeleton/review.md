@@ -83,3 +83,27 @@ Verdict: **NEEDS_WORK**
 ### レビュー環境の制約
 
 `gh` を実行する手段が無いため issue #4 本文を直接読めていない。判定は spec 内の成功条件とテスト観点の対応のみに基づく。
+
+## Review 2026-08-22 (3 回目) — clarify gate
+
+Verdict: **NEEDS_WORK**
+
+### 2 回目の指摘 7 件の解消状況
+
+6 件が解消。指摘 4 (`paused` と `completed` の優先順位) のみ一部で、D19 の結論と D15 根拠 2 の書き換えは妥当だが、正本の所在 (ADR-0002) と Flow 10 の扱いが残る。
+
+観点別では **未解決論点 / 外部依存の健全性 / 実装対象明示 / template 必須節 / EARS acceptance が PASS**。NEEDS_WORK は上位文書整合のみ。
+
+### 指摘 (3 回目)
+
+1. **Flow 10 の `rerun_step` が `completed` の run に掛かる。** Flow 9 の run は全ステップを実行して終わるため `completed` になる。`design/features/execution/DesignDoc_execution.md:134` は `rerun_step` を「一時停止中に任意の通過済みステップを指定して再実行できる」と定め、`adr/0002-pause-semantics.md:36` の状態遷移図でも `completed` は終端である。**D19 が塞いだのと同じ種類の穴が 1 つ残っている。** 9 の run にも pause を予約し、最終ステップ完了時に `paused` で止めれば (D19 の規則をそのまま再利用)、追加の上位文書変更なしで閉じられる。
+2. **entry の `open` step に `expect` が書かれていない。** `design/features/execution/DesignDoc_execution.md:92` は「Expectation を持たないステップは評価を省いて必ず action を実行する」と定めるため、`expect` が無いと Flow 10 の「全ステップが `skipped`」が成立しない。`open` の step に `url` の Expectation を書くことを明記する必要がある。なお D20 の「`default` の `expect` は空のまま」は、`default` が遷移 step を持たない状態であるため同 92 行と衝突しない。
+3. **ADR-0002 が整合表に無い。** pause の意味論 (「ステップ境界でのみ効く」「完了後に停止する予約」) を決めた正本は `adr/0002-pause-semantics.md` であり、D15 / D19 はその決定を拡張している。feature doc だけを直すと ADR-0002 の状態遷移図 (`running --> [*] : completed`) が優先順位を持たないまま残り、**正本が 2 つに割れる**。整合表・関連資料・ADR 影響表へ載せ、改訂か新規 ADR かを記録すべきである。
+4. **変更点表が拾えていない確定判断がある。** D12 (Expectation 候補を「操作の前後で変化した項目」に絞る) は `adr/0026-operation-recording.md:26` の「操作後の Snapshot から URL・可視要素などの候補を出し」を実質的に狭める決定だが、ADR-0026 行に入っていない。D21 は `context/toolchain.md:122` の「現時点で未確定のものは無い」に関わる。D7 / D9 も `context/architecture.md` / `adr/0017` が方式まで定めていないため、反映先の判定が要る。`phase-sync.md` は解決済みの論点を全行走査して判定を付けることを求めており、現状では D6 / D7 / D9 / D12 / D13 / D16 / D17 / D20 / D21 が未判定で sync に入る。
+
+### 今回あらためて確認した整合 (問題なし)
+
+- D19 の結論 (pause 予約優先) は `execution:129` の予約の意味論と矛盾せず、`paused → resume → completed` の復帰経路も既存の遷移として存在する。新しい状態を増やしていない。
+- D15 の記録経路は ADR-0008 の中継 3 条件をすべて満たし、web-editor feature の「モード切替は一時停止中だけ有効」とも衝突しない。記録中のセッション生存も `execution:141` と一致する。
+- Flow 9 の「run ごとに新しいセッション」は `execution:141` のセッション抽象と整合し、Flow 10 の「同一セッション」も D4 の「黙って再作成しない」と噛み合う。
+- D20 の Screen 文書骨格の手書きは `workflow-dsl:142,222` の entry / `default` の定義と一致する。

@@ -5,7 +5,7 @@
 - Issue: `#4`
 - ステータス: `Draft`
 - 作成日: 2026-08-22
-- 更新日: 2026-08-22
+- 更新日: 2026-08-23
 - Branch: `feature/4`
 - Owner: Fukuemon
 
@@ -19,13 +19,13 @@
 | 2   | 下書き                      | 完了   | 2026-08-22 | 実装突合: 対象外 (実装は scaffold の stub のみ)     |
 | 3   | 上位文書突合                | 完了   | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context) |
 | 4   | 論点整理                    | 完了   | 2026-08-22 | D1〜D12 を起票                                      |
-| 5   | 論点解決                    | 完了   | 2026-08-22 | D1〜D21 を確定。未決ゼロ                            |
+| 5   | 論点解決                    | 完了   | 2026-08-22 | D1〜D23 を確定。未決ゼロ                            |
 | 6   | Interface / Routing 設計    | 未着手 |            |                                                     |
 | 7   | Content / Data 設計         | 未着手 |            |                                                     |
 | 8   | Performance / Security 設計 | 未着手 |            |                                                     |
 | 9   | Test / Metrics 設計         | 未着手 |            |                                                     |
 | 10  | 実装分割                    | 未着手 |            |                                                     |
-| 11  | レビュー済                  | 進行中 | 2026-08-22 | 2 回目の指摘 7 件を反映。3 回目のレビュー待ち       |
+| 11  | レビュー済                  | 進行中 | 2026-08-23 | 3 回目の指摘 4 件を反映。4 回目のレビュー待ち       |
 
 ## 上位文書整合
 
@@ -35,25 +35,28 @@
 - Design Doc 更新要否: **要**。成功条件「構成番号付き PNG 画像」の一般化 (D11) と、Runtime Boundary の記述 (context/architecture.md 起因) の 2 件
 - ADR 起票要否: **要**。注釈画像の形式を SVG とする判断 (D11) を新規 ADR とする。D2 / D3 / D4 / D5 は既存 ADR (0026 / 0027) と feature doc の改訂で足りる
 
-| 上位文書                         | 節 / 該当箇所                                             | 整合方針 (継承 / 補足 / 変更提案)  |
-| -------------------------------- | --------------------------------------------------------- | ---------------------------------- |
-| Design Doc                       | スコープ → 冪等実行 / 要素同一性 / 成果物生成 / 記録      | 継承                               |
-| Design Doc                       | モジュール責務 → core 層 / adapter/browser / 合成ルート   | 継承                               |
-| Design Doc                       | Non Goals → 任意 JS の無制限実行                          | 継承 (D1 の選択肢が接触する)       |
-| Design Doc                       | Why/What → 成功条件「構成番号付き PNG 画像」              | **変更提案** (D11 が SVG へ変える) |
-| feature doc: workflow-dsl        | 文書構造 / 状態モデル / action 語彙 / Expectation 語彙    | 補足 (skeleton の最小部分集合)     |
-| feature doc: execution           | ステップ実行のルール / Browser Port の契約 / 実行イベント | 補足 (D4 が契約に 1 項目を足す)    |
-| feature doc: element-mapping     | 座標からの要素解決と候補の正規化                          | 補足 (D1 が取得手段を確定する)     |
-| feature doc: artifact-generation | 注釈画像の描画規則 / 書き換え抑止                         | 補足 (D11 が描画手段を確定する)    |
-| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成           | 継承                               |
-| context: architecture            | Package Boundary / 依存方向 / Port の定義場所             | 継承                               |
-| context: architecture            | Runtime Boundary → agent-browser の起動と管理             | 変更提案 (実測と生存期間がずれる)  |
-| context: testing                 | テスト責務の分担 / fixture 対象アプリ / runtime contract  | 補足 (D10 が隔離手段を確定する)    |
-| ADR-0008                         | Stream Proxy の経路と入力転送の検証                       | 継承 (実測で裏付け済み)            |
-| ADR-0012                         | 永続要素 ID と構成番号の分離                              | 継承 (実測で必要性を再確認)        |
-| ADR-0017                         | draft と確定の境界 / revision 固定                        | 継承                               |
-| ADR-0026                         | 操作の記録 / 座標を残さない / 未確認事項                  | 変更提案 (未確認事項が解決した)    |
-| ADR-0027                         | agent-browser の同梱 / ブラウザの起動時検査 / 未確認事項  | 変更提案 (根拠と手段が実測と違う)  |
+| 上位文書                         | 節 / 該当箇所                                                                                                                                                                                                                                                   | 整合方針 (継承 / 補足 / 変更提案)                                                                                                                                                                               |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Design Doc                       | スコープ → 冪等実行 / 要素同一性 / 成果物生成 / 記録                                                                                                                                                                                                            | 継承                                                                                                                                                                                                            |
+| Design Doc                       | モジュール責務 → core 層 / adapter/browser / 合成ルート                                                                                                                                                                                                         | 継承                                                                                                                                                                                                            |
+| Design Doc                       | Non Goals → 任意 JS の無制限実行                                                                                                                                                                                                                                | 継承 (D1 の選択肢が接触する)                                                                                                                                                                                    |
+| Design Doc                       | Why/What → 成功条件「構成番号付き PNG 画像」                                                                                                                                                                                                                    | **変更提案** (D11 が SVG へ変える)                                                                                                                                                                              |
+| feature doc: workflow-dsl        | 文書構造 / 状態モデル / action 語彙 / Expectation 語彙                                                                                                                                                                                                          | 補足 (skeleton の最小部分集合)                                                                                                                                                                                  |
+| feature doc: execution           | ステップ実行のルール / Browser Port の契約 / 実行イベント                                                                                                                                                                                                       | 補足 (D4 が契約に 1 項目を足す)                                                                                                                                                                                 |
+| feature doc: element-mapping     | 座標からの要素解決と候補の正規化                                                                                                                                                                                                                                | 補足 (D1 が取得手段を確定する)                                                                                                                                                                                  |
+| feature doc: artifact-generation | 注釈画像の描画規則 / 書き換え抑止                                                                                                                                                                                                                               | 補足 (D11 が描画手段を確定する)                                                                                                                                                                                 |
+| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成                                                                                                                                                                                                                 | 継承                                                                                                                                                                                                            |
+| context: architecture            | Package Boundary / 依存方向 / Port の定義場所                                                                                                                                                                                                                   | 継承                                                                                                                                                                                                            |
+| context: architecture            | Runtime Boundary → agent-browser の起動と管理                                                                                                                                                                                                                   | 変更提案 (実測と生存期間がずれる)                                                                                                                                                                               |
+| context: testing                 | テスト責務の分担 / fixture 対象アプリ / runtime contract                                                                                                                                                                                                        | 補足 (D10 が隔離手段を確定する)                                                                                                                                                                                 |
+| ADR-0002                         | pause の意味論 (ステップ境界 / 完了後停止の予約)                                                                                                                                                                                                                | 変更提案 (D15 / D19 が拡張する)                                                                                                                                                                                 |
+| ADR-0008                         | Stream Proxy の経路と入力転送の検証                                                                                                                                                                                                                             | 継承 (実測で裏付け済み)                                                                                                                                                                                         |
+| ADR-0012                         | 永続要素 ID と構成番号の分離                                                                                                                                                                                                                                    | 継承 (実測で必要性を再確認)                                                                                                                                                                                     |
+| ADR-0017                         | draft と確定の境界 / revision 固定                                                                                                                                                                                                                              | 継承                                                                                                                                                                                                            |
+| ADR-0026                         | 未確認事項「入力転送でどこまでの操作種別を扱えるか」を解決済みとして記録する。座標解決に `--annotate` の box を使うこと (D1)、Snapshot を操作の直前に取ること (D5)、Expectation 候補を**操作の前後で変化した項目に絞る**こと (D12) を明記する (source: clarify) | `input_mouse` / `input_keyboard` / `input_touch` が使え `click` は実測で通った (F4)。D12 は本 ADR の「操作後の Snapshot から URL・可視要素などの候補を出す」を実質的に狭めるため、書かないと規則が 2 通りになる |
+| ADR-0002                         | 決定と状態遷移図に「最終ステップの完了と pause 予約が重なったときは pause を優先する」を追記する (source: clarify)                                                                                                                                              | pause の意味論の正本は本 ADR であり、feature doc だけを直すと状態遷移図が優先順位を持たないまま残って正本が割れる (D19)                                                                                         |
+| ADR-0017                         | 承認依頼の revision を **draft の内容ハッシュ**とする方式を追記する (source: clarify)                                                                                                                                                                           | 本 ADR は「revision を固定する」とだけ定め方式を書いていない。ADR-0018 の IR 版と方式を揃えるため (D9)                                                                                                          |
+| ADR-0027                         | agent-browser の同梱 / ブラウザの起動時検査 / 未確認事項                                                                                                                                                                                                        | 変更提案 (根拠と手段が実測と違う)                                                                                                                                                                               |
 
 > 変更提案は clarify で結論が出ている。durable な反映は `spec-lifecycle` の sync phase で行う。
 
@@ -69,7 +72,7 @@
 - `context/testing.md`: テスト 3 層の責務、fixture 対象アプリ、runtime contract
 - `context/infrastructure.md`: 起動時に検査するもの、秘密情報の置き場、常駐サーバの接続先
 - `context/toolchain.md`: 標準スタックと採用方針
-- `adr/0008-stream-proxy.md` / `adr/0012-element-id-number-separation.md` / `adr/0017-agent-draft-boundary.md` / `adr/0026-operation-recording.md` / `adr/0027-agent-browser-bundling.md`
+- `adr/0002-pause-semantics.md` / `adr/0008-stream-proxy.md` / `adr/0012-element-id-number-separation.md` / `adr/0017-agent-draft-boundary.md` / `adr/0026-operation-recording.md` / `adr/0027-agent-browser-bundling.md`
 - 関連 issue: `#3` (親 epic: MVP 実装)
 - 事前調査: agent-browser 0.34.0 の実挙動確認 (本 spec の「事前調査で確定した事実」節に転記済み)
 
@@ -115,7 +118,7 @@ spec 起案前に `agent-browser@0.34.0` を隔離環境で実行し、次を実
 
 - `packages/fixture-app` に 1 画面 1 遷移の対象アプリを置く。ボタンを 1 つ押すとモーダルが開く静的 HTML とし、role と accessible name を付けて Semantic Locator で一意に解決できることを保証する
 - Screen 文書の最小 DSL (`default` と、そこから 1 回の `click` で到達する状態の 2 つ) と、entry が参照する Workflow 文書 (`open` 1 ステップ) を扱う core/workflow の Schema 検証と IR 正規化
-- entry まで実行して `paused` で止まる run (記録の前提。pause の予約で表現する)
+- pause を予約して `paused` で止まる run (記録の前提と、再現後の `rerun_step` の前提。D15 / D22)
 - 操作の記録: `paused` の run に対して操作モードへ切り替え、Stream Proxy を通る入力を要素へ解決して `click` の step と要素定義を draft へ入れる
 - 記録停止後の Expectation 候補の提示と、選んだ候補の step への反映
 - draft と正本の分離、承認キュー、承認依頼の revision 固定と `stale` 判定
@@ -177,7 +180,7 @@ EARS 風で振る舞いを記述する。
 
 設計 / 実装フェーズへ持ち越す残課題を 1 件ずつ管理する。確定したものは「解決済みの論点」へ移す。
 
-**未決の論点は無い。** D1〜D21 はすべて「解決済みの論点」へ移した。新たな論点が出たら本節に表を作り直す。
+**未決の論点は無い。** D1〜D23 はすべて「解決済みの論点」へ移した。新たな論点が出たら本節に表を作り直す。
 
 ## 解決済みの論点
 
@@ -294,11 +297,20 @@ EARS 風で振る舞いを記述する。
   - 根拠: install は警告なく通る (F3)。本システムは agent-browser を **CLI として子プロセスで呼ぶだけ**で、pnpm の API に依存しない。engines の宣言は agent-browser 自身の開発環境の要件である。
   - pnpm 11 への更新は `context/toolchain.md` の別判断とし、skeleton の範囲に含めない。`packageManager` の変更はリポジトリ全体に効くためである。
 
+- **D22: 再現の run にも pause を予約し、全ステップ完了時に `paused` で止めてから `rerun_step` を掛ける。**
+  - 根拠: execution feature は `rerun_step` を「**一時停止中に**任意の通過済みステップを指定して再実行できる」と定め、ADR-0002 の状態遷移図でも `completed` は終端である。予約しないと再現の run は `completed` になり、**受け入れ条件「同一セッションでの再実行で全ステップが `skipped`」を観測する経路が無い**。
+  - D19 の規則をそのまま再利用するため、**上位文書の追加変更は要らない**。
+  - 却下した代替案: `rerun_step` を `completed` からも掛けられるようにする案は、execution feature と ADR-0002 の両方を改訂し、終端状態の意味を変えるため却下。
+
+- **D23: entry の `open` step には `url` の Expectation を書く。**
+  - 根拠: execution feature は「**Expectation を持たないステップは、評価を省いて必ず action を実行する**」と定める。`expect` が無いと `open` が毎回実行され、受け入れ条件「全ステップが `skipped`」が成立しない。
+  - `default` 状態の `expect` を空のままにする D20 とは衝突しない。`default` は遷移 step を持たない状態であり、実行対象ではないためである。
+
 ## 未確定事項
 
 - entry の Workflow 文書と Screen 文書の骨格は手書きが残る (D17 / D20)。「URL を入力すると entry の draft を作る」導線は `#3` の厚くする段階へ送る。**判断者は本 repo の owner、判断時期は skeleton 完了後の次の issue 起票時**とする。
 - 上位文書への変更提案 3 件 (ADR-0026 / ADR-0027 / context/architecture.md) のうち、context/architecture.md の反映内容は D4 で確定した。ADR-0027 は D2 と D3 で反映内容が確定した。ADR-0026 は D1 が `eval` を選ばなかったため、未確認事項の解決記録だけを反映する。
-- **未決の論点は無い。** D1〜D21 をすべて確定した。
+- **未決の論点は無い。** D1〜D23 をすべて確定した。
 - F9 の詰まりの再現条件が特定できていない (F12)。原因が agent-browser 側か利用側かを切り分けられていないため、上流への報告は行わない。**判断者は本 repo の owner、判断時期は skeleton の統合テストで再発したとき**とする。再発しなければ持ち越さない。
 - 入力転送で `hover` と `scroll` が扱えるかは未検証である。`input_mouse` の `mouseMoved` / `mouseWheel` で表現できる見込みだが、実測していない。skeleton は `click` だけで足りるため、確認は厚くする段階に送る。**判断者は本 repo の owner、判断時期は `#3` の「状態遷移と Expectation」を厚くする回**とする (その回の issue 起票時に確認事項として引き継ぐ)。
 
@@ -322,15 +334,15 @@ EARS 風で振る舞いを記述する。
 ### User Flow
 
 1. 利用者が Workflow Server を起動する。起動時検査 3 件 (ブラウザ本体 / 実行してよい origin の列挙 / 二重起動) のいずれかを満たさなければ、理由と対処を出して中止する。
-2. 利用者が Screen 文書の骨格 (id / title / entry 参照 / `default` 状態) と、fixture-app を開く entry の Workflow 文書 (`open` 1 ステップ) を手で書く (D20 / D17)。
+2. 利用者が Screen 文書の骨格 (id / title / entry 参照 / `default` 状態) と、fixture-app を開く entry の Workflow 文書 (`open` 1 ステップ。`url` の Expectation つき) を手で書く (D20 / D17 / D23)。
 3. 利用者が run を開始する。pause を予約しておくため、entry の実行完了時に `paused` で止まる (最終ステップの完了より pause 予約が優先される。D19)。
 4. 利用者が操作モードへ切り替え、記録を開始する。記録中であることが常時表示される。
 5. 利用者がボタンをクリックする。server は転送の前に `--annotate screenshot` を撮り、座標を要素へ解決して `click` の step と要素定義を draft へ入れてから転送する。
 6. 利用者が記録を停止する。操作の前後で変化した項目から Expectation の候補が提示される。
 7. 利用者が候補を 1 つ選び、step の `expect` に入れる。記録した steps の遷移元は run の到達状態 (`default`) から決まる。
 8. 利用者が承認依頼を出し、差分を確認して承認する。draft が正本の置き場へ移る。
-9. 利用者が `run.start` で実行する。**記録に使った run とは別の run で、新しいセッションが開く。** `open` から順に実行され、記録どおりに操作が再現される。
-10. モーダルが開いた状態のまま、**9 の run と同じセッション**で最初のステップから `rerun_step` する。全ステップが `skipped` になり `completed` で終わる。新規セッションで 2 回目を回すと `open` の期待状態を満たさず必ず実行されるため、`skipped` を観測できない。
+9. 利用者が `run.start` で実行する。**記録に使った run とは別の run で、新しいセッションが開く。** pause を予約しておくため、全ステップの完了時に `paused` で止まる (D22)。`open` から順に実行され、記録どおりに操作が再現される。
+10. `paused` のまま、モーダルが開いた状態で、**9 の run と同じセッション**の最初のステップから `rerun_step` する。全ステップが `skipped` になり `completed` で終わる。新規セッションで 2 回目を回すと `open` の期待状態を満たさず必ず実行されるため、`skipped` を観測できない。
 11. 到達した状態で成果物を生成する。バッジ 1 個の注釈画像 (SVG) と生スクリーンショット、1 行の Markdown テーブルが出る。
 12. もう一度生成する。ファイルは書き換わらない。
 
@@ -436,7 +448,7 @@ diagram phase で確定させる。現時点で必要と見込む面を列挙す
 - 記録の前提: pause を予約した run が entry の完了時に `paused` で止まること (**最終ステップの完了で `completed` に倒れないこと**。D19)。`paused` でない run への入力転送が破棄され、破棄がイベントに残ること (ADR-0008)。
 - 記録: 解決した step が `ref` を指すこと。要素定義が同時に draft へ入ること。既存定義に一致する場合に重複定義を作らないこと。
 - 承認: draft と正本が別のものとして保存されていること。承認前の draft を承認後の正本が上書きしないこと。`stale` 判定が効くこと。
-- 再現: 同一セッションでの `rerun_step` で全ステップが `skipped` になり `completed` で終わること。イベント列だけからステップ結果を再構成できること。
+- 再現: 再現の run が全ステップ完了時に `paused` で止まること (D22)。同一セッションでの `rerun_step` で全ステップが `skipped` になり `completed` で終わること。`open` が `url` の Expectation を持つため `skipped` になること (D23)。イベント列だけからステップ結果を再構成できること。
 - 成果物: 同一入力での再生成でファイルの mtime が変わらないこと。バッジ位置とテーブル内容の決定性。SVG が完全一致で判定できること (D11)。
 - Expectation 候補: 操作の前後で変化した項目だけが候補に出ること (D12)。変化していない項目が候補に混ざらないこと。
 - 基盤: 起動時検査 3 件がそれぞれ単独で起動を中止させること (ブラウザ本体なし / origin 列挙が空 / 二重起動)。`runtime.json` が終了時に消えること。
@@ -489,6 +501,36 @@ diagram phase の図を経てから確定する。現時点の見込みを置く
 
 本 spec で Design Doc / feature doc / context / 既存 ADR から変更・追加した内容を、反映先別に記録する。track / sync phase で更新する。
 
+### 確定判断の反映先判定
+
+D1〜D23 を全行走査し、durable な反映先を持つものと spec で閉じるものを分けた。sync phase はこの判定に従う。
+
+| 判断 | 反映先                                                                                                                      |
+| ---- | --------------------------------------------------------------------------------------------------------------------------- |
+| D1   | feature doc: element-mapping                                                                                                |
+| D2   | ADR-0027 / context: infrastructure.md / context: toolchain.md                                                               |
+| D3   | ADR-0027                                                                                                                    |
+| D4   | feature doc: execution                                                                                                      |
+| D5   | ADR-0026                                                                                                                    |
+| D6   | context: testing.md                                                                                                         |
+| D7   | **spec で閉じる** (置き場の分割は adapter/store の実装詳細。`context/architecture.md` の「draft と確定を分離する」の範囲内) |
+| D8   | **spec で閉じる** (skeleton の実装範囲の判断)                                                                               |
+| D9   | ADR-0017                                                                                                                    |
+| D10  | context: testing.md                                                                                                         |
+| D11  | Design Doc: Why/What → 成功条件 / feature doc: artifact-generation / ADR (新規)                                             |
+| D12  | ADR-0026                                                                                                                    |
+| D13  | **spec で閉じる** (設定ファイルの配置の実装詳細)                                                                            |
+| D14  | feature doc: workflow-dsl                                                                                                   |
+| D15  | ADR-0002 / feature doc: execution                                                                                           |
+| D16  | **spec で閉じる** (`context/infrastructure.md` の既存契約に従うだけで、契約自体は変えない)                                  |
+| D17  | **spec で閉じる** (skeleton の範囲判断。導線の追加は次の issue へ)                                                          |
+| D18  | feature doc: element-mapping                                                                                                |
+| D19  | ADR-0002 / feature doc: execution                                                                                           |
+| D20  | **spec で閉じる** (skeleton の範囲判断)                                                                                     |
+| D21  | context: toolchain.md                                                                                                       |
+| D22  | **spec で閉じる** (D19 の規則の適用。上位文書の追加変更なし)                                                                |
+| D23  | **spec で閉じる** (DSL の書き方。語彙は既存)                                                                                |
+
 ### PRD への影響
 
 統合モードのため PRD 単独の文書は無い (`context/project.yml` の `design.prd: integrated`)。**PRD 相当は Design Doc の Why/What 節**であり、下記の変更が要る。反映先は「Design Doc への影響」と同じ節である。
@@ -517,12 +559,12 @@ diagram phase の図を経てから確定する。現時点の見込みを置く
 
 ### context への影響
 
-| 対象 doc / 節                            | 変更内容                                                                                                                                                                        | 理由                                                                                                                                          |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| architecture.md → Runtime Boundary       | 「agent-browser は Workflow Server の子プロセスとして adapter/browser が起動・管理する」を実態に合わせる。daemon の生存期間とセッションの回収範囲を書き分ける (source: clarify) | daemon は CLI プロセスの終了後も生存し、既定は 1 時間のアイドルで終了する (F10)。ADR-0027 の「daemon を明示的に終了させない」とも噛み合わない |
-| testing.md → テスト runtime contract     | agent-browser の隔離は `--namespace` とテスト専用 session 名で行うことを書き足す。**`XDG_STATE_HOME` が agent-browser に効かない**ことを明記する (source: clarify)              | 実測で `XDG_STATE_HOME` は無効、`HOME` 差し替えはブラウザキャッシュを失いシステム Chrome へ落ちる (F16)                                       |
-| infrastructure.md → 起動時に検査するもの | ブラウザ本体の案内を `agent-browser install` から本リポジトリの導入コマンドへ変える (source: clarify)                                                                           | ブラウザ本体を自前で版指定取得するため (D2)                                                                                                   |
-| toolchain.md → 標準スタック / 採用方針   | `@puppeteer/browsers` と Chrome for Testing の自前取得を標準スタック表へ足す (source: clarify)                                                                                  | 同表は「現時点で未確定のものは無い」と宣言しており、依存の追加を反映しないと宣言が偽になる (D2)                                               |
+| 対象 doc / 節                                             | 変更内容                                                                                                                                                                                                                         | 理由                                                                                                                                                      |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| architecture.md → Runtime Boundary                        | 「agent-browser は Workflow Server の子プロセスとして adapter/browser が起動・管理する」を実態に合わせる。daemon の生存期間とセッションの回収範囲を書き分ける (source: clarify)                                                  | daemon は CLI プロセスの終了後も生存し、既定は 1 時間のアイドルで終了する (F10)。ADR-0027 の「daemon を明示的に終了させない」とも噛み合わない             |
+| testing.md → テスト runtime contract / fixture 対象アプリ | agent-browser の隔離は `--namespace` とテスト専用 session 名で行うことを書き足す。**`XDG_STATE_HOME` が agent-browser に効かない**ことを明記する。fixture 対象アプリを静的 HTTP サーバで配信することを書き足す (source: clarify) | 実測で `XDG_STATE_HOME` は無効、`HOME` 差し替えはブラウザキャッシュを失いシステム Chrome へ落ちる (F16)。`file://` は URL に環境依存の値が入る (F15 / D6) |
+| infrastructure.md → 起動時に検査するもの                  | ブラウザ本体の案内を `agent-browser install` から本リポジトリの導入コマンドへ変える (source: clarify)                                                                                                                            | ブラウザ本体を自前で版指定取得するため (D2)                                                                                                               |
+| toolchain.md → 標準スタック / 採用方針                    | `@puppeteer/browsers` と Chrome for Testing の自前取得を標準スタック表へ足す。`agent-browser` の `engines.pnpm >=11` を外れて運用する判断を記録する (source: clarify)                                                            | 同表は「現時点で未確定のものは無い」と宣言しており、依存の追加と engines 逸脱を反映しないと宣言が偽になる (D2 / D21)                                      |
 
 ### ADR の新規 / 更新
 
@@ -536,27 +578,29 @@ diagram phase の図を経てから確定する。現時点の見込みを置く
 
 `spec-review` (fresh-context evaluator) の最新結果。完全な記録は `review.md` を参照する。
 
-| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                | 対応                                                                                                                     |
-| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| 2026-08-22 | NEEDS_WORK               | 上位文書整合 / 未解決論点 / 外部依存 / template 必須節で指摘 10 件。D11 が Design Doc の成功条件「構成番号付き PNG 画像」を覆す点が最大 | 全 10 件を反映。D11 は維持し Design Doc の成功条件の一般化と新規 ADR を影響表へ追加。設計の穴 4 件を D15〜D18 として確定 |
-| 2026-08-22 | NEEDS_WORK               | 2 回目。1 回目の指摘のうち 5 件が解消、5 件が一部。新規指摘 7 件。`paused` と `completed` の優先順位が上位文書に無い点が最大            | 全 7 件を反映。優先順位を D19、Screen 文書の初期 draft を D20、pnpm engines を D21 として確定                            |
+| 日付       | 結果 (PASS / NEEDS_WORK) | 指摘要点                                                                                                                                      | 対応                                                                                                                     |
+| ---------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-22 | NEEDS_WORK               | 上位文書整合 / 未解決論点 / 外部依存 / template 必須節で指摘 10 件。D11 が Design Doc の成功条件「構成番号付き PNG 画像」を覆す点が最大       | 全 10 件を反映。D11 は維持し Design Doc の成功条件の一般化と新規 ADR を影響表へ追加。設計の穴 4 件を D15〜D18 として確定 |
+| 2026-08-22 | NEEDS_WORK               | 2 回目。1 回目の指摘のうち 5 件が解消、5 件が一部。新規指摘 7 件。`paused` と `completed` の優先順位が上位文書に無い点が最大                  | 全 7 件を反映。優先順位を D19、Screen 文書の初期 draft を D20、pnpm engines を D21 として確定                            |
+| 2026-08-22 | NEEDS_WORK               | 3 回目。2 回目の指摘は 6 件解消・1 件一部。観点別 PASS が 5 つ。新規指摘 4 件。Flow 10 の `rerun_step` が `completed` の run に掛かる点が最大 | 対応方針をユーザーと確認中                                                                                               |
 
 ## 変更履歴
 
-| 日付       | 変更者   | 変更内容                                                                       |
-| ---------- | -------- | ------------------------------------------------------------------------------ |
-| 2026-08-22 | Fukuemon | scaffold phase で新規作成。事前調査 F1〜F11 と論点 D1〜D12 を記載              |
-| 2026-08-22 | Fukuemon | clarify phase で D1 を確定 (座標解決の入力は `--annotate` の box)              |
-| 2026-08-22 | Fukuemon | clarify phase で D2 を確定 (Chrome for Testing を自前で版指定取得)。D13 を起票 |
-| 2026-08-22 | Fukuemon | clarify phase で D3 を確定 (ネイティブバイナリを直接 spawn)                    |
-| 2026-08-22 | Fukuemon | clarify phase で D4 を確定 (不応答を Port の構造化エラーに)。F12 を追記        |
-| 2026-08-22 | Fukuemon | clarify phase で D5 を確定 (操作の直前に撮る)。F13 / F14 を追記                |
-| 2026-08-22 | Fukuemon | clarify phase で D6 / D7 / D8 を確定。F15 と D14 を追記                        |
-| 2026-08-22 | Fukuemon | clarify phase で D9 / D10 / D13 / D14 を確定。F16 を追記                       |
-| 2026-08-22 | Fukuemon | clarify phase で D11 / D12 を確定。全論点の確定を完了                          |
-| 2026-08-22 | Fukuemon | clarify gate が NEEDS_WORK。指摘を反映し D15〜D18 を起票、F17 / F18 を追記     |
-| 2026-08-22 | Fukuemon | clarify phase で D15〜D18 を確定。User Flow と起動時検査を書き直した           |
-| 2026-08-22 | Fukuemon | 2 回目の指摘を反映し D19 / D20 / D21 を確定                                    |
+| 日付       | 変更者   | 変更内容                                                                                         |
+| ---------- | -------- | ------------------------------------------------------------------------------------------------ |
+| 2026-08-22 | Fukuemon | scaffold phase で新規作成。事前調査 F1〜F11 と論点 D1〜D12 を記載                                |
+| 2026-08-22 | Fukuemon | clarify phase で D1 を確定 (座標解決の入力は `--annotate` の box)                                |
+| 2026-08-22 | Fukuemon | clarify phase で D2 を確定 (Chrome for Testing を自前で版指定取得)。D13 を起票                   |
+| 2026-08-22 | Fukuemon | clarify phase で D3 を確定 (ネイティブバイナリを直接 spawn)                                      |
+| 2026-08-22 | Fukuemon | clarify phase で D4 を確定 (不応答を Port の構造化エラーに)。F12 を追記                          |
+| 2026-08-22 | Fukuemon | clarify phase で D5 を確定 (操作の直前に撮る)。F13 / F14 を追記                                  |
+| 2026-08-22 | Fukuemon | clarify phase で D6 / D7 / D8 を確定。F15 と D14 を追記                                          |
+| 2026-08-22 | Fukuemon | clarify phase で D9 / D10 / D13 / D14 を確定。F16 を追記                                         |
+| 2026-08-22 | Fukuemon | clarify phase で D11 / D12 を確定。全論点の確定を完了                                            |
+| 2026-08-22 | Fukuemon | clarify gate が NEEDS_WORK。指摘を反映し D15〜D18 を起票、F17 / F18 を追記                       |
+| 2026-08-22 | Fukuemon | clarify phase で D15〜D18 を確定。User Flow と起動時検査を書き直した                             |
+| 2026-08-22 | Fukuemon | 2 回目の指摘を反映し D19 / D20 / D21 を確定                                                      |
+| 2026-08-23 | Fukuemon | 3 回目の指摘を反映し D22 / D23 を確定。ADR-0002 を整合表へ載せ、確定判断の反映先判定を全行付けた |
 
 ## 備考
 
