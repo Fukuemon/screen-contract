@@ -241,3 +241,32 @@ Verdict: **NEEDS_WORK**
 - **D25**: `session-recreated` と `input-discarded` の 2 件を語彙へ足す。上位文書が「イベントに残す」と定めながら語彙を持っていなかった箇所である。
 
 `## Interface 設計` を上記で埋め、Sequence 1 に `input-discarded`、Sequence 2 に D4 の alt 分岐と `step-failed` → `run-failed` の分岐を足した。3 図とも実レンダリングで再検証済み。
+
+## Review 2026-08-23 (track gate 2 回目)
+
+Verdict: **NEEDS_WORK**
+
+前回の 5 件は 4 件が解消、1 件 (D4 を図へ) が一部。観点別では上位文書整合のみ NEEDS_WORK で、他は PASS / N/A。
+
+### 指摘 (track gate 2 回目)
+
+1. **D24 の `rolled-back` 除外理由と、図に足した再作成の分岐が矛盾する。** D4 は「セッションの再作成はページ状態を失う操作」と述べ、execution feature は前提が崩れた状況を「満たさなくなった最初のステップまで巻き戻して再実行する」と定め、そのイベントが `rolled-back` である。図は再作成後そのまま次の評価へ進むため、**ページ状態を失ったまま後続ステップを評価する**。エラーケース 5 も「止めるか再作成するか」の両方を残しながら復旧欄は「run をやり直す」で、図に「止める」分岐が無い。
+2. **`input-discarded` の置き場が層と噛み合わない。** ExecutionEvent は core/execution が定義し run 単位で発行順序が決定的。入力の破棄は api (Stream Proxy) で起き、破棄条件の 1 つ「対象 run が要求元のものでない」では **run が定まらない**。図も `API->>App: input-discarded` で、interface が core の語彙のイベントを起こす形になっている (`context/architecture.md` は interface → core の直接依存を禁じる)。外部タイミングの事象を混ぜると「発行順序が決定的」が成り立たない。
+3. **`ir-version-changed` の除外理由が spec 内の記述と食い違う。** 「記録と再現の間に draft を編集しない」とあるが、**記録そのものが draft を書く操作**である。正確な理由は「記録に使った run を `resume` も `rerun_step` もしない」。結論は妥当だが、理由のままだと実装者が読み違える。
+4. (軽微) **記録に使った run の終わり方が spec に無い。** 別 run で再現へ移るため記録用 run は `paused` のまま残り、`run-aborted` を除外した D24 の下では**イベント列上で終端を持たない**。
+
+### 確認された整合 (問題なし)
+
+- D24 の 3 件の除外は、理由を直せば妥当。`rolled-back` は `rerun_step` そのものでは発行されず、Flow 10 では通過済みステップの Expectation が満たされたままなので巻き戻しに入らない。`ir-version-changed` も再現の run では draft が変わらない。ただし再作成経路を残す限り `rolled-back` の除外は成立しない。
+- Sequence 2 の評価まわりの分岐は execution のステップ実行ルール 4 手順と一致する。`createSession (匿名)` も認証コンテキスト必須の契約を満たす。
+- 反映先判定表は D25 まで拡張され影響表と対応している。
+
+### 親 agent の対応
+
+指摘 3 は理由の文言を直した。指摘 1・2・4 はユーザー確認のうえ D26 / D27 / D28 を確定した。
+
+- **D26**: skeleton ではセッション不応答時に**再作成せず `run-failed` で終える**。`rolled-back` を持たない D24 と整合し、エラーケース 5 の復旧とも一致する。D4 の Port 契約は変えず、skeleton の方針を「止める」に固定するだけである。`session-recreated` は語彙として足すが skeleton では発行経路を持たない。
+- **D27**: `input-discarded` を **Stream Proxy 側の語彙**として定義する。反映先を ADR-0008 と web-editor feature に分け、core/execution へは足さない。整合表の ADR-0008 も「継承」から「変更提案」へ変えた。
+- **D28**: 記録に使った run は記録の停止後に `resume` して `run-completed` で終える。D24 の語彙で足り、終端を持たない run が残らない。
+
+Sequence 2 の再作成分岐を「止める」へ、Sequence 1 の `input-discarded` を Stream Proxy 内で完結する形へ直し、3 図とも実レンダリングで再検証した。
