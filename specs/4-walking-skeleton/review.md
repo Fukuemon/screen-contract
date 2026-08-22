@@ -41,3 +41,45 @@ Verdict: **NEEDS_WORK**
 ### 照合結果 (親 agent が上流文書で確認)
 
 指摘 1 / 3 / 4 / 5 / 6 / 8 は該当箇所を直接読んで実在を確認した。指摘 2 も ADR-0008 と web-editor feature の記述で確認した。
+
+## Review 2026-08-22 (2 回目) — clarify gate
+
+Verdict: **NEEDS_WORK**
+
+### 1 回目の指摘 10 件の解消状況
+
+| #   | 指摘                      | 判定 | 残る問題                                                           |
+| --- | ------------------------- | ---- | ------------------------------------------------------------------ |
+| 1   | D11 が Why/What を覆す    | 一部 | PRD 影響節が「変更なし」のまま。artifact-generation が影響表に無い |
+| 2   | 記録開始と ADR-0008       | 一部 | `paused` と `completed` の優先順位が未定義                         |
+| 3   | 起動時検査の残り 2 件     | 解消 | —                                                                  |
+| 4   | D2 の波及先               | 解消 | —                                                                  |
+| 5   | Workflow 文書がスコープ外 | 一部 | Screen 文書の初期 draft を誰がいつ作るかが未記載                   |
+| 6   | D1 と element-mapping     | 一部 | Reuse Policy の「同じ規則を使う」が D18 と矛盾                     |
+| 7   | メタ情報の同期            | 一部 | 「clarify で確定させる」等の古い記述が残る                         |
+| 8   | `## 備考` 欠落            | 解消 | —                                                                  |
+| 9   | D3 の計測値               | 解消 | —                                                                  |
+| 10  | 未確定事項の追跡先        | 解消 | —                                                                  |
+
+観点別では未解決論点 / 外部依存の健全性 / 実装対象明示 / EARS acceptance が PASS、上位文書整合と template 必須節が NEEDS_WORK。
+
+### 指摘 (2 回目)
+
+1. **PRD 影響節が Design Doc 影響節と矛盾する。** メタの「PRD 更新要否: 不要」と PRD 影響表「Why/What に変更なし」が、Design Doc 影響表の「Why/What → 成功条件を一般化する」と逆のことを述べている。統合モードでは Why/What が PRD 相当 (`context/project.yml` の `design.prd: integrated`) である。あわせて `design/features/artifact-generation/DesignDoc_artifact-generation.md:34` (同じ成功条件の再掲) を feature doc 影響の対象節へ足す。
+2. **Reuse Policy が D18 と矛盾する。** 「記録の座標解決は element-mapping feature の要素選択と**同じ規則**を使う」が残っており、D18 (祖先候補列と `label` / `testid` を使わず role+name に絞る) と食い違う。
+3. **Screen 文書の初期 draft が User Flow に無い。** run は Screen 文書 (id / title / entry 参照 / `default` 状態) を必要とし、「遷移元は run の到達状態 (`default`) から決まる」もその存在を前提にしている。誰がいつ作るかが読めない。あわせて Flow 9 の `run.start` が新しいセッションで `open` から実行されること、Flow 10 の `rerun_step` がその run と同じセッションで行われることを明示しないと、「9 で再現され 10 で全 skip」の観測が成立しない。
+4. **`paused` と `completed` の優先順位が上位文書に無い。** D15 の根拠 2 は「pause の予約で表現できるため新しい概念が要らない」とするが、記録時点の実行ステップ列は entry の `open` 1 件だけで、`design/features/execution/DesignDoc_execution.md:121` は「全ステップ完了 → `completed`」を定めている。**最終ステップの完了と pause 予約が重なったときにどちらが勝つかが決まっていない。** `completed` に倒れると ADR-0008 の中継条件を満たさず、記録経路が丸ごと成立しない。
+5. **実装対象テーブルの責務列がスコープ更新に追随していない。** `workflow` 行に Workflow 文書 (D17) が無く、`infra` 行が「起動時のブラウザ検査」のままで起動時検査 3 件 (D16) を反映していない。
+6. **clarify 完了後の古い記述が残る。** 「clarify を先に通す」「clarify で確定させる」「clarify と diagram を経てから」。
+7. **pnpm の `engines` を外れて運用することが決定として書かれていない。** F3 / F18 に事実は揃ったが、可否の判断が無い。
+
+### 今回あらためて確認した整合 (問題なし)
+
+- D16 と `context/infrastructure.md` の検査 3 項目、およびエラーケースが一対一で対応する。
+- D17 は `workflow-dsl` の「`open` だけを使う Workflow は `params` を省略できる」と噛み合う。
+- D18 は element-mapping の祖先候補列・優先順位ポリシーが要素選択の機能であることと一致する。
+- F17 / F18 の追加により、D2 / D3 の根拠がすべて F の表から辿れる。
+
+### レビュー環境の制約
+
+`gh` を実行する手段が無いため issue #4 本文を直接読めていない。判定は spec 内の成功条件とテスト観点の対応のみに基づく。
