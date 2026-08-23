@@ -19,19 +19,20 @@ verified_commit: ed339e9fb684cc46ebcb7ceea48567202de46c3d
 
 ## 標準スタック
 
-| 区分             | ツール                  | 備考                                                                                 |
-| ---------------- | ----------------------- | ------------------------------------------------------------------------------------ |
-| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)                 |
-| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                                   |
-| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                                      |
-| Linter           | oxlint                  |                                                                                      |
-| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md)             |
-| Unit test        | vitest                  | 統合テストも vitest で書く                                                           |
-| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                                  |
-| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))                |
-| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))                |
-| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                                        |
-| ブラウザ実行基盤 | agent-browser           | npm 依存として同梱し版を固定する ([adr/0027](../adr/0027-agent-browser-bundling.md)) |
+| 区分             | ツール                  | 備考                                                                                                                                                                                        |
+| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)                                                                                                                        |
+| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                                                                                                                                          |
+| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                                                                                                                                             |
+| Linter           | oxlint                  |                                                                                                                                                                                             |
+| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md)                                                                                                                    |
+| Unit test        | vitest                  | 統合テストも vitest で書く                                                                                                                                                                  |
+| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                                                                                                                                         |
+| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))                                                                                                                       |
+| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))                                                                                                                       |
+| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                                                                                                                                               |
+| ブラウザ実行基盤 | agent-browser           | npm 依存として同梱し版を固定する ([adr/0027](../adr/0027-agent-browser-bundling.md))                                                                                                        |
+| ブラウザ本体     | Chrome for Testing      | 版を指定して自前で取得し、実行時は実行ファイルのパスを明示する。版番号は `packages/adapter-browser` 配下の専用 JSON に置く (判断の正本は [adr/0027](../adr/0027-agent-browser-bundling.md)) |
 
 ### Node のバージョンを LTS に固定する
 
@@ -120,6 +121,7 @@ flowchart LR
 
 - 採用候補を先行固定する場合は、その根拠と確定タイミング (どの issue / ADR で確定するか) を記す。
 - **現時点で未確定のものは無い。** 標準スタック表の全項目が ADR で確定している。
+- **agent-browser が宣言する pnpm の `engines` を外れて運用する。** 本システムは agent-browser を CLI として子プロセスで呼ぶだけで pnpm の API に依存せず、install も警告なく通る。engines の宣言は agent-browser 自身の開発環境の要件である。pnpm の更新は本表とは独立に判断する。
 
 ## Scaffold Policy
 

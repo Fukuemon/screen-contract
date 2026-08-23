@@ -61,7 +61,7 @@ Baseline と構成番号の確定のみ、人間の承認を必要とする。
 - 既に期待状態を満たしている操作は再実行せず、変更なしとして記録する。
 - 画面要素には、表示用の構成番号とは別に永続的な要素 ID を付与できる。
 - Web UI 上で画面要素を選択し、名称、種別、構成番号、Locator を編集できる。
-- DSL から構成番号付き PNG 画像と Markdown テーブルを生成できる。
+- DSL から構成番号付きの注釈画像と Markdown テーブルを生成できる (形式の判断は [adr/0028](../adr/0028-annotated-artifact-format.md))。
 - Workflow IR (DSL を実行しやすい形へ正規化した中間表現) から Playwright の Page Object コードを決定的に生成できる。
 - 生成内容に意味上の変更がない場合、既存成果物を書き換えない。
 - Locator の未解決、複数一致、Role 変更、文言変更、位置変更、画像変更を区別して検知できる。
@@ -96,7 +96,7 @@ MVP では次を対象とする。
 
 成果物生成 (core/artifact):
 
-- 構成番号付き画像の生成
+- 構成番号付きの注釈画像と生スクリーンショットの生成 ([adr/0028](../adr/0028-annotated-artifact-format.md))
 - Markdown 構成要素テーブルの生成
 - Playwright の Page Object コードの生成 (編集禁止の生成物。adr/0006)
 
@@ -262,18 +262,18 @@ Port は原則、それを使う core が定義する。
 
 ### interface / app / adapter 層
 
-| モジュール      | 責務                                                                                                                                                 | 実装・依存                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                                                            | api に依存                                          |
-| api             | HTTP API、WebSocket、認可                                                                                                                            | app に依存                                          |
-| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可                                    | app に依存                                          |
-| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、提案依頼キューの保持、外部入力の検証、Store Port の定義                                      | 各 core に依存。adapter と interface へは依存しない |
-| domain          | 全 core が共有する型の定義。**実行時の値を持たない**                                                                                                 | 何にも依存しない                                    |
-| MCP ブリッジ    | stdio とループバックの間で JSON-RPC のフレームを転送し、トークンを付与する。tool 語彙を解釈しない ([adr/0021](../adr/0021-agent-interface-authz.md)) | 何にも依存しない                                    |
-| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                                                             | Browser Port を実装                                 |
-| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得。**MVP では実装しない** ([adr/0019](../adr/0019-agent-led-ai-suggestions.md))                        | AI Port と DSL Fix Port を実装                      |
-| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                                                                  | Store Port を実装                                   |
-| 合成ルート      | adapter の具象を選んで app へ注入、api と agent を 1 プロセスへ載せる、起動と終了の管理                                                              | 全層に依存してよい                                  |
+| モジュール      | 責務                                                                                                                                                                                                                                | 実装・依存                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| web             | DSL 編集、ライブ表示、再生制御 (一時停止・再開)、要素選択、採番、差分承認                                                                                                                                                           | api に依存                                          |
+| api             | HTTP API、WebSocket、認可                                                                                                                                                                                                           | app に依存                                          |
+| agent           | MCP server と App Server 型 JSON-RPC による use case の公開、実行イベントのストリーム配信、エージェント操作の認可                                                                                                                   | app に依存                                          |
+| app             | use case の編成 (実行、要素編集、成果物生成、差分承認)、提案依頼キューの保持、外部入力の検証、Store Port の定義                                                                                                                     | 各 core に依存。adapter と interface へは依存しない |
+| domain          | 全 core が共有する型の定義。**実行時の値を持たない**                                                                                                                                                                                | 何にも依存しない                                    |
+| MCP ブリッジ    | stdio とループバックの間で JSON-RPC のフレームを転送し、トークンを付与する。tool 語彙を解釈しない ([adr/0021](../adr/0021-agent-interface-authz.md))                                                                                | 何にも依存しない                                    |
+| adapter/browser | agent-browser の起動、操作、Snapshot・スクリーンショット取得、ライブ配信                                                                                                                                                            | Browser Port を実装                                 |
+| adapter/ai      | 要素名、種別、Locator、DSL 修正候補の構造化取得。**MVP では実装しない** ([adr/0019](../adr/0019-agent-led-ai-suggestions.md))                                                                                                       | AI Port と DSL Fix Port を実装                      |
+| adapter/store   | DSL、Baseline、Snapshot、画像、ログ、差分結果の保存                                                                                                                                                                                 | Store Port を実装                                   |
+| 合成ルート      | adapter の具象を選んで app へ注入、api と agent を 1 プロセスへ載せる、自プロセスの起動と終了の管理。**agent-browser の daemon は管理対象に含まず、セッションの回収までを担う** ([adr/0027](../adr/0027-agent-browser-bundling.md)) | 全層に依存してよい                                  |
 
 ```mermaid
 flowchart TD
@@ -397,6 +397,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0025](../adr/0025-image-diff-library.md)           | 画像差分に pixelmatch と ssim.js を採用する判断                                   | change-detection             |
 | [adr/0026](../adr/0026-operation-recording.md)          | 操作の記録を DSL の draft を書く手段として提供する判断                            | web-editor / workflow-dsl    |
 | [adr/0027](../adr/0027-agent-browser-bundling.md)       | agent-browser を npm 依存として同梱しブラウザは起動時に検査する判断               | execution                    |
+| [adr/0028](../adr/0028-annotated-artifact-format.md)    | 注釈画像を SVG とし生スクリーンショットを別ファイルで参照する判断                 | artifact-generation          |
 
 ## Open Questions / Future Work
 

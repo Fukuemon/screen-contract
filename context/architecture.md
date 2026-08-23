@@ -123,7 +123,7 @@ Store Port を app に置くのは保存が機能横断のためであり、**�
 - adapter の具象を選ぶ (実装か fake か)
 - `app` の factory へ Port の実装を注入する
 - `api` と `agent` を 1 つのプロセスへ載せる
-- 起動と終了を管理する (agent-browser のセッション回収を含む)
+- 自プロセスの起動と終了を管理する (agent-browser のセッション回収を含む。daemon の終了は含まない)
 
 Nx が「an application project contains the deployable shell: entry point, configuration, and composition of features」「the majority of your code in `libs/`, with `apps/` reduced to wiring」と定める形に一致する。
 
@@ -135,7 +135,7 @@ Nx が「an application project contains the deployable shell: entry point, conf
 
 - Web UI と Workflow Server は別プロセスとする。Web UI はブラウザ操作・成果物生成を直接実行しない。
 - Workflow Server (api 層) を唯一の backend とする。web 側の server 機能 (TanStack Start の server function 等) に API ロジックを置かない。中間層 (BFF / 別言語 backend) を追加しない判断は [adr/0001-tech-stack.md](../adr/0001-tech-stack.md)。
-- agent-browser は Workflow Server の子プロセスとして adapter/browser が起動・管理する。
+- agent-browser の CLI は adapter/browser が子プロセスとして呼ぶ。**daemon は CLI が自動起動し、CLI プロセスの終了後も生存する** (既定は 1 時間のアイドルで終了)。本システムは daemon を明示的に終了させず、**回収するのはセッションまで**である ([adr/0027](../adr/0027-agent-browser-bundling.md))。
 - AI エージェント (Claude Code / Codex 等) は interface/agent (MCP server / App Server 型 JSON-RPC) からのみ接続する。
 - ライブ映像は agent-browser の WebSocket ストリーミングを Workflow Server 経由で配信する ([adr/0008](../adr/0008-stream-proxy.md))。
 - 秘密情報 (認証情報・トークン) を client / DSL / 成果物へ露出させない ([infrastructure.md](infrastructure.md))。
@@ -143,6 +143,6 @@ Nx が「an application project contains the deployable shell: entry point, conf
 ## State Boundary
 
 - 正本は DSL と Baseline であり、adapter/store が保存する。画像・Markdown テーブルは生成物で、直接編集しない。
-- draft と確定を分離する: エージェント・利用者の編集は draft に置き、人間の承認によってのみ Baseline・構成番号を確定する (用語は [project.yml](project.yml) の glossary)。
+- draft と確定を分離する: エージェント・利用者の編集は draft に置き、人間の承認によってのみ Baseline・構成番号を確定する (用語は [project.yml](project.yml) の glossary)。**draft と正本は別の置き場に保存する**。承認は draft を正本の置き場へ確定させる操作である (判断の正本は [adr/0017](../adr/0017-agent-draft-boundary.md))。
 - 実行中の一時状態 (agent-browser の要素参照、実行途中のステップ状態) は永続化しない。永続化するのは実行履歴 (入力、ステップ結果、Snapshot、スクリーンショット、差分結果) のみ。
 - client state (Web UI の表示状態) は正本を持たない。リロードで再取得できる情報のみ保持する。

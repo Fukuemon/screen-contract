@@ -108,7 +108,7 @@ stateDiagram-v2
     [*] --> idle
     idle --> running : run 開始
     running --> running : ステップ完了 → 次ステップ
-    running --> paused : pause 要求<br/>(実行中ステップの完了後に停止)
+    running --> paused : pause 要求<br/>(実行中ステップの完了後に停止。<br/>最終ステップの完了より優先する)
     paused --> paused : 要素選択 (座標 query) /<br/>実ページ操作 (許可)
     paused --> pin : resume / ステップ指定の再実行
     state "IR の版を差し替える<br/>(draft が変わっていれば ir-version-changed)" as pin
@@ -118,7 +118,7 @@ stateDiagram-v2
     verify --> rollback : 前提不一致
     state "巻き戻し" as rollback
     rollback --> running : 崩れた最初のステップから再実行<br/>(変化のない区間は冪等スキップ)
-    running --> completed : 全ステップ完了
+    running --> completed : 全ステップ完了<br/>(pause 予約が無いときだけ)
     running --> failed : 検証失敗
     running --> aborted : 中断要求
     completed --> [*]
@@ -127,6 +127,8 @@ stateDiagram-v2
 ```
 
 - **一時停止はステップ境界でのみ効く**。pause 要求は「実行中ステップの完了後に停止する」予約として扱う。
+- **最終ステップの完了と pause 予約が重なったときは pause を優先する** ([adr/0002](../../../adr/0002-pause-semantics.md))。優先順位を決めないと、ステップが 1 件だけの run で `completed` に倒れ、一時停止を前提とする経路 (操作の記録など) が成立しない。
+- **pause 予約は 1 回で消費される。** `resume` すると予約は消え、次の完了では `completed` へ進む。
 - **一時停止中の実ページ操作は許可する**。要素選択のための座標問い合わせ (Element Inspector への query) は操作に含めず、常に可能。
 - **再開時は前提を再検証する**: それまでに通過したステップの Expectation を再評価し、
   - すべて満たしていれば次のステップから続行する。
@@ -143,12 +145,19 @@ stateDiagram-v2
 | コマンド   | 型付きの action 実行。CLI / SDK の呼び出し形式・JSON パースは adapter 内に閉じ、Port は型付き結果のみ返す                                                                              |
 | 取得       | Snapshot (Accessibility ツリー)、スクリーンショット (バイナリ参照)、現在 URL 等の状態取得                                                                                              |
 | 配信       | ライブ映像ストリームのハンドル取得 (描画は web-editor、転送は adapter/browser の責務)                                                                                                  |
+| 不応答     | セッションが応答しなくなったことを**構造化エラーで返す**。**adapter が黙ってセッションを作り直さない**。再作成するかどうかは core/execution が決める                                   |
 
 認証コンテキストは省略可能にしない。省略できると「認証なし」が既定になり、意図しないプロファイルでの実行と Baseline の汚染を招く。認証しない場合も匿名であることを明示する。
 
 **復号した Storage State を core / app へ渡さない。** Port が受け取るのはプロファイルの名前だけで、実体の復号と注入は adapter に閉じる。
 
-構造化エラーの語彙に `auth/expired` を持つ。認証状態が失効したときに、呼び出し側が「取り込み直しを促す」判断を機械的にできるようにするためである。
+構造化エラーの語彙に `auth/expired` と `browser/unresponsive` を持つ。前者は認証状態が失効したときに、呼び出し側が「取り込み直しを促す」判断を機械的にできるようにするためである。
+
+#### `browser/unresponsive` を adapter が握りつぶさない理由
+
+セッションは**部分的に壊れる**。Snapshot の取得は成功し続けるのにスクリーンショットの取得だけが恒久的に失敗する状態が実在する。生存確認では検出できない。
+
+**セッションの再作成はページ状態を失う操作である。** adapter が黙って作り直すと、core から見て「たまに遅い」だけになり、同一セッションでの再実行を前提とする検証 (冪等スキップの観測) が静かに壊れる。どこまで進んだかを core が把握できないまま次のステップを評価することにもなる。再作成の可否は、run の意味を知っている core/execution が決める。
 
 #### `auth/expired` を断定できる条件
 
@@ -201,11 +210,15 @@ flowchart TD
 
 発行順序が決定的な append-only のイベント列。web (再生表示の同期)、agent interface (エージェントへの通知)、実行履歴 (永続化) が同じ列を購読する。
 
-`run-started / step-started / expectation-evaluated / step-skipped / step-executed / step-failed / paused / ir-version-changed / resumed / rolled-back / run-completed / run-failed / run-aborted`
+`run-started / step-started / expectation-evaluated / step-skipped / step-executed / step-failed / paused / ir-version-changed / resumed / rolled-back / session-recreated / run-completed / run-failed / run-aborted`
 
 イベントには step id、Expectation の評価結果、Snapshot / スクリーンショット参照を含め、UI 側が注釈表示に必要な情報をイベントだけで組み立てられるようにする。
 
 `ir-version-changed` は `resume` と `rerun_step` で IR の版を差し替えたときに発行し、差し替え前後の版を含める ([adr/0018](../../../adr/0018-ir-version-pinning.md))。**イベント列だけを読んで、どのステップがどの版に対する結果かを判別できるようにする**ためである。
+
+`session-recreated` は `browser/unresponsive` を受けてセッションを作り直したときに発行し、**再作成の理由と失われたページ状態の範囲**を含める。失敗ではないため `run-failed` では表せない。イベント列を読む側が「ここから先はページ状態が引き継がれていない」と判断できるようにするためである。
+
+**入力転送の破棄はこの列に含めない。** 破棄は Stream Proxy で起き、破棄条件の 1 つでは結びつけるべき run が定まらない。語彙と置き場は [adr/0008](../../../adr/0008-stream-proxy.md) を正本とする。
 
 **秘密情報をイベントへ入れない。** 入力値のうち secret 指定されたものは、イベント・StepResult・ログのいずれでも伏せる ([workflow-dsl feature](../workflow-dsl/DesignDoc_workflow-dsl.md))。実行履歴は永続化されるため、一度入ると後から取り除けない。
 
@@ -227,5 +240,7 @@ flowchart TD
 - イベント: 発行順序の決定性と、履歴から run を再構成できること。
 - IR 版の固定: 実行中に draft を編集しても走行中の run のステップ列が変わらないこと。`resume` で差し替わったとき `ir-version-changed` が発行され、その後の再検証が新しい版で行われること。
 - 認証: `createSession` に認証コンテキストが必ず渡ること。失効時に `auth/expired` の構造化エラーが返ること。
+- 不応答: `browser/unresponsive` の構造化エラーが返ること。**adapter が黙ってセッションを作り直さないこと**。再作成した場合に `session-recreated` が発行され、失われたページ状態の範囲が含まれること。
+- pause の優先順位: 最終ステップの完了と pause 予約が重なったときに `paused` へ入ること。`resume` 後の完了では `completed` へ進むこと (予約が 1 回で消費されること)。
 - Expectation を持たないステップが `skipped` にならず必ず実行されること。
 - secret 指定した入力値が、StepResult・イベント・ログのいずれにも現れないこと。

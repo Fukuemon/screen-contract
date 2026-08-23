@@ -128,6 +128,8 @@ Semantic Locator を優先する (DesignDoc の前提)。1 つの Locator は次
 Web UI の要素選択 (viewport 上のクリック) を要素候補に変える規則:
 
 1. 入力: クリック座標 + その時点の Snapshot (Accessibility ツリー + 各ノードの bounding box + 補助 DOM 情報)。取得は adapter/browser の責務。
+   - **bounding box は Accessibility Snapshot の応答に含まれるとは限らない。** 実行基盤によっては注釈スクリーンショットの応答など別の経路から得る。core/element は入力値として受け取るだけで、取得手段を問わない。
+   - **祖先方向の候補列と `label` / `testid` の優先順位は、取得できる情報が揃っている場合の規則である。** role と accessible name しか得られない実行基盤では、role+name への解決までが適用範囲になる。祖先候補列は要素選択 (Web UI で「ボタンではなくカード全体を選ぶ」) のための機能であり、操作の記録では第一候補だけで足りる。
 2. 座標を含むノードのうち、操作可能・意味のある role を持つ最小のノードを第一候補とし、祖先方向の候補列を付ける (「ボタンではなくカード全体を選びたい」場合の切り替え用)。
 3. 各候補について Locator 候補列を生成する: 優先順位ポリシー (既定は role+name → label → testid) の順で、その Snapshot 内で一意に解決できるものだけを提案する。一意にならない場合は属性を追加して絞り込み、それでも曖昧なら `css` を提案せず「曖昧」と明示する。
 4. 名称・種別の推定: Accessible Name と role から機械的に初期値を作る。より良い候補が必要な場合は AI Port に委ねる。
