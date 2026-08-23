@@ -3,7 +3,7 @@
 ## メタ情報
 
 - Issue: `#4`
-- ステータス: `In Progress`
+- ステータス: `Done`
 - 作成日: 2026-08-22
 - 更新日: 2026-08-23
 - Branch: `feature/4`
@@ -24,8 +24,8 @@
 | 7   | Content / Data 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-08-23 | track gate PASS                                     |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
-| 10  | 実装分割                    | 完了       | 2026-08-23 | prompt 11 本を生成。新規実装モード                  |
-| 11  | レビュー済                  | 未着手     |            | clarify gate は PASS。最終 gate は prompts          |
+| 10  | 実装分割                    | レビュー済 | 2026-08-23 | prompt 11 本。最終 gate PASS                        |
+| 11  | レビュー済                  | レビュー済 | 2026-08-23 | 最終 gate PASS (2 回目)。spec-lifecycle 終端        |
 
 ## 上位文書整合
 
@@ -766,6 +766,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | NEEDS_WORK               | track gate 3 回目。D28 を採ると `ir-version-changed` の除外が成立しない。テスト観点が D26 と矛盾。整合表の web-editor が継承のまま                            | 全 4 件を反映。D24 に `ir-version-changed` を戻して 11 件とし、テスト観点に D4 の眼目を入れた                                              |
 | 2026-08-23 | PASS                     | track gate 4 回目 (diagram + track を累積)。全 8 観点で PASS または N/A。非ブロッキング推奨 2 件                                                              | 推奨 2 件も反映。次は sync phase                                                                                                           |
 | 2026-08-23 | NEEDS_WORK               | 最終 gate (sync + prompts を累積)。spec が二重化し見出しが 1 つ壊れていた。`@puppeteer/browsers` が sync で落ちていた。P1_01 が採用ライブラリを伏せていた     | 全 4 件を反映。重複 469 行を削除し、パッケージ名を toolchain / ADR-0027 / P1_01 へ明記した                                                 |
+| 2026-08-23 | PASS                     | 最終 gate 2 回目。全 8 観点で PASS。二重化の削除で内容の欠落なし。申し送り 4 件はいずれも対応済みか closeout 向け                                             | spec-lifecycle 終端。実装フェーズへ                                                                                                        |
 
 ## 変更履歴
 
@@ -796,6 +797,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | sync phase を実施。ADR 6 本 / design 6 本 / context 5 本へ反映し、正本をハンドオフ (81f4f81)     |
 | 2026-08-23 | Fukuemon | prompts phase で実装 prompt 11 本を生成。絶対ガードと hook 検査を通した                          |
 | 2026-08-23 | Fukuemon | 最終 gate の指摘を反映。spec の重複を削除し、採用パッケージ名を durable 文書へ残した             |
+| 2026-08-23 | Fukuemon | 最終 gate が PASS。spec-lifecycle の全 phase を完了                                              |
 
 ## 備考
 
