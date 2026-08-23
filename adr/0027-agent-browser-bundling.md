@@ -24,7 +24,7 @@
 - **`agent-browser` を npm の依存として `packages/adapter-browser` に宣言する。** Homebrew と cargo は使わない。リポジトリの依存管理 (lockfile) の外に出ると、再現性を最優先とする方針 ([context/project.yml](../context/project.yml)) を満たせない。
 - **バージョンを範囲指定せず固定する。** ブラウザ操作の挙動が変わると成果物と差分判定が変わるためである。更新は動作確認を伴う明示的な操作とする。
 - **ブラウザ本体を `postinstall` で自動取得しない。** 代わりに **Workflow Server の起動時に検査し、無ければ導入コマンドを案内して中止する**。
-- **ブラウザ本体は自前で版を指定して取得し、`--executable-path` で常に明示する。** `agent-browser install` に版を指定するフラグは無く、指定しなければシステムの Chrome を自動検出する経路が残る。決定性を最優先とする方針を満たすには、どの版で撮ったかを固定できなければならない。起動時検査が案内するのは**本リポジトリの導入コマンド**とする。
+- **ブラウザ本体は `@puppeteer/browsers` で版を指定して取得し、`--executable-path` で常に明示する。** 同パッケージは puppeteer 本体と同じ monorepo で保守され、Apache-2.0、直接依存は 2 つ、deprecated ではない (2026-08-23 時点)。 `agent-browser install` に版を指定するフラグは無く、指定しなければシステムの Chrome を自動検出する経路が残る。決定性を最優先とする方針を満たすには、どの版で撮ったかを固定できなければならない。起動時検査が案内するのは**本リポジトリの導入コマンド**とする。
 - **ブラウザ本体の版番号は `packages/adapter-browser` 配下の専用 JSON に置く。** npm の依存ではないため lockfile に載らない。読む側が 2 つ (取得コマンドと起動時検査) あり、片方は TS のビルド前に走るため、両方から読める形にする。
 - **CLI はネイティブバイナリを直接 spawn する。** `pnpm-workspace.yaml` の `onlyBuiltDependencies` に `agent-browser` を足し、postinstall に実行ビットを付けさせる。
 - **daemon の起動は CLI の自動起動に任せる。** 本システムから daemon を明示的に終了させない。

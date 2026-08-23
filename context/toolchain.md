@@ -19,20 +19,21 @@ verified_commit: ae7532aa70652a1f63add9d5ada937eaa4f806a6
 
 ## 標準スタック
 
-| 区分             | ツール                  | 備考                                                                                                                                                                                        |
-| ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Package manager  | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)                                                                                                                        |
-| Task runner      | turborepo               | 依存グラフで層の依存規約を反映する                                                                                                                                                          |
-| Language         | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                                                                                                                                             |
-| Linter           | oxlint                  |                                                                                                                                                                                             |
-| Formatter        | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md)                                                                                                                    |
-| Unit test        | vitest                  | 統合テストも vitest で書く                                                                                                                                                                  |
-| E2E              | Playwright              | 責務分担は [testing.md](testing.md)                                                                                                                                                         |
-| HTTP / WebSocket | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))                                                                                                                       |
-| 画像差分         | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))                                                                                                                       |
-| Runtime 管理     | mise                    | Node を LTS に固定する (後述)                                                                                                                                                               |
-| ブラウザ実行基盤 | agent-browser           | npm 依存として同梱し版を固定する ([adr/0027](../adr/0027-agent-browser-bundling.md))                                                                                                        |
-| ブラウザ本体     | Chrome for Testing      | 版を指定して自前で取得し、実行時は実行ファイルのパスを明示する。版番号は `packages/adapter-browser` 配下の専用 JSON に置く (判断の正本は [adr/0027](../adr/0027-agent-browser-bundling.md)) |
+| 区分               | ツール                  | 備考                                                                                                                                                                                        |
+| ------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package manager    | pnpm (workspace)        | `apps/` と `packages/` の分け方は [architecture.md](architecture.md)                                                                                                                        |
+| Task runner        | turborepo               | 依存グラフで層の依存規約を反映する                                                                                                                                                          |
+| Language           | TypeScript 7 (Node LTS) | 言語サービス用に TypeScript 6 を併置する (後述)                                                                                                                                             |
+| Linter             | oxlint                  |                                                                                                                                                                                             |
+| Formatter          | oxfmt                   | md / yml / json は prettier。担当分けは [engineering.md](engineering.md)                                                                                                                    |
+| Unit test          | vitest                  | 統合テストも vitest で書く                                                                                                                                                                  |
+| E2E                | Playwright              | 責務分担は [testing.md](testing.md)                                                                                                                                                         |
+| HTTP / WebSocket   | Hono                    | listen は合成ルートが行う ([adr/0024](../adr/0024-http-framework.md))                                                                                                                       |
+| 画像差分           | pixelmatch / ssim.js    | Pixel Diff と知覚差分 ([adr/0025](../adr/0025-image-diff-library.md))                                                                                                                       |
+| Runtime 管理       | mise                    | Node を LTS に固定する (後述)                                                                                                                                                               |
+| ブラウザ実行基盤   | agent-browser           | npm 依存として同梱し版を固定する ([adr/0027](../adr/0027-agent-browser-bundling.md))                                                                                                        |
+| ブラウザ本体       | Chrome for Testing      | 版を指定して自前で取得し、実行時は実行ファイルのパスを明示する。版番号は `packages/adapter-browser` 配下の専用 JSON に置く (判断の正本は [adr/0027](../adr/0027-agent-browser-bundling.md)) |
+| ブラウザ本体の取得 | `@puppeteer/browsers`   | Chrome for Testing を版指定で取得する。puppeteer 本体と同じ monorepo で保守され、Apache-2.0、直接依存は 2 つ (判断の正本は [adr/0027](../adr/0027-agent-browser-bundling.md))               |
 
 ### Node のバージョンを LTS に固定する
 

@@ -44,7 +44,7 @@ depends_on: []
 
 1. `packages/adapter-browser` に `agent-browser` を **版を範囲指定せず固定**して依存へ足す
 2. `pnpm-workspace.yaml` の `onlyBuiltDependencies` に `agent-browser` を足す
-3. Chrome for Testing を版指定で取得するツールを `packages/adapter-browser` の依存へ足す
+3. `@puppeteer/browsers` を `packages/adapter-browser` の依存へ足す (Chrome for Testing を版指定で取得するため)
 4. Chrome for Testing の版番号を `packages/adapter-browser` 配下の**専用 JSON** に置く (取得コマンドと起動時検査の両方から読めるようにする)
 5. ブラウザ本体の導入コマンドをリポジトリの script として用意する (暫定名 `browser:install`)
 6. `pnpm install` が通ること、実行ビットが付いたネイティブバイナリが存在することを確認する
@@ -111,7 +111,7 @@ depends_on: []
 
 ## 設計仕様
 
-- **ブラウザ本体は版を指定して自前で取得し、実行時は実行ファイルのパスを明示する。** 実行基盤の install コマンドには版を指定するフラグが無く、指定しなければシステムの Chrome を自動検出する経路が残る。決定性を最優先とする以上、どの版で撮ったかを固定できなければならない。
+- **ブラウザ本体は `@puppeteer/browsers` で版を指定して取得し、実行時は実行ファイルのパスを明示する。** 実行基盤の install コマンドには版を指定するフラグが無く、指定しなければシステムの Chrome を自動検出する経路が残る。決定性を最優先とする以上、どの版で撮ったかを固定できなければならない。
 - **版番号は `packages/adapter-browser` 配下の専用 JSON に置く。** npm の依存ではないため lockfile に載らない。読む側が 2 つ (取得コマンドと起動時検査) あり、片方は TS のビルド前に走るため、両方から読める形にする。
 - **CLI はネイティブバイナリを直接 spawn する。** `onlyBuiltDependencies` に足して postinstall に実行ビットを付けさせる。JS wrapper 経由は呼び出しごとに node 起動が挟まり、実測で 1 回あたり約 100ms (直接は約 6ms) かかる。
 - **起動時検査は 3 件すべてを満たさなければ中止する。** 実行してよい origin の列挙は既定が空で、列挙が無いと実行できない。既定が空であること自体が意図しない対象への実行を防ぐ安全装置であり、fixture の origin を既定値として埋め込まない。
