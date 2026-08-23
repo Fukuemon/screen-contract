@@ -23,7 +23,8 @@
   - 既存の要素定義に一致すれば、その `ref` を使う。
   - 一致しなければ、要素候補を作って**新規の要素定義も draft に含める** (規則は element-mapping feature)。
   - 一意な Locator へ解決できない場合に限り `clickPoint` として残し、**警告を付ける**。
-- **Expectation は自動生成しない。候補として提示し、人が選ぶ。** 操作後の Snapshot から URL・可視要素などの候補を出し、採否は人が決める。
+- **Expectation は自動生成しない。候補として提示し、人が選ぶ。** 候補は **操作の前後で変化した項目だけ**とする (`url` / `title` / `element` のうち変化したもの)。採否は人が決める。変化していない項目まで並べると、無関係な条件を選ぶ余地が残り、壊れやすいステップを増やす。
+- **座標の解決に使う画面情報は、入力を転送する前に取得する。** 操作後の状態で解決すると、ページが自律的に変化していたときに「解決できない」ではなく**間違った要素へ解決する**。前者は `clickPoint` と警告で気付けるが、後者は静かに壊れる。
 - **記録していることを UI に明示する。** 黙って記録しない。開始と停止は明示操作とする。
 - 記録する操作は **DSL の action 語彙に対応するものだけ**とする (`open` / `click` / `fill` / `hover` / `scroll`)。生の入力イベントを残さない。
 
@@ -84,7 +85,8 @@ flowchart TD
   - [design/features/workflow-dsl/DesignDoc_workflow-dsl.md](../design/features/workflow-dsl/DesignDoc_workflow-dsl.md) に、記録が draft を書く手段であること (正本の扱いは変わらないこと) を記載する — 実施済み
   - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に、記録時の座標解決が要素選択と同じ規則を使うことを記載する — 実施済み
   - [design/DesignDoc.md](../design/DesignDoc.md) のスコープと ADR 表を更新する — 実施済み
-- 未確認事項: agent-browser が入力転送でどこまでの操作種別を扱えるか (`hover` / `scroll` の扱い)。skeleton の実装で確認する
+- **未確認事項 (2026-08-23 に一部解消)**: 入力転送は CDP レベルの `input_mouse` / `input_keyboard` / `input_touch` を扱えることを実測で確認した。`click` は実際に通っている。`hover` / `scroll` (`mouseMoved` / `mouseWheel`) は未実測で、状態遷移と Expectation を厚くする回に確認する。
+- **追記 (2026-08-23)**: 入力転送で届くのは **CDP 生の座標のみ**で要素情報を含まない。座標から要素への解決は選択肢ではなく必須である。解決に使う bounding box は agent-browser の `snapshot` に含まれないため、注釈スクリーンショットの応答から得る (`specs/4-walking-skeleton/` の F5 / F7 / D1)
 
 ## 関連ドキュメント / チケット
 
@@ -92,4 +94,4 @@ flowchart TD
 - [adr/0008](0008-stream-proxy.md): 入力が Stream Proxy を通る経路
 - [adr/0017](0017-agent-draft-boundary.md): draft と確定の境界
 - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md): モードと導線
-- spec / PR: なし
+- spec / PR: `specs/4-walking-skeleton/` の D1 / D5 / D12
