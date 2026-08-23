@@ -20,7 +20,7 @@
 | 3   | 上位文書突合                | 完了       | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context)             |
 | 4   | 論点整理                    | 完了       | 2026-08-22 | D1〜D12 を起票                                                  |
 | 5   | 論点解決                    | レビュー済 | 2026-08-23 | D1〜D23 を確定。clarify gate PASS (6 回目)                      |
-| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | 図と発行イベント (D24 / D25) を確定                             |
+| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | 図と発行イベントを確定 (D24〜D28 は track gate で確定)          |
 | 7   | Content / Data 設計         | 完了       | 2026-08-23 | clarify で D7 / D9 / D13 を確定済み                             |
 | 8   | Performance / Security 設計 | 完了       | 2026-08-23 | clarify で D3 / D5 / D16 を確定済み                             |
 | 9   | Test / Metrics 設計         | 完了       | 2026-08-23 | clarify で D10 を確定し、テスト観点を全受け入れ条件に対応させた |
@@ -46,7 +46,7 @@
 | feature doc: execution           | ステップ実行のルール / Browser Port の契約 / 実行イベント / 実行状態と再生制御 | 変更提案 (D4 が Port の語彙、D25 がイベントの語彙、D15 / D19 / D22 が pause の優先順位を足す) |
 | feature doc: element-mapping     | 座標からの要素解決と候補の正規化                                               | 変更提案 (D1 が取得手段、D18 が適用範囲を定める)                                              |
 | feature doc: artifact-generation | 注釈画像の描画規則 / 書き換え抑止                                              | 補足 (D11 が描画手段を確定する)                                                               |
-| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成                                | 継承                                                                                          |
+| feature doc: web-editor          | 操作の記録 → draft のフロー / Stream の接続構成 / 映像と重ね描きの対応付け     | 変更提案 (F14 が制約を足し、D27 が破棄のイベント語彙を足す)                                   |
 | context: architecture            | Package Boundary / 依存方向 / Port の定義場所                                  | 継承                                                                                          |
 | context: architecture            | Runtime Boundary → agent-browser の起動と管理                                  | 変更提案 (実測と生存期間がずれる)                                                             |
 | context: architecture            | State Boundary → draft と確定の分離                                            | 変更提案 (D7 が置き場の分割を足す)                                                            |
@@ -310,13 +310,13 @@ EARS 風で振る舞いを記述する。
   - 根拠: execution feature は「**Expectation を持たないステップは、評価を省いて必ず action を実行する**」と定める。`expect` が無いと `open` が毎回実行され、受け入れ条件「全ステップが `skipped`」が成立しない。
   - `default` 状態の `expect` を空のままにする D20 とは衝突しない。`default` は遷移 step を持たない状態であり、実行対象ではないためである。
 
-- **D24: skeleton が発行する実行イベントは、受け入れ条件の再構成に必要な 10 件に限る。**
-  - 対象: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `resumed` / `run-completed` / `run-failed`。
+- **D24: skeleton が発行する実行イベントは 11 件に限る。**
+  - 対象: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `ir-version-changed` / `resumed` / `run-completed` / `run-failed`。
   - 根拠: 受け入れ条件は「イベント列だけを読んで、どのステップがどの結果になったかを再構成できる」ことを求める。ステップの開始・評価・結果と run の終端があれば再構成できる。`paused` と `resumed` は D15 / D22 の記録と再現の境界を読むために要る。
-  - 除く 3 件の理由:
-    - `ir-version-changed`: `resume` / `rerun_step` の直前に draft が変わっていた場合だけ発行される (ADR-0018)。**記録そのものは draft を書く操作だが**、記録に使った run はその draft を確定させずに `resume` して終え (D28)、再現の run は `paused` 後に draft を編集せずに `rerun_step` する。よって発行機会が無い。
-    - `rolled-back`: 前提が崩れる経路を skeleton が通らない。`rerun_step` は利用者が指定したステップからの再実行であり、前提不一致による巻き戻しとは別である。セッション不応答も再作成せず `run-failed` で終える (D26)。
-    - `run-aborted`: 中断要求をスコープに持たない。
+  - `ir-version-changed` を含める理由: ADR-0018 のトリガは **draft の変更**であって承認ではない。記録は draft を書く操作であり、記録に使った run は `paused` の間に draft が変わったうえで `resume` される (D28)。IR 版は「正規化した IR の内容から決まる値」であるため、記録が state と要素定義を足せば版が変わり、`resume` の直前に差し替えが起きて発行される。差し替え後の前提再検証では `open` の `url` が満たされたままなので巻き戻しは起きない。
+  - 除く 2 件の理由:
+    - `rolled-back`: 前提が崩れる経路を skeleton が通らない。`rerun_step` は利用者が指定したステップからの再実行であり、前提不一致による巻き戻しとは別である。セッション不応答も再作成せず `run-failed` で終える (D26)。上記の版の差し替え後も `open` の `url` が満たされたままで巻き戻しに入らない。
+    - `run-aborted`: 中断要求をスコープに持たない。記録に使った run は `resume` で終える (D28) ため、中断で終える経路が要らない。
   - 却下した代替案: 語彙を全件実装する案は、skeleton で発行されないイベントの経路が未検証のまま残るため却下。5 件へ絞る案は `paused` が落ち、記録と再現の境界がイベントから読めなくなるため却下。
 
 - **D25: `session-recreated` と `input-discarded` の 2 件をイベントの語彙へ足す。**
@@ -423,7 +423,7 @@ EARS 風で振る舞いを記述する。
 
 - **HTTP**: 記録の開始・停止、draft の取得、承認依頼、承認、`run.start`、`rerun_step`、成果物生成。endpoint の形は実装時に確定する。
 - **WebSocket**: Stream Proxy (映像フレームの中継と入力転送)、実行イベントの購読。web の接続先は Workflow Server の単一エンドポイントのみとする (ADR-0008)。
-- **実行イベント (D24)**: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `resumed` / `run-completed` / `run-failed` の 10 件を発行する。`ir-version-changed` / `rolled-back` / `run-aborted` は skeleton で発行機会が無いため実装しない。
+- **実行イベント (D24)**: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `ir-version-changed` / `resumed` / `run-completed` / `run-failed` の 11 件を発行する。`rolled-back` / `run-aborted` は skeleton で発行機会が無いため実装しない。
 - **追加するイベント (D25)**: 上位文書が「イベントに残す」と定めながら語彙を持っていなかった 2 件を足す。**置き場は分ける** (D27)。
   - `session-recreated` (再作成の理由と失われたページ状態の範囲を含む) は core/execution の語彙へ。ただし skeleton は再作成せず止めるため (D26)、**発行経路を実装しない**。
   - `input-discarded` (破棄の理由を含む) は Stream Proxy 側の語彙へ。run が定まらない破棄があり、外部タイミングで起きるため実行イベント列の決定性に混ぜない。
@@ -483,15 +483,15 @@ EARS 風で振る舞いを記述する。
 ### テスト観点
 
 - Schema: workflow-dsl の語彙を一通り検証できること。実行系が未対応の語彙 (`fill` / `hover` / `scroll` / `use` / `count` 等) が IR 正規化で構造化エラーになること (D14)。
-- 記録の前提: pause を予約した run が entry の完了時に `paused` で止まること (**最終ステップの完了で `completed` に倒れないこと**。D19)。`paused` でない run への入力転送が破棄され、破棄がイベントに残ること (ADR-0008)。
+- 記録の前提: pause を予約した run が entry の完了時に `paused` で止まること。記録の停止後に `resume` すると `ir-version-changed` → `resumed` → `run-completed` の順で終わること (D24 / D28) (**最終ステップの完了で `completed` に倒れないこと**。D19)。`paused` でない run への入力転送が破棄され、破棄がイベントに残ること (ADR-0008)。
 - 記録: 解決した step が `ref` を指すこと。要素定義が同時に draft へ入ること。既存定義に一致する場合に重複定義を作らないこと。
 - 承認: draft と正本が別のものとして保存されていること。承認前の draft を承認後の正本が上書きしないこと。`stale` 判定が効くこと。
-- イベント: 実行イベント列に現れるのは D24 の 10 件に限ること (`session-recreated` は語彙にあるが skeleton では発行されない。D26)。イベント列だけからステップ結果を再構成できること。破棄した入力が `input-discarded` として Stream Proxy 側に残ること (D27)。
+- イベント: 実行イベント列に現れるのは D24 の 11 件に限ること (`session-recreated` は語彙にあるが skeleton では発行されない。D26)。イベント列だけからステップ結果を再構成できること。破棄した入力が `input-discarded` として Stream Proxy 側に残ること (D27)。
 - 再現: 再現の run が全ステップ完了時に `paused` で止まること (D22)。同一セッションでの `rerun_step` で全ステップが `skipped` になり `completed` で終わること。`open` が `url` の Expectation を持つため `skipped` になること (D23)。イベント列だけからステップ結果を再構成できること。
 - 成果物: 同一入力での再生成でファイルの mtime が変わらないこと。バッジ位置とテーブル内容の決定性。SVG が完全一致で判定できること (D11)。
 - Expectation 候補: 操作の前後で変化した項目だけが候補に出ること (D12)。変化していない項目が候補に混ざらないこと。
 - 基盤: 起動時検査 3 件がそれぞれ単独で起動を中止させること (ブラウザ本体なし / origin 列挙が空 / 二重起動)。`runtime.json` が終了時に消えること。
-- 不応答: Browser Port が構造化エラーを返すこと。fake Browser Port で不応答を注入し、core/execution が再作成の判断を下せること (D4)。実起動での再現は条件が未特定のため統合テストの対象にしない。
+- 不応答: Browser Port が構造化エラーを返すこと。fake Browser Port で不応答を注入し、core/execution が **run を止める判断**を下して `run-failed` で終えること (D26)。**adapter が黙ってセッションを作り直さないこと** (D4 の眼目。黙って再作成されると `skipped` を観測できなくなる)。実起動での再現は条件が未特定のため統合テストの対象にしない。
 - 横断: `pnpm boundaries` が通ること。`pnpm test:integration` で agent-browser を実起動する統合テストが 1 本以上通ること。
 
 ### 計測指標
@@ -596,6 +596,7 @@ sequenceDiagram
             AB-->>Exec: 構造化エラー (browser/unresponsive)
             Exec->>Exec: skeleton は再作成せず止めると決める
             Exec-->>App: run-failed
+            Note over Exec: 以降のステップは実行しない
         else 応答する
             AB-->>Exec: Snapshot
         end
@@ -750,6 +751,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | PASS                     | 6 回目。1〜5 回目の指摘 27 件すべて解消。全 8 観点で PASS または N/A。非ブロッキング推奨 2 件 (整合表の D 番号の粒度 / context への判断正本の 1 行参照)       | 推奨 2 件も反映。issue #4 の受け入れ条件 20 件との突合も実施。差異は成果物の形式 1 点のみで、issue は形式を指定していないため条件は満たす  |
 | 2026-08-23 | NEEDS_WORK               | track gate (diagram + track を累積)。図は 8 項目が一致したが D4 が図に無い。Interface 設計が未記入のまま phase 6 を完了にしていた。メタの同期漏れ 3 件        | 全 5 件を反映。D24 / D25 を確定して Interface 設計を埋め、図に D4 の分岐を足した。受け入れ条件は 20 件が正しい                             |
 | 2026-08-23 | NEEDS_WORK               | track gate 2 回目。D24 の `rolled-back` 除外理由と図の再作成分岐が矛盾。`input-discarded` の置き場が層と噛み合わない。`ir-version-changed` の除外理由が不正確 | 全 4 件を反映。D26 / D27 / D28 を確定し、図の分岐と語彙の置き場を直した                                                                    |
+| 2026-08-23 | NEEDS_WORK               | track gate 3 回目。D28 を採ると `ir-version-changed` の除外が成立しない。テスト観点が D26 と矛盾。整合表の web-editor が継承のまま                            | 全 4 件を反映。D24 に `ir-version-changed` を戻して 11 件とし、テスト観点に D4 の眼目を入れた                                              |
 
 ## 変更履歴
 
@@ -775,6 +777,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | track phase で変更点表を突合。ADR-0002 行の退行を復元し、Design Doc の反映先を実態へ直した       |
 | 2026-08-23 | Fukuemon | track gate の指摘を反映。D24 / D25 を確定し Interface 設計を埋め、図に D4 の分岐を足した         |
 | 2026-08-23 | Fukuemon | track gate 2 回目の指摘を反映し D26 / D27 / D28 を確定                                           |
+| 2026-08-23 | Fukuemon | track gate 3 回目の指摘を反映。D24 に ir-version-changed を戻した                                |
 
 ## 備考
 
