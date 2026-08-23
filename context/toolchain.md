@@ -8,7 +8,7 @@ governs:
   - tsconfig.json
   - pnpm-workspace.yaml
   - packages/config/tsconfig/
-verified_commit: ed339e9fb684cc46ebcb7ceea48567202de46c3d
+verified_commit: ae7532aa70652a1f63add9d5ada937eaa4f806a6
 ---
 
 # Toolchain
