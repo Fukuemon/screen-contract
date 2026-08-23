@@ -24,7 +24,7 @@
 | 7   | Content / Data 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
 | 8   | Performance / Security 設計 | レビュー済 | 2026-08-23 | track gate PASS                                     |
 | 9   | Test / Metrics 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
-| 10  | 実装分割                    | 未着手     |            | prompts phase で確定させる                          |
+| 10  | 実装分割                    | 完了       | 2026-08-23 | prompt 11 本を生成。新規実装モード                  |
 | 11  | レビュー済                  | 未着手     |            | clarify gate は PASS。最終 gate は prompts          |
 
 ## 上位文書整合
@@ -635,18 +635,493 @@ sequenceDiagram
 
 ### 実装タスク案
 
-diagram phase の図を経てから確定する。現時点の見込みを置く。
+prompts phase で生成した prompt に一対一で対応する。依存は `depends_on` に実依存で列挙してある。
 
-| Phase | 対象                        | 概要                                                                                    | 依存       |
-| ----- | --------------------------- | --------------------------------------------------------------------------------------- | ---------- |
-| P1    | infra                       | agent-browser と Chrome for Testing の同梱と版固定、起動時検査 3 件、`runtime.json`     | なし       |
-| P2    | fixture-app                 | 1 画面 1 遷移の静的 HTML と静的 HTTP サーバでの配信                                     | なし       |
-| P3    | execution / adapter-browser | Browser Port の契約と agent-browser 実装、Snapshot 取得                                 | P1, P2     |
-| P4    | workflow / element          | DSL 語彙を一通り Schema 化、Screen と Workflow の 2 文書、IR 正規化、座標からの要素解決 | P3         |
-| P5    | app / api / web             | entry まで実行して `paused` で止まる run、記録、Expectation 候補、draft と承認          | P4         |
-| P6    | execution                   | `run.start` と `rerun_step`、実行イベント                                               | P4         |
-| P7    | artifact                    | 注釈画像 (SVG) と生スクリーンショット、Markdown テーブル、書き換え抑止                  | P6         |
-| P8    | 横断                        | 統合テストと `pnpm boundaries`                                                          | P5, P6, P7 |
+| Phase | prompt                                    | target    | 並列可 | 依存                | 概要                                                    |
+| ----- | ----------------------------------------- | --------- | ------ | ------------------- | ------------------------------------------------------- |
+| P1    | `P1_01_infra_agent_browser_bundling.md`   | infra     | P1_02  | なし                | 実行基盤の同梱と版固定、起動時検査 3 件、`runtime.json` |
+| P1    | `P1_02_infra_fixture_app.md`              | infra     | P1_01  | なし                | fixture 対象アプリと静的 HTTP 配信                      |
+| P2    | `P2_01_execution_browser_port.md`         | execution | -      | P1_01, P1_02        | Browser Port の契約と adapter の実装                    |
+| P3    | `P3_01_workflow_dsl_schema_ir.md`         | workflow  | P3_02  | P2_01               | Schema と IR 正規化、未対応語彙の構造化エラー           |
+| P3    | `P3_02_element_coordinate_resolution.md`  | element   | P3_01  | P2_01               | 座標からの要素解決と要素定義の生成                      |
+| P4    | `P4_01_execution_run_and_events.md`       | execution | P4_02  | P3_01               | ステップ実行、再生制御、実行イベント                    |
+| P4    | `P4_02_artifact_svg_and_table.md`         | artifact  | P4_01  | P3_01               | 注釈画像 (SVG) とテーブル、書き換え抑止                 |
+| P5    | `P5_01_web_store_and_approval.md`         | web       | -      | P3_01               | Store Port、draft と正本の分離、承認キュー              |
+| P5    | `P5_02_web_stream_proxy_and_recording.md` | web       | -      | P3_02, P4_01, P5_01 | Stream Proxy と記録、Expectation 候補、HTTP API         |
+| P6    | `P6_01_web_ui_recording_and_approval.md`  | web       | -      | P5_02               | Web UI (live viewport / モード / 記録 / 承認)           |
+| P7    | `P7_01_infra_integration_tests.md`        | infra     | -      | P4_02, P6_01        | 実起動の統合テストと横断チェック                        |
+
+### prompts 生成方針
+
+- **新規実装モード**で生成した。変更対象の既存実装コードが無く、`packages/*/src` は scaffold の stub のみである。
+- `context/project.yml` の対象ドメインで分けた。target をまたぐ場合は必ず別 prompt にしている。
+- 並列可の判定は「変更ファイルの衝突」で行った。P1_01 と P1_02、P3_01 と P3_02、P4_01 と P4_02 が並列実行できる。
+- 各 prompt は自己完結させ、spec の該当箇所を本文へ抜粋した。探索を誘発する表現を置いていない。
+- `## 実装コンテキスト` の path は読み取り索引 (`context/impact-index.yaml`) の該当 feature の `read:` から採った。
+
+## 上位資料からの変更点` の判定表を参照)。設計の現在値は反映先の文書を、判断の理由は ADR を正本とする。本節は「この issue で何をどう決めたか」の作業記録として残す。
+
+- **D1: 座標解決の入力は `--annotate screenshot` が返す bounding box を使う。**
+  - 根拠: element-mapping が要求する box + role + name が 1 回の CLI 呼び出しで揃う。バッジ描画 (D11) も同じ経路で材料を得られ、取得の系統が 1 本で済む。
+  - トレードオフ: スクリーンショット生成を伴うため、`Page.captureScreenshot` が詰まると記録そのものが止まる (F9)。扱いは D4 で決める。生成された注釈済み画像は保存せず捨てる (差分検知の対象は生スクリーンショットであるため)。
+  - 却下した代替案: `eval` の `document.elementFromPoint` は対象ページで任意 JS を実行し、ADR-0026 が却下した「JS を注入して DOM イベントを拾う」と擦れるため却下。`get box` の反復は要素数に比例して CLI 呼び出しが増え、厚くする段階で作り直しになるため却下。
+
+- **D2: Chrome for Testing を自前で版指定取得し、`--executable-path` で常に明示する。**
+  - 根拠: 決定性が `decision_priority` の 1 位であり、実行基盤を勝手に動かさない形を最初から取る。自前取得は実行ファイルのパスが決定的に返るため、`doctor --json` の message 文字列を解析する経路が消える。
+  - 併せて決まること: 起動時のブラウザ検査が案内するのは**本リポジトリの導入コマンド**とする (暫定名 `pnpm browser:install`)。システムの Chrome を自動検出させない。
+  - 依存の健全性: `@puppeteer/browsers` 3.2.1 は puppeteer 本体と同じ monorepo で保守され、`engines.node >=22.12.0` (本 repo は 24)、Apache-2.0、直接依存 2 つ、deprecated 無し (F18)。
+  - トレードオフ: 依存が 1 つ増える (`@puppeteer/browsers`)。ADR-0027 の案内文 1 箇所を改訂する。「postinstall で自動取得しない」「起動時に検査して中止する」という判断の骨格は変えない。
+  - 却下した代替案: `agent-browser install` に任せる案は、ブラウザ更新で描画が変わりシステム Chrome の混入も残るため却下。版を固定せず記録だけ残す案は、パス解決に人間向けメッセージの解析が要るうえ決定性を満たさないため却下。先送りは ADR-0027 の未確認事項を open のまま残し、差分検知の段階で adapter を作り直すため却下。
+  - 残る論点: 版番号の置き場は D13 で決める。
+
+- **D3: `onlyBuiltDependencies` に `agent-browser` を足し、adapter/browser はネイティブバイナリを直接 spawn する。**
+  - 根拠: `.bin` の JS wrapper 経由は 1 回あたり約 100ms、ネイティブバイナリ直接は約 6ms だった (`--version` を 5 回ずつ実行して計測)。差の約 94ms は node プロセスの起動分で、CLI の呼び出し回数に比例して効く。記録も実行も 1 操作で複数回呼ぶ。
+  - 併せて決まること: バイナリのパスをプラットフォーム (`darwin` / `linux` / `linux-musl` / `win32` × `arm64` / `x64`) から解決する処理を adapter/browser に置く。解決は adapter に閉じ、他層へ出さない。
+  - トレードオフ: パス解決の分岐を自前で持つ。agent-browser 側の命名規則が変わると追従が要る。
+  - 却下した代替案: wrapper を呼ぶ案は実装が単純だが、呼び出しごとの約 94ms を恒常的に払うため却下。`onlyBuiltDependencies` に足さない案は issue の受け入れ条件に反し、wrapper の自己 chmod に依存する形になるため却下。
+
+- **D4: セッションの不応答を Browser Port の構造化エラーとして返し、再作成するかどうかは core/execution が決める。**
+  - 根拠: セッションは**部分的に壊れる**。`snapshot` は成功し続けるのに `screenshot` だけが恒久的に失敗するため (F9)、生存確認では検出できない。加えて再現条件が特定できていない (F12) ため、引き金を避ける形では防げない。
+  - 併せて決まること: セッションの再作成は**ページ状態を失う操作**であるため、adapter が黙って行わない。issue の受け入れ条件「同一セッションでの再実行で全ステップが `skipped`」は、黙って再作成されると静かに壊れて `skipped` を観測できなくなる。
+  - トレードオフ: execution feature の Browser Port 契約に構造化エラーの語彙が 1 つ増える。上位文書の改訂が要る。
+  - 却下した代替案: adapter で吸収する案は Port の契約を変えずに済むが、ページ状態の喪失を core が知らないまま冪等実行の前提が崩れるため却下。skeleton で扱わない案は、統合テストが間欠的に落ちたときに原因を切り分けられないため却下。
+
+- **D5: 記録中は入力を転送する前に `--annotate screenshot` を撮り、その結果で座標を解決してから転送する。**
+  - 根拠: ADR-0026 と element-mapping feature がどちらも「その時点の Snapshot に対して座標を解決する」と定めている。操作後の状態で解決すると、ページが自律的に変化していたときに**間違った要素へ解決してしまう**。「解決できない」なら `clickPoint` と警告で気付けるが、「間違って解決した」は静かに壊れる。
+  - 代償: 記録モード中のクリックが約 72ms 遅れる (F13)。実ページではより遅くなる。記録は人が明示的に開始する探索的な操作であり、この遅延を許容する。
+  - 却下した代替案: 操作の直後に取る案は転送を遅らせないが、上記の静かな誤解決を招くため却下。フレームの `seq` と対応づける案は、**agent-browser の応答にフレーム識別子が無い** (F14) ため成立しない。
+
+- **D6: fixture-app は静的 HTTP サーバで配信する。**
+  - 根拠: `file://` で開くと URL がマシン固有のフルパスになり (F15)、`url` の Expectation に環境依存の値が入る。決定性が `decision_priority` の 1 位である以上、期待状態に環境の値を持ち込まない。ADR-0017 の「実行してよい origin を列挙する」も `file://` では意味をなさない。
+  - 代償: テスト起動時にサーバプロセスが 1 つ増える。ポートの選定と後始末が要る。
+
+- **D7: draft と正本を別の置き場に分けて保存する。**
+  - 根拠: 受け入れ条件が「承認前の draft と承認後の正本が別のものとして保存されている」ことを求めている。置き場を分ければ構造で満たせ、テストで直接示せる。同一ファイルの版として持つ形は、分離を実装の約束で保つことになる。
+  - 併せて決まること: 承認は「draft を正本の置き場へ確定させる」操作になる。
+  - 反映先: 規則は `context/architecture.md` の State Boundary、判断 (却下案と理由) は ADR-0017 へ 1 項足す。`spec-contract.md` は「design 側は現在の設計だけを持つ。なぜ変えたかは書かない」と定めるため、context へ規則だけを書くと却下案が spec の削除とともに消える。ADR-0017 は draft / 確定の境界を扱い既に改訂対象であるため、ADR は増えない。
+
+- **D8: workflow-dsl feature の語彙を一通り Schema 化する。**
+  - 根拠: 後から語彙を足すたびに Schema と検証テストを触るより、語彙の全体を最初に固定するほうが手戻りが少ない。
+  - トレードオフ: skeleton が除外した機能 (`fragments` / 複数分岐 / 再採番) の Schema が、使われないまま先に入る。**Schema が受け付けるのに実行系が対応しない語彙**が生まれるため、その扱いを D14 として起票した。
+
+- **D9: 承認依頼の revision は draft の内容ハッシュとする。**
+  - 根拠: ADR-0018 が Workflow IR の版を「正規化した IR の内容から決まる値」と定めており、方式を揃えると版の意味が 1 つで済む。カウンタの永続化も要らない。
+  - 帰結: 編集して元に戻した draft は `stale` にならない。人間が見た差分と確定する内容が一致するため、ADR-0017 の目的 (承認待ちの間の編集が見ていない差分のまま確定するのを防ぐ) は満たす。
+  - 却下した代替案: 単調増加する版番号は順序が分かるが、IR 版と方式が食い違い、内容が同じでも `stale` になる誤検出が出るため却下。
+
+- **D10: 統合テストは `--namespace` とテスト専用の session 名で隔離する。**
+  - 根拠: `--namespace` は state と socket だけを分け、ブラウザ本体のキャッシュを共有したままにできる (F16)。テストのたびに数百 MB を取り直さずに済み、版も変わらない。
+  - 併せて決まること: `context/testing.md` の「`XDG_STATE_HOME` をテスト専用の一時ディレクトリへ向ける」は **agent-browser には効かない** (F16)。同節に agent-browser の隔離手段を書き足す。
+  - 却下した代替案: `HOME` の差し替えはブラウザキャッシュを失い、システムの Chrome へフォールバックするため却下 (F16)。`XDG_STATE_HOME` だけに頼る案は実測で効かないため却下。
+
+- **D13: Chrome for Testing の版番号は `packages/adapter-browser` 配下の専用 JSON に書く。**
+  - 根拠: 読む側が 2 つある。取得コマンド (node script。TS のビルド前に走る) と起動時検査 (TS)。JSON なら両方から読める。
+  - 却下した代替案: `package.json` の独自フィールドはビルド外の設定を混ぜる。TS 定数は型が付くがビルド前の script から読めない。`context/project.yml` は skill が読む固有値の正本であり、実行時設定と責務が混ざる。
+  - 反映先: 規則は `context/toolchain.md` の標準スタック (D2 / D21 で同節を触るため同じ行に記録する)、判断 (却下案 3 件と理由) は ADR-0027 へ含める。ADR-0027 は Chrome for Testing の版固定を扱い既に改訂対象であるため、ADR は増えない。
+
+- **D14: Schema が受け付けても skeleton の実行系が対応しない語彙は、IR 正規化で構造化エラーにする。**
+  - 根拠: workflow-dsl feature は参照エラーを `ref/cyclic` などの構造化エラーで返し、「規則に反している」として返す方針を持つ。実行前に分かり、エージェントが自己修正できる。
+  - 帰結: 実行系が未対応であることを表す構造化エラーの語彙を 1 つ足す。skeleton で通すのは `open` と `click`、Expectation は `url` と `element` に限る。
+  - 却下した代替案: 実行時に失敗させる案は、失敗がステップの途中で起き、どこまで実行されたかが状況依存になるため却下。実行系も語彙を一通り実装する案は skeleton の範囲を大きく超えるため却下。
+
+- **D11: 注釈画像は SVG として出力し、生スクリーンショットを `raw.png` として別に保存して SVG から参照する。**
+  - 根拠 1: **書き換え抑止の判定が 1 本化される。** 現在の設計は Markdown と POM が「テキスト比較 (完全一致)」、注釈画像 PNG だけが「生成入力の比較」という別ルールだった。PNG は描画エンジンの環境差でバイトが揺れるためである。SVG はテキストなので、他の成果物と同じ完全一致で判定できる。
+  - 根拠 2: **再合成が設計の意図と噛み合う。** 再採番や `badges` の並べ替えでは SVG のテキスト数行だけが変わり、画像は触らない。git の差分としても読める。
+  - 根拠 3: core/artifact が SVG 文字列を生成する純粋計算のままでいられる。画像合成ライブラリのネイティブ依存が core に入らない。
+  - 差分検知との関係: **注釈画像の形式は差分検知に影響しない。** 差分検知の対象は生スクリーンショットであり、バッジを焼き込んだ画像は対象にしない (artifact-generation feature)。
+  - **上流の変更が要る。** `design/DesignDoc.md` の成功条件は「DSL から構成番号付き **PNG** 画像と Markdown テーブルを生成できる」であり、SVG 化はこの Why/What を覆す。成功条件を「構成番号付きの注釈画像」へ一般化し、形式の判断は ADR として起こす。
+  - トレードオフ: 外部参照する SVG は `raw.png` と一緒に動かさないと壊れる。Word や Confluence へ貼る運用では PNG が要るが、DesignDoc の Goal は配布先を規定していない。
+  - 却下した代替案: SVG を PNG へラスタライズする案は配布先を選ばないが、Port が 1 つ増えるうえ書き換え抑止が生成入力の比較のまま残るため却下。両方出す案は成果物が 1 状態あたり 1 つ増え、正本がどちらか曖昧になるため却下。pure-JS で PNG へ直接描く案は上位文書の変更が要らないが、判定規則が 2 本のまま残るため却下。
+
+- **D12: Expectation 候補は、操作の前後で変化した項目だけを出す。**
+  - 根拠: D5 で操作の直前にも Snapshot を撮るため、**前後の差分が無償で手に入る**。ADR-0026 は「機械的に条件を起こすと無関係な要素まで期待状態に入り、壊れやすいステップが量産される」ことを懸念しており、候補を変化分に絞ればその懸念が減る。
+  - 対象は `url` / `title` / `element` のうち変化したものとする。ADR-0026 の「URL・可視要素などの候補を出す」の範囲内で絞り込む。
+  - トレードオフ: 変化していないが期待状態として宣言したい項目 (操作後も URL が変わらないことを明示したい等) は候補に出ない。人が手で足す。
+
+- **D15: 記録は、entry まで実行して `paused` にした run の中で行う。**
+  - 根拠 1: ADR-0008 の中継条件 (対象 run が `paused` / 操作モード / 要求元のもの) と、web-editor feature の「モード切替は一時停止中だけ有効」を**どちらも改訂せずに満たす**。
+  - 根拠 2: **既存の pause 予約の延長で表せる。** execution feature の pause は「実行中ステップの完了後に停止する予約」であるため、run 開始時に予約すれば entry の最後のステップ完了時に `paused` へ入る。専用の実行モードは作らない。
+    - ただし **execution feature への追加が 1 件要る**。記録時点の実行ステップ列は entry の `open` 1 件だけで、同 feature は「全ステップ完了 → `completed`」も定めている。最終ステップの完了と pause 予約が重なったときの優先順位が上位文書に無い。**pause 予約を優先する**と決め、feature doc へ書き足す (D19)。`completed` に倒れると ADR-0008 の中継条件を満たさず、記録経路が丸ごと成立しない。
+  - 根拠 3: **遷移元が自動で決まる。** ADR-0026 は「記録した steps をどの状態の遷移として扱うかは機械的に決まらない。人が決める」とするが、run の到達状態が分かっていれば `default` に居る状態で記録した steps は `default` からの遷移だと決まる。人の判断が 1 つ減る。
+  - 前提の整理: ADR-0008 の条件が本当に守っているのは「実行中の run のページ状態を勝手に変えられないようにする」ことであり、記録とは衝突しない。衝突していたのは条件の書き方だけである。記録を run の枠内へ置くと、セッションを誰が使ってよいかの判断が run に一元化される。
+  - 却下した代替案: 中継条件を「run が `paused` **または** 記録セッションが有効」へ広げる案は、ADR-0008 と web-editor feature の両方を改訂し、「対象 run が要求元のものである」の検証を記録セッションに対して定義し直す必要があるため却下。空の run を自動生成する案は条件を形だけ通し、中身の無い run が実行履歴に並ぶため却下。
+
+- **D16: 起動時検査は `context/infrastructure.md` の 3 件すべてを skeleton の範囲に入れる。**
+  - 根拠: **origin 列挙は既定が空で、列挙が無いと `run.start` が実行できない。** 入れなければ skeleton が動かない。二重起動の検査は `runtime.json` を読むだけで、skeleton が既に `runtime.json` を扱うため追加コストが小さい。
+  - 却下した代替案: fixture-app の origin を既定値として埋め込む案は、**既定が空であること自体が意図しない対象への実行を防ぐ安全装置**であるため却下。二重起動を範囲外にする案は、契約を部分的にしか満たさない割に節約が小さいため却下。
+
+- **D17: entry の Workflow 文書は skeleton の範囲に入れ、手で書く。**
+  - 根拠: D15 を採ると、記録を始める前にページが開いている必要があり、その `open` は run が実行する。**記録が `open` を作る余地が無い** (記録から Workflow 文書を起こす案は鶏と卵になる)。skeleton の Workflow 文書は `open` 1 ステップの YAML 数行で、DSL の 2 文書構成をそのまま通せる。
+  - **制約として残ること**: ADR-0026 の価値は「DSL を書けない利用者でも画面仕様を起こせる」ことだが、**entry の Workflow 文書だけは手書きが残る**。「URL を入力すると entry の Workflow 文書の draft を作る」導線は skeleton の範囲外とし、厚くする段階に送る。
+  - 却下した代替案: entry を Screen 文書へ直接書ける形へ DSL を変える案は、workflow-dsl feature の Screen / Workflow 分離という大きな判断を覆すため却下。
+
+- **D18: skeleton の座標解決は role+name だけに絞る。**
+  - 根拠: element-mapping が要求する「祖先方向の候補列」は「ボタンではなくカード全体を選びたい」場合の切り替え用で、**要素選択 (Web UI) の機能**である。skeleton のスコープは記録だけで要素選択を含まない。`label` / `testid` も、fixture-app が role と accessible name で一意に解決できることを保証するため不要である。
+  - 必要になったときの手段: 祖先関係は `snapshot` が返すインデント付きツリーと `--annotate` の box を `ref` で突き合わせれば復元できる (追加は `snapshot` 1 回、約 7ms)。手段が無いのではなく、skeleton で要らないという判断である。
+  - 却下した代替案: 追加の CLI 呼び出しで `label` / `testid` まで補う案は、`ref` で属性を引けるかが未実測であり、skeleton では使わないため却下。
+
+- **D19: 最終ステップの完了と pause 予約が重なったときは、pause 予約を優先して `paused` へ入る。**
+  - 根拠: 優先順位が決まっていないと、entry が 1 ステップだけの run (記録の前提) で `completed` に倒れうる。倒れると ADR-0008 の中継条件を満たさず、**記録経路が丸ごと成立しない**。
+  - 意味論: pause 予約は「利用者がこの run のセッションを使いたい」という意思表示であり、ステップ列を消化しきったことより優先する。`paused` から `resume` すれば `completed` へ進める。
+  - 上位文書への反映: execution feature の実行状態と再生制御に優先順位を書き足す。**新しい状態は増やさない。** あわせて **pause 予約は 1 回で消費される** (`resume` すると予約は消え、次の完了では `completed` へ進む) ことを添える。ADR-0002 の「pause 要求 = 予約」から読めるが、明記しないと揺れる。
+  - 却下した代替案: `completed` を優先し記録を別の仕組みで成立させる案は D15 の再検討を招き、ADR-0008 の改訂へ戻るため却下。entry にダミーのステップを足して重なりを避ける案は、本質的な未定義を回避するだけで実態と合わないため却下。
+
+- **D20: Screen 文書の初期 draft は、entry の Workflow 文書と一緒に手で書く。**
+  - 根拠: run は Screen 文書 (id / title / entry 参照 / `default` 状態) を必要とし、「記録した steps の遷移元は run の到達状態から決まる」(D15) もその存在を前提にする。D17 で entry を手書きと決めた以上、同じ扱いに揃える。
+  - 書く範囲: `screen.id` / `title` / `entry.workflow` / `states` の `default` 1 件のみ。`default` の `expect` は空のまま記録に入る。`default` は遷移 step を持たない状態であり実行対象ではないため、Expectation を持たないことの影響 (冪等スキップが効かない) を受けない。
+  - 制約として残ること: D17 と同じく手書きが残る範囲が広がる。「URL と画面名を受け取って Screen 文書と entry の draft を同時に作る」導線は skeleton の範囲外とし、厚くする段階に送る。
+  - 却下した代替案: 記録停止時に Screen 文書ごと draft を起こす案は、run の開始に Screen 文書が要るため順序が逆になり却下。
+
+- **D21: `agent-browser` が宣言する `engines.pnpm >=11` を外れたまま、pnpm 10.27.0 で運用する。**
+  - 根拠: install は警告なく通る (F3)。本システムは agent-browser を **CLI として子プロセスで呼ぶだけ**で、pnpm の API に依存しない。engines の宣言は agent-browser 自身の開発環境の要件である。
+  - pnpm 11 への更新は `context/toolchain.md` の別判断とし、skeleton の範囲に含めない。`packageManager` の変更はリポジトリ全体に効くためである。
+
+- **D22: 再現の run にも pause を予約し、全ステップ完了時に `paused` で止めてから `rerun_step` を掛ける。**
+  - 根拠: execution feature は `rerun_step` を「**一時停止中に**任意の通過済みステップを指定して再実行できる」と定め、ADR-0002 の状態遷移図でも `completed` は終端である。予約しないと再現の run は `completed` になり、**受け入れ条件「同一セッションでの再実行で全ステップが `skipped`」を観測する経路が無い**。
+  - D19 の規則をそのまま再利用するため、**上位文書の追加変更は要らない**。
+  - 却下した代替案: `rerun_step` を `completed` からも掛けられるようにする案は、execution feature と ADR-0002 の両方を改訂し、終端状態の意味を変えるため却下。
+
+- **D23: entry の `open` step には `url` の Expectation を書く。**
+  - 根拠: execution feature は「**Expectation を持たないステップは、評価を省いて必ず action を実行する**」と定める。`expect` が無いと `open` が毎回実行され、受け入れ条件「全ステップが `skipped`」が成立しない。
+  - `default` 状態の `expect` を空のままにする D20 とは衝突しない。`default` は遷移 step を持たない状態であり、実行対象ではないためである。
+
+- **D24: skeleton が発行する実行イベントは 11 件に限る。**
+  - 対象: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `ir-version-changed` / `resumed` / `run-completed` / `run-failed`。
+  - 根拠: 受け入れ条件は「イベント列だけを読んで、どのステップがどの結果になったかを再構成できる」ことを求める。ステップの開始・評価・結果と run の終端があれば再構成できる。`paused` と `resumed` は D15 / D22 の記録と再現の境界を読むために要る。
+  - `ir-version-changed` を含める理由: ADR-0018 のトリガは **draft の変更**であって承認ではない。記録は draft を書く操作であり、記録に使った run は `paused` の間に draft が変わったうえで `resume` される (D28)。IR 版は「正規化した IR の内容から決まる値」であるため、記録が state と要素定義を足せば版が変わり、`resume` の直前に差し替えが起きて発行される。差し替え後の前提再検証では `open` の `url` が満たされたままなので巻き戻しは起きない。
+  - 除く 2 件の理由:
+    - `rolled-back`: 前提が崩れる経路を skeleton が通らない。`rerun_step` は利用者が指定したステップからの再実行であり、前提不一致による巻き戻しとは別である。セッション不応答も再作成せず `run-failed` で終える (D26)。上記の版の差し替え後も `open` の `url` が満たされたままで巻き戻しに入らない。
+    - `run-aborted`: 中断要求をスコープに持たない。記録に使った run は `resume` で終える (D28) ため、中断で終える経路が要らない。
+  - 却下した代替案: 語彙を全件実装する案は、skeleton で発行されないイベントの経路が未検証のまま残るため却下。5 件へ絞る案は `paused` が落ち、記録と再現の境界がイベントから読めなくなるため却下。
+
+- **D25: `session-recreated` と `input-discarded` の 2 件をイベントの語彙へ足す。**
+  - 根拠: 上位文書が「イベントに残す」と定めながら語彙を持っていない箇所が 2 つある。D4 は「セッションを再作成した場合はページ状態を失ったことをイベントに残す」、ADR-0008 は「破棄した入力をイベントとして残す」と定める。既存の語彙ではどちらも表せない。
+  - `session-recreated`: 再作成の理由 (構造化エラー) と、失われたページ状態の範囲を含む。**失敗ではない**ため `run-failed` では表せない。
+  - `input-discarded`: 破棄の理由 (run が `paused` でない / 操作モードでない / 要求元の run でない) を含む。ADR-0008 は「黙って捨てると UI 側の不具合と迂回の試みを区別できない」ことを理由に挙げている。
+  - 却下した代替案: 既存イベントのフィールドで表す案は語彙を増やさずに済むが、**再作成して続行したケース (失敗ではない) を表せない**ため却下。`input-discarded` を範囲外にする案は ADR-0008 の要求を満たさないため却下。
+
+- **D26: skeleton では、セッションが応答しないときに再作成せず `run-failed` で終える。**
+  - 根拠: 再作成は**ページ状態を失う操作**であり (D4)、失ったまま後続ステップを評価すると前提が崩れる。続行するなら巻き戻し (`rolled-back`) の経路が要り、D24 の除外理由と衝突する。止めれば `rolled-back` を持たない D24 と整合し、エラーケース 5 の復旧「利用者が run をやり直す」とも一致する。
+  - **D4 の Port 契約は変えない。** Browser Port は構造化エラーを返し、再作成するかは core/execution が決める。skeleton はその判断を「止める」に固定するだけである。厚くする段階で「再作成して巻き戻す」へ広げられる。
+  - 帰結: `session-recreated` (D25) は skeleton で発行されない。**語彙としては足すが、skeleton の実装では発行経路を持たない。**
+  - 却下した代替案: 再作成して続行する案は利用者の手戻りが減るが、`rolled-back` を D24 へ戻し巻き戻しの経路を図とテスト観点に足す必要があり、skeleton の範囲を超えるため却下。
+
+- **D27: `input-discarded` は Stream Proxy 側のイベントとして定義する。**
+  - 根拠: ExecutionEvent は core/execution が定義し **run 単位で発行順序が決定的**な語彙である。入力の破棄は api (Stream Proxy) で起き、破棄条件の 1 つ「対象 run が要求元のものでない」では**結びつけるべき run が定まらない**。実行イベント列へ混ぜると、外部タイミングで起きる事象が入って決定性が崩れる。
+  - あわせて、`context/architecture.md` は interface (api) から core への直接依存を禁じている。api が core/execution の語彙のイベントを起こす形は依存方向の規約と擦れる。
+  - 反映先: 破棄の規則を持つ ADR-0008 と web-editor feature の Stream Proxy 側。**core/execution の語彙へは足さない。**
+  - 却下した代替案: 実行イベントの語彙に置く案は系統が 1 つで済むが、依存方向・決定性・run が定まらない破棄の 3 点で噛み合わないため却下。範囲外にする案は ADR-0008 の「破棄した入力をイベントとして残す」を満たさないため却下。
+
+- **D28: 記録に使った run は、記録の停止後に `resume` して `run-completed` で終える。**
+  - 根拠: entry の残りステップが無いため `resume` すればそのまま `completed` になる。D24 の語彙 (`resumed` / `run-completed`) で足り、**イベント列上で終端を持たない run が残らない**。
+  - 却下した代替案: `run-aborted` を D24 へ戻す案は意味が素直だが、除外理由 (中断要求を持たない) を撤回し中断の経路を実装することになるため却下。`paused` のまま残す案は、終端を持たない run がイベント列に残るため却下。
+
+## 未確定事項
+
+- entry の Workflow 文書と Screen 文書の骨格は手書きが残る (D17 / D20)。「URL を入力すると entry の draft を作る」導線は `#3` の厚くする段階へ送る。**判断者は本 repo の owner、判断時期は skeleton 完了後の次の issue 起票時**とする。
+- 上位文書への変更提案 3 件 (ADR-0026 / ADR-0027 / context/architecture.md) のうち、context/architecture.md の反映内容は D4 で確定した。ADR-0027 は D2 と D3 で反映内容が確定した。ADR-0026 は D1 が `eval` を選ばなかったため、未確認事項の解決記録だけを反映する。
+- **未決の論点は無い。** D1〜D28 をすべて確定した。
+- F9 の詰まりの再現条件が特定できていない (F12)。原因が agent-browser 側か利用側かを切り分けられていないため、上流への報告は行わない。**判断者は本 repo の owner、判断時期は skeleton の統合テストで再発したとき**とする。再発しなければ持ち越さない。
+- 入力転送で `hover` と `scroll` が扱えるかは未検証である。`input_mouse` の `mouseMoved` / `mouseWheel` で表現できる見込みだが、実測していない。skeleton は `click` だけで足りるため、確認は厚くする段階に送る。**判断者は本 repo の owner、判断時期は `#3` の「状態遷移と Expectation」を厚くする回**とする (その回の issue 起票時に確認事項として引き継ぐ)。
+
+## 実装対象
+
+正規 target は `context/project.yml` の対象ドメイン一覧を正本とする。
+
+| モジュール  | 実装有無 | 主な責務                                                                                         |
+| ----------- | :------: | ------------------------------------------------------------------------------------------------ |
+| `workflow`  |    ◯     | Screen 文書と entry の Workflow 文書の Schema 検証と IR 正規化 (2 状態 1 遷移)                   |
+| `execution` |    ◯     | ステップ実行、冪等スキップ、Browser Port の契約と agent-browser 実装、実行イベント               |
+| `element`   |    ◯     | 要素定義、座標からの要素解決、Semantic Locator の生成                                            |
+| `artifact`  |    ◯     | バッジ 1 個の注釈画像 (SVG)、1 行の Markdown テーブル、書き換え抑止                              |
+| `diff`      |    -     | 範囲外 (Baseline の 2 回目が要る)                                                                |
+| `web`       |    ◯     | 記録の開始と停止、Expectation 候補の選択、承認キュー、live viewport                              |
+| `agent`     |    -     | 範囲外 (MCP / JSON-RPC は通さない)                                                               |
+| `infra`     |    ◯     | agent-browser と Chrome for Testing の同梱と版固定、起動時検査 3 件、`runtime.json` の生成と削除 |
+
+## 機能仕様
+
+### User Flow
+
+1. 利用者が Workflow Server を起動する。起動時検査 3 件 (ブラウザ本体 / 実行してよい origin の列挙 / 二重起動) のいずれかを満たさなければ、理由と対処を出して中止する。
+2. 利用者が Screen 文書の骨格 (id / title / entry 参照 / `default` 状態) と、fixture-app を開く entry の Workflow 文書 (`open` 1 ステップ。`url` の Expectation つき) を手で書く (D20 / D17 / D23)。
+3. 利用者が run を開始する。pause を予約しておくため、entry の実行完了時に `paused` で止まる (最終ステップの完了より pause 予約が優先される。D19)。
+4. 利用者が操作モードへ切り替え、記録を開始する。記録中であることが常時表示される。
+5. 利用者がボタンをクリックする。server は転送の前に `--annotate screenshot` を撮り、座標を要素へ解決して `click` の step と要素定義を draft へ入れてから転送する。
+6. 利用者が記録を停止する。操作の前後で変化した項目から Expectation の候補が提示される。
+7. 利用者が候補を 1 つ選び、step の `expect` に入れる。記録した steps の遷移元は run の到達状態 (`default`) から決まる。
+8. 利用者が記録に使った run を `resume` する。記録で draft が変わっているため `ir-version-changed` が出るが、`open` の `url` は満たされたままなので巻き戻しは起きず `run-completed` で終わる (D24 / D28)。その後、承認依頼を出し、差分を確認して承認する。draft が正本の置き場へ移る。
+9. 利用者が `run.start` で実行する。**記録に使った run とは別の run で、新しいセッションが開く。** pause を予約しておくため、全ステップの完了時に `paused` で止まる (D22)。`open` から順に実行され、記録どおりに操作が再現される。
+10. `paused` のまま、モーダルが開いた状態で、**9 の run と同じセッション**の最初のステップから `rerun_step` する。全ステップが `skipped` になり `completed` で終わる。新規セッションで 2 回目を回すと `open` の期待状態を満たさず必ず実行されるため、`skipped` を観測できない。
+11. 到達した状態で成果物を生成する。バッジ 1 個の注釈画像 (SVG) と生スクリーンショット、1 行の Markdown テーブルが出る。
+12. もう一度生成する。ファイルは書き換わらない。
+
+### Reuse Policy
+
+- 第一原則は feature / colocation とする。skeleton は各 core の最小実装を置くだけで、共通化を先回りしない。
+- agent-browser の CLI 呼び出しは `packages/adapter-browser` に閉じる。CLI の引数組み立て、`--json` のパース、プラットフォーム別のバイナリパス解決 (D3) を他層へ漏らさない。
+- 記録の座標解決は element-mapping feature の解決規則の**部分集合**を使う (ADR-0026)。記録専用の規則を作らない。skeleton で使うのは role+name への解決までで、祖先方向の候補列と `label` / `testid` の優先順位は要素選択の機能として範囲外とする (D18)。
+
+### Performance
+
+- CLI の呼び出し回数を実行ステップ数に対して線形に保つ。D1 の決定により、座標解決 1 回あたりの CLI 呼び出しは `--annotate screenshot` の 1 回で済む (要素数に依存しない)。
+- 記録モード中は 1 クリックあたり `--annotate screenshot` を 1 回挟むため、約 72ms の遅延が乗る (D5 / F13)。記録モード以外では挟まない。
+- `--annotate screenshot` は呼ぶたびに画像を生成する。**記録中に生成した注釈済み画像は保存せず捨てる。** 残すと成果物の注釈画像と紛らわしく、差分検知の対象を誤らせる。
+- CLI はネイティブバイナリを直接 spawn する (D3)。1 回あたり約 6ms で、JS wrapper 経由の約 100ms を避ける。
+
+### Routing / URL State
+
+- Web UI の URL は `screen / state / run` を表し、リロードしても同じ文脈に戻る (web-editor feature)。skeleton では 1 画面 2 状態しか無いため、状態の切替は URL に載せるだけとする。
+
+### Content / Assets
+
+- fixture-app の HTML は `packages/fixture-app` に置き、**内容を固定する** (`context/testing.md`)。外部サイトを対象にしない。
+- fixture-app は静的 HTTP サーバで配信する (D6)。`file://` を使わない。
+- 成果物の既定の出力先は `artifacts/screens/<screen-id>/<authProfile>/` とする (artifact-generation feature)。skeleton の `authProfile` は匿名固定。
+- 注釈画像は `<state-id>.svg`、生スクリーンショットは `<state-id>.raw.png` とし、SVG が同じディレクトリの PNG を相対参照する (D11)。
+
+### UI Reuse
+
+- 記録の開始・停止と Expectation 候補の選択は `apps/web` に閉じる。共有 UI へ切り出さない。
+
+### Testing
+
+- 記録の解決ロジック・承認・再現・成果物は `apps/server/src/**/*.integration.test.ts` で agent-browser を実起動して検証する (`context/testing.md`)。
+- 成果物の決定性と座標解決の規則は core の unit test で検証する。座標解決は「座標 + box 付き要素一覧」を入力とする純粋関数として書き、CLI の呼び出しをまたがせない。
+- **記録の UI 操作だけは手動確認が残る。** E2E は Browser Port を fake に置き換える設計のため、記録の実挙動を E2E では検証できない。
+- 統合テストは `--namespace` とテスト専用の session 名で agent-browser を隔離する (D10)。ブラウザ本体のキャッシュは共有する。
+- E2E (Playwright) は skeleton の範囲に含めない。
+
+## Interface 設計
+
+### UI / API / Event Interface
+
+- **HTTP**: 記録の開始・停止、draft の取得、承認依頼、承認、`run.start`、`rerun_step`、成果物生成。endpoint の形は実装時に確定する。
+- **WebSocket**: Stream Proxy (映像フレームの中継と入力転送)、実行イベントの購読。web の接続先は Workflow Server の単一エンドポイントのみとする (ADR-0008)。
+- **実行イベント (D24)**: `run-started` / `step-started` / `expectation-evaluated` / `step-skipped` / `step-executed` / `step-failed` / `paused` / `ir-version-changed` / `resumed` / `run-completed` / `run-failed` の 11 件を発行する。`rolled-back` / `run-aborted` は skeleton で発行機会が無いため実装しない。
+- **追加するイベント (D25)**: 上位文書が「イベントに残す」と定めながら語彙を持っていなかった 2 件を足す。**置き場は分ける** (D27)。
+  - `session-recreated` (再作成の理由と失われたページ状態の範囲を含む) は core/execution の語彙へ。ただし skeleton は再作成せず止めるため (D26)、**発行経路を実装しない**。
+  - `input-discarded` (破棄の理由を含む) は Stream Proxy 側の語彙へ。run が定まらない破棄があり、外部タイミングで起きるため実行イベント列の決定性に混ぜない。
+- イベントは append-only で発行順序が決定的であり、web と実行履歴が同じ列を購読する (execution feature)。
+
+### Props / Request / Response
+
+- 実装時に確定する。skeleton の範囲では、上記の面が存在することと、イベントの語彙が上記で閉じることまでを契約とする。
+- **秘密情報をイベントへ入れない** (execution feature)。skeleton は匿名実行のみだが、`runtime.json` のトークンをイベント・ログ・成果物のいずれにも出さない。
+
+## Content / Data 設計
+
+### 保存・管理するデータ
+
+- Screen 文書 (draft / 正本)、承認依頼 (対象 draft の内容ハッシュを revision として固定する。D9)、実行履歴 (入力・StepResult・Snapshot 参照・スクリーンショット参照)、成果物と `meta.json`。
+- 実行中の一時状態 (agent-browser の ref、実行途中のステップ状態) は永続化しない (`context/architecture.md` の State Boundary)。
+- ref は snapshot ごとに振り直されるため (F6)、**DSL にも実行履歴にも保存しない**。
+- 記録中に `--annotate screenshot` が生成する注釈済み画像は保存しない (D1)。使うのは応答に含まれる box だけである。
+
+### コンテンツ配置 / package / route
+
+- `packages/adapter-store` がファイルとして保存する。draft と正本は**別の置き場**に分ける (D7)。承認は draft を正本の置き場へ確定させる操作とする。
+
+## Performance / Security 設計
+
+### Performance
+
+- 「機能仕様 → Performance」に記載した 2 点を守る。数値目標は skeleton では置かない。
+
+### Security / Privacy
+
+- Workflow Server は 127.0.0.1 のみに bind し、ローカルトークンを要求する (ADR-0021)。`runtime.json` に接続先とトークンを書き、終了時に消す。
+- `token` のファイル権限は 0600、置き場は 0700 とし、緩ければ起動を中止する (`context/testing.md` の負例テスト)。
+- CLI の引数は配列で渡す。文字列を連結してシェルに解釈させない (ADR-0027)。
+- 成果物の出力先はプロジェクトルート配下に限る。絶対パス・`..`・`~` 始まり・解決後にルート外を指すシンボリックリンクを拒否する (artifact-generation feature)。
+
+## Error / Fallback 設計
+
+### エラーケース
+
+| #   | ケース                                        | ユーザーへの見せ方                                                                   | リカバリ                                                             |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| 1   | ブラウザ本体が見つからない                    | 本リポジトリの導入コマンドを案内して起動を中止する                                   | 利用者が導入コマンド (暫定名 `pnpm browser:install`) を 1 回実行する |
+| 1b  | 実行してよい origin が 1 つも列挙されていない | 設定への追記を案内して起動を中止する                                                 | 利用者が fixture-app の origin を設定に足す                          |
+| 1c  | 常駐サーバが二重起動である                    | 既存の `runtime.json` が指すプロセスの停止を案内して中止する                         | 利用者が既存プロセスを止める                                         |
+| 2   | 記録した操作を一意な Locator へ解決できない   | `clickPoint` として残し警告を出す。記録は止めない                                    | 利用者が要素定義を手で整える                                         |
+| 3   | 承認待ちの間に対象 draft が編集された         | `stale` として表示し確定させない                                                     | 依頼を出し直す                                                       |
+| 4   | 実行後も Expectation を満たさない             | 失敗ステップと評価結果をイベントで提示し run を `failed` にする                      | DSL か要素定義を直して再実行する                                     |
+| 5   | daemon またはセッションが応答しない (F9)      | Browser Port が構造化エラーを返す。skeleton は再作成せず `run-failed` で終える (D26) | 利用者が run をやり直す                                              |
+
+### Fallback
+
+- Expectation を選ばずに承認できてしまう点を UI で明示する。選ばないと冪等スキップが効かず毎回実行される (web-editor feature)。
+
+## テスト / 評価方針
+
+### テスト観点
+
+- Schema: workflow-dsl の語彙を一通り検証できること。実行系が未対応の語彙 (`fill` / `hover` / `scroll` / `use` / `count` 等) が IR 正規化で構造化エラーになること (D14)。
+- 記録の前提: pause を予約した run が entry の完了時に `paused` で止まること。記録の停止後に `resume` すると `ir-version-changed` → `resumed` → `run-completed` の順で終わること (D24 / D28) (**最終ステップの完了で `completed` に倒れないこと**。D19)。`paused` でない run への入力転送が破棄され、破棄がイベントに残ること (ADR-0008)。
+- 記録: 解決した step が `ref` を指すこと。要素定義が同時に draft へ入ること。既存定義に一致する場合に重複定義を作らないこと。
+- 承認: draft と正本が別のものとして保存されていること。承認前の draft を承認後の正本が上書きしないこと。`stale` 判定が効くこと。
+- イベント: 実行イベント列に現れるのは D24 の 11 件に限ること (`session-recreated` は語彙にあるが skeleton では発行されない。D26)。イベント列だけからステップ結果を再構成できること。破棄した入力が `input-discarded` として Stream Proxy 側に残ること (D27)。
+- 再現: 再現の run が全ステップ完了時に `paused` で止まること (D22)。同一セッションでの `rerun_step` で全ステップが `skipped` になり `completed` で終わること。`open` が `url` の Expectation を持つため `skipped` になること (D23)。イベント列だけからステップ結果を再構成できること。
+- 成果物: 同一入力での再生成でファイルの mtime が変わらないこと。バッジ位置とテーブル内容の決定性。SVG が完全一致で判定できること (D11)。
+- Expectation 候補: 操作の前後で変化した項目だけが候補に出ること (D12)。変化していない項目が候補に混ざらないこと。
+- 基盤: 起動時検査 3 件がそれぞれ単独で起動を中止させること (ブラウザ本体なし / origin 列挙が空 / 二重起動)。`runtime.json` が終了時に消えること。
+- 不応答: Browser Port が構造化エラーを返すこと。fake Browser Port で不応答を注入し、core/execution が **run を止める判断**を下して `run-failed` で終えること (D26)。**adapter が黙ってセッションを作り直さないこと** (D4 の眼目。黙って再作成されると `skipped` を観測できなくなる)。実起動での再現は条件が未特定のため統合テストの対象にしない。
+- 横断: `pnpm boundaries` が通ること。`pnpm test:integration` で agent-browser を実起動する統合テストが 1 本以上通ること。
+
+### 計測指標
+
+- skeleton では数値目標を置かない。「通ること」を指標とする。
+
+## フロー / シーケンス
+
+skeleton が通す経路を 3 つの図で示す。1 つ目は利用者の操作起点の全体、2 つ目は記録の 1 クリック、3 つ目は再現と冪等スキップである。
+
+### Flowchart (ユーザー操作起点)
+
+```mermaid
+flowchart TD
+    start["Workflow Server を起動"] --> check{"起動時検査 3 件"}
+    check -->|"いずれか不成立"| abort["理由と対処を出して中止"]
+    check -->|"すべて成立"| authoring["Screen 文書の骨格と<br/>entry の Workflow 文書を手で書く"]
+    authoring --> runstart["run を開始 (pause を予約)"]
+    runstart --> paused1["entry の完了時に paused"]
+    paused1 --> opmode["操作モードへ切替 → 記録開始"]
+    opmode --> opclick["viewport でボタンをクリック"]
+    opclick --> resolve{"座標を一意な<br/>Semantic Locator へ解決できるか"}
+    resolve -->|"できる"| stepref["click の step (ref) と<br/>要素定義を draft へ"]
+    resolve -->|"できない"| steppoint["clickPoint として残し警告"]
+    stepref --> stop["記録を停止"]
+    steppoint --> stop
+    stop --> cand["操作の前後で変化した項目から<br/>Expectation 候補を提示"]
+    cand --> pick["候補を選び step の expect へ"]
+    pick --> recend["記録用 run を resume<br/>(ir-version-changed → run-completed)"]
+    recend --> req["承認依頼 (draft の内容ハッシュを固定)"]
+    req --> staleq{"承認待ちの間に draft を編集したか"}
+    staleq -->|"編集した"| stale["stale として確定しない"]
+    staleq -->|"編集していない"| commit["正本の置き場へ確定"]
+    commit --> replay["run.start<br/>(別の run / 新しいセッション / pause を予約)"]
+    replay --> paused2["全ステップの完了時に paused"]
+    paused2 --> rerun["同じセッションで<br/>最初のステップから rerun_step"]
+    rerun --> skipped["全ステップが skipped → completed"]
+    skipped --> gen["成果物を生成<br/>(注釈画像 SVG / 生スクリーンショット / テーブル)"]
+    gen --> gen2["同じ入力でもう一度生成"]
+    gen2 --> nochange["書き換えない (mtime も変わらない)"]
+```
+
+### Sequence — 記録の 1 クリック
+
+入力転送の前に box 付き要素一覧を取る (D5)。中継条件の検証は server 側で行う (ADR-0008)。
+
+```mermaid
+sequenceDiagram
+    actor User as 利用者
+    participant Web as Web UI
+    participant API as api (Stream Proxy)
+    participant App as app (use case)
+    participant Elem as core/element
+    participant AB as adapter/browser
+    participant Browser as agent-browser
+
+    User->>Web: viewport をクリック
+    Web->>API: input_mouse (x, y)
+    API->>API: 中継条件を検証 (paused / 操作モード / 要求元の run)
+    alt 条件を満たさない
+        API->>API: input-discarded を記録する (破棄の理由を含む)
+        API-->>Web: 破棄したことを返す
+    else 条件を満たす
+        API->>App: 記録中の入力として渡す
+        App->>AB: box 付き要素一覧を要求
+        AB->>Browser: --annotate screenshot --json
+        Browser-->>AB: annotations (ref / role / name / box)
+        AB-->>App: 要素一覧 (注釈済み画像は保存しない)
+        App->>Elem: 座標と要素一覧から候補を解決
+        alt 一意に解決できる
+            Elem-->>App: role+name の Locator
+            App->>App: click の step と要素定義を draft へ
+        else 一意にならない
+            Elem-->>App: 解決不能
+            App->>App: clickPoint として残し警告を付ける
+        end
+        App->>AB: 入力を転送
+        AB->>Browser: input_mouse を中継
+    end
+```
+
+### Sequence — 再現と冪等スキップ
+
+`run.start` は新しいセッションで `open` から実行する。`rerun_step` は同じセッションの `paused` から掛ける (D22)。
+
+```mermaid
+sequenceDiagram
+    actor User as 利用者
+    participant API as api
+    participant App as app (use case)
+    participant Exec as core/execution
+    participant AB as adapter/browser
+    participant Browser as agent-browser
+
+    User->>API: run.start (pause を予約)
+    API->>App: run を開始
+    App->>Exec: 実行ステップ列を渡す
+    Exec->>AB: createSession (匿名)
+    AB->>Browser: 新しいセッションを開く
+    loop 各ステップ
+        Exec->>AB: Snapshot を取得
+        alt セッションが応答しない
+            AB-->>Exec: 構造化エラー (browser/unresponsive)
+            Exec->>Exec: skeleton は再作成せず止めると決める
+            Exec-->>App: run-failed
+            Note over Exec: 以降のステップは実行しない
+        else 応答する
+            AB-->>Exec: Snapshot
+        end
+        Exec->>Exec: Expectation を評価
+        alt すべて満たす
+            Exec-->>App: step-skipped
+        else 満たさない
+            Exec->>AB: action を実行
+            Exec->>AB: Snapshot を再取得
+            Exec->>Exec: Expectation を再評価
+            alt 満たす
+                Exec-->>App: step-executed
+            else 満たさない
+                Exec-->>App: step-failed
+                Exec-->>App: run-failed
+            end
+        end
+    end
+    Note over Exec: 最終ステップの完了と pause 予約が重なったら pause を優先する
+    Exec-->>App: paused
+    User->>API: rerun_step (最初のステップ / 同じセッション)
+    API->>Exec: 指定ステップ以降を再実行
+    loop 各ステップ
+        Exec->>AB: Snapshot を取得
+        Exec->>Exec: Expectation はすべて満たされている
+        Exec-->>App: step-skipped
+    end
+    Exec-->>App: run-completed
+```
+
+## 実装分割
+
+### 実装タスク案
+
+prompts phase で生成した prompt に一対一で対応する。依存は `depends_on` に実依存で列挙してある。
+
+| Phase | prompt                                    | target    | 並列可 | 依存                | 概要                                                    |
+| ----- | ----------------------------------------- | --------- | ------ | ------------------- | ------------------------------------------------------- |
+| P1    | `P1_01_infra_agent_browser_bundling.md`   | infra     | P1_02  | なし                | 実行基盤の同梱と版固定、起動時検査 3 件、`runtime.json` |
+| P1    | `P1_02_infra_fixture_app.md`              | infra     | P1_01  | なし                | fixture 対象アプリと静的 HTTP 配信                      |
+| P2    | `P2_01_execution_browser_port.md`         | execution | -      | P1_01, P1_02        | Browser Port の契約と adapter の実装                    |
+| P3    | `P3_01_workflow_dsl_schema_ir.md`         | workflow  | P3_02  | P2_01               | Schema と IR 正規化、未対応語彙の構造化エラー           |
+| P3    | `P3_02_element_coordinate_resolution.md`  | element   | P3_01  | P2_01               | 座標からの要素解決と要素定義の生成                      |
+| P4    | `P4_01_execution_run_and_events.md`       | execution | P4_02  | P3_01               | ステップ実行、再生制御、実行イベント                    |
+| P4    | `P4_02_artifact_svg_and_table.md`         | artifact  | P4_01  | P3_01               | 注釈画像 (SVG) とテーブル、書き換え抑止                 |
+| P5    | `P5_01_web_store_and_approval.md`         | web       | -      | P3_01               | Store Port、draft と正本の分離、承認キュー              |
+| P5    | `P5_02_web_stream_proxy_and_recording.md` | web       | -      | P3_02, P4_01, P5_01 | Stream Proxy と記録、Expectation 候補、HTTP API         |
+| P6    | `P6_01_web_ui_recording_and_approval.md`  | web       | -      | P5_02               | Web UI (live viewport / モード / 記録 / 承認)           |
+| P7    | `P7_01_infra_integration_tests.md`        | infra     | -      | P4_02, P6_01        | 実起動の統合テストと横断チェック                        |
 
 ### prompts 生成方針
 
@@ -787,9 +1262,10 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | track gate 3 回目の指摘を反映。D24 に ir-version-changed を戻した                                |
 | 2026-08-23 | Fukuemon | track gate が PASS。非ブロッキング推奨 2 件 (Flow 8 の順序 / flowchart の終端) を反映            |
 | 2026-08-23 | Fukuemon | sync phase を実施。ADR 6 本 / design 6 本 / context 5 本へ反映し、正本をハンドオフ (81f4f81)     |
+| 2026-08-23 | Fukuemon | prompts phase で実装 prompt 11 本を生成。絶対ガードと hook 検査を通した                          |
 
 ## 備考
 
-追加 appendix (API / Database / Authorization / Screen / testid) は取り込んでいない。endpoint と画面構成は diagram phase で確定させる。
+追加 appendix (API / Database / Authorization / Screen / testid) は取り込んでいない。endpoint の具体形と画面の細部は実装時に確定させる。
 
 **issue #4 の受け入れ条件との突合 (2026-08-23)**: 記録 5 件 / 承認 4 件 / 再現 3 件 / 成果物 2 件 / 基盤 4 件 / 横断 2 件の計 20 件をすべて本 spec が受けていることを確認した。差異は 1 点のみで、成果物の「バッジ 1 個の注釈画像」について issue は形式を指定していないため、SVG とする D11 でも条件を満たす (形式を PNG と定めていたのは Design Doc の成功条件であり、D11 の変更提案の対象である)。本 spec が issue より広い範囲を持つのは起動時検査 (issue はブラウザ本体のみ、spec は `context/infrastructure.md` の契約に従い 3 件) と、entry / Screen 文書の手書き (D17 / D20) である。いずれも受け入れ条件を狭めない。
