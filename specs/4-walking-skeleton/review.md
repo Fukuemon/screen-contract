@@ -296,3 +296,20 @@ Verdict: **NEEDS_WORK**
 指摘 2 は上流で照合し、指摘のとおりだった。ADR-0018 のトリガは draft の変更であって承認ではない。ユーザー確認のうえ **`ir-version-changed` を D24 の対象へ戻し 11 件**とした。差し替え後の前提再検証では `open` の `url` が満たされたままなので巻き戻しは起きず、`rolled-back` の除外と D26 は維持できる。記録用 run の終端も `ir-version-changed` → `resumed` → `run-completed` と読める。
 
 指摘 1・3・4 は確定済みの決定へ揃えた。テスト観点に「run を止める判断を下すこと」と「adapter が黙って再作成しないこと」の 2 つを入れ、整合表の web-editor を変更提案へ直し、Sequence 2 の不応答分岐に `Note over Exec: 以降のステップは実行しない` を足した。
+
+## Review 2026-08-23 (track gate 4 回目) — diagram + track を累積
+
+Verdict: **PASS**
+
+前回の 4 件はすべて解消。全 8 観点で PASS または N/A。
+
+`ir-version-changed` の発行箇所は spec 内で一貫している。発行するのは Flow 8 の記録用 run の `resume` だけで、Flow 10 の `rerun_step` では発行しない (再現の run は `paused` 後に draft を編集しないため)。テスト観点は D24 の 11 件・D25 の 2 件・D26 の「止める」・D27 の置き場をすべて観測可能な形で受けている。3 図は `diagram-rules.md` の必須要素を満たし、変更点表 22 行はすべて D か F に辿れ、空欄・重複は無い。
+
+### 非ブロッキングの推奨 (反映済み)
+
+1. Flow 8 が「承認 → 記録用 run を `resume`」の順で、`resume` 時の IR 再読込がどの文書を読むかが実装時に問題になりうる。**`resume` を承認の前へ置いた。**
+2. flowchart に D28 の終端が無い。**記録用 run の `resume` ノードを足した。**
+
+### 次の phase
+
+sync phase で `## 上位資料からの変更点` の 22 行と反映先判定表に従って durable 反映を行う。ADR-0002 / 0008 / 0017 / 0026 / 0027 の改訂と新規 ADR 1 件、`(判断の正本は ADR-NNNN)` の 1 行参照が対象。その後 prompts phase が最終 gate になる。

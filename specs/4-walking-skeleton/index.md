@@ -13,19 +13,19 @@
 
 状態は `未着手 / 進行中 / 完了 / レビュー済 / 保留` のいずれか。保留の場合は理由を備考に残す。
 
-| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                            |
-| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------------------- |
-| 1   | 起票                        | 完了       | 2026-08-22 | intake checklist で再検証済み。差し戻す欠落なし                 |
-| 2   | 下書き                      | 完了       | 2026-08-22 | 実装突合: 対象外 (実装は scaffold の stub のみ)                 |
-| 3   | 上位文書突合                | 完了       | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context)             |
-| 4   | 論点整理                    | 完了       | 2026-08-22 | D1〜D12 を起票                                                  |
-| 5   | 論点解決                    | レビュー済 | 2026-08-23 | D1〜D23 を確定。clarify gate PASS (6 回目)                      |
-| 6   | Interface / Routing 設計    | 完了       | 2026-08-23 | 図と発行イベントを確定 (D24〜D28 は track gate で確定)          |
-| 7   | Content / Data 設計         | 完了       | 2026-08-23 | clarify で D7 / D9 / D13 を確定済み                             |
-| 8   | Performance / Security 設計 | 完了       | 2026-08-23 | clarify で D3 / D5 / D16 を確定済み                             |
-| 9   | Test / Metrics 設計         | 完了       | 2026-08-23 | clarify で D10 を確定し、テスト観点を全受け入れ条件に対応させた |
-| 10  | 実装分割                    | 未着手     |            |                                                                 |
-| 11  | レビュー済                  | 未着手     |            | clarify gate は PASS。最終 gate は prompts                      |
+| #   | フェーズ                    | 状態       | 最終更新   | 備考                                                |
+| --- | --------------------------- | ---------- | ---------- | --------------------------------------------------- |
+| 1   | 起票                        | 完了       | 2026-08-22 | intake checklist で再検証済み。差し戻す欠落なし     |
+| 2   | 下書き                      | 完了       | 2026-08-22 | 実装突合: 対象外 (実装は scaffold の stub のみ)     |
+| 3   | 上位文書突合                | 完了       | 2026-08-22 | 変更提案 3 件を検出 (ADR-0026 / ADR-0027 / context) |
+| 4   | 論点整理                    | 完了       | 2026-08-22 | D1〜D12 を起票                                      |
+| 5   | 論点解決                    | レビュー済 | 2026-08-23 | D1〜D23 を確定。clarify gate PASS (6 回目)          |
+| 6   | Interface / Routing 設計    | レビュー済 | 2026-08-23 | 図と発行イベントを確定。track gate PASS (4 回目)    |
+| 7   | Content / Data 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
+| 8   | Performance / Security 設計 | レビュー済 | 2026-08-23 | track gate PASS                                     |
+| 9   | Test / Metrics 設計         | レビュー済 | 2026-08-23 | track gate PASS                                     |
+| 10  | 実装分割                    | 未着手     |            |                                                     |
+| 11  | レビュー済                  | 未着手     |            | clarify gate は PASS。最終 gate は prompts          |
 
 ## 上位文書整合
 
@@ -375,7 +375,7 @@ EARS 風で振る舞いを記述する。
 5. 利用者がボタンをクリックする。server は転送の前に `--annotate screenshot` を撮り、座標を要素へ解決して `click` の step と要素定義を draft へ入れてから転送する。
 6. 利用者が記録を停止する。操作の前後で変化した項目から Expectation の候補が提示される。
 7. 利用者が候補を 1 つ選び、step の `expect` に入れる。記録した steps の遷移元は run の到達状態 (`default`) から決まる。
-8. 利用者が承認依頼を出し、差分を確認して承認する。draft が正本の置き場へ移る。記録に使った run は `resume` して `run-completed` で終える (D28)。
+8. 利用者が記録に使った run を `resume` する。記録で draft が変わっているため `ir-version-changed` が出るが、`open` の `url` は満たされたままなので巻き戻しは起きず `run-completed` で終わる (D24 / D28)。その後、承認依頼を出し、差分を確認して承認する。draft が正本の置き場へ移る。
 9. 利用者が `run.start` で実行する。**記録に使った run とは別の run で、新しいセッションが開く。** pause を予約しておくため、全ステップの完了時に `paused` で止まる (D22)。`open` から順に実行され、記録どおりに操作が再現される。
 10. `paused` のまま、モーダルが開いた状態で、**9 の run と同じセッション**の最初のステップから `rerun_step` する。全ステップが `skipped` になり `completed` で終わる。新規セッションで 2 回目を回すと `open` の期待状態を満たさず必ず実行されるため、`skipped` を観測できない。
 11. 到達した状態で成果物を生成する。バッジ 1 個の注釈画像 (SVG) と生スクリーンショット、1 行の Markdown テーブルが出る。
@@ -520,7 +520,8 @@ flowchart TD
     steppoint --> stop
     stop --> cand["操作の前後で変化した項目から<br/>Expectation 候補を提示"]
     cand --> pick["候補を選び step の expect へ"]
-    pick --> req["承認依頼 (draft の内容ハッシュを固定)"]
+    pick --> recend["記録用 run を resume<br/>(ir-version-changed → run-completed)"]
+    recend --> req["承認依頼 (draft の内容ハッシュを固定)"]
     req --> staleq{"承認待ちの間に draft を編集したか"}
     staleq -->|"編集した"| stale["stale として確定しない"]
     staleq -->|"編集していない"| commit["正本の置き場へ確定"]
@@ -752,6 +753,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | NEEDS_WORK               | track gate (diagram + track を累積)。図は 8 項目が一致したが D4 が図に無い。Interface 設計が未記入のまま phase 6 を完了にしていた。メタの同期漏れ 3 件        | 全 5 件を反映。D24 / D25 を確定して Interface 設計を埋め、図に D4 の分岐を足した。受け入れ条件は 20 件が正しい                             |
 | 2026-08-23 | NEEDS_WORK               | track gate 2 回目。D24 の `rolled-back` 除外理由と図の再作成分岐が矛盾。`input-discarded` の置き場が層と噛み合わない。`ir-version-changed` の除外理由が不正確 | 全 4 件を反映。D26 / D27 / D28 を確定し、図の分岐と語彙の置き場を直した                                                                    |
 | 2026-08-23 | NEEDS_WORK               | track gate 3 回目。D28 を採ると `ir-version-changed` の除外が成立しない。テスト観点が D26 と矛盾。整合表の web-editor が継承のまま                            | 全 4 件を反映。D24 に `ir-version-changed` を戻して 11 件とし、テスト観点に D4 の眼目を入れた                                              |
+| 2026-08-23 | PASS                     | track gate 4 回目 (diagram + track を累積)。全 8 観点で PASS または N/A。非ブロッキング推奨 2 件                                                              | 推奨 2 件も反映。次は sync phase                                                                                                           |
 
 ## 変更履歴
 
@@ -778,6 +780,7 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | 2026-08-23 | Fukuemon | track gate の指摘を反映。D24 / D25 を確定し Interface 設計を埋め、図に D4 の分岐を足した         |
 | 2026-08-23 | Fukuemon | track gate 2 回目の指摘を反映し D26 / D27 / D28 を確定                                           |
 | 2026-08-23 | Fukuemon | track gate 3 回目の指摘を反映。D24 に ir-version-changed を戻した                                |
+| 2026-08-23 | Fukuemon | track gate が PASS。非ブロッキング推奨 2 件 (Flow 8 の順序 / flowchart の終端) を反映            |
 
 ## 備考
 
