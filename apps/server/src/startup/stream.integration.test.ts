@@ -41,10 +41,8 @@ afterEach(async () => {
   rmSync(stateDir, { recursive: true, force: true });
 });
 
-async function start(
-  runState?: () => { runId: string; paused: boolean; mode: "view" | "operate" },
-) {
-  server = await listen({ stateDir, host: fakeHost(), runState });
+async function start() {
+  server = await listen({ stateDir, host: fakeHost() });
   return server;
 }
 
@@ -145,6 +143,8 @@ describe("live viewport の映像", () => {
         }
         return Promise.resolve({ send: () => undefined, close: () => Promise.resolve() });
       },
+      // run を起こさないため、実行の相手は無い。
+      runner: () => undefined,
     };
   }
 

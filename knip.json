@@ -23,7 +23,8 @@
     },
     "apps/web": {
       "entry": ["src/router.tsx", "src/routes/**/*.tsx", "src/**/*.test.ts"],
-      "project": ["src/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["tailwindcss"]
     },
     "apps/mcp-bridge": {
       "entry": ["src/index.ts", "src/**/*.test.ts"],

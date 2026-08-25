@@ -11,7 +11,12 @@ export type {
   RecordedStep,
 } from "@screen-contract/app";
 
-export { createHttpApp, type HttpAppOptions, type WebAssets } from "./http.js";
+export {
+  createHttpApp,
+  type HttpAppOptions,
+  type ViewportControl,
+  type WebAssets,
+} from "./http.js";
 export {
   createStreamConnection,
   type StreamConnection,

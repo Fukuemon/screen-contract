@@ -1,5 +1,11 @@
 import { connectStream, type StreamClient } from "@screen-contract/adapter-browser";
-import type { BrowserPort, BrowserSession } from "@screen-contract/core-execution";
+import type {
+  BrowserPort,
+  BrowserSession,
+  Observation,
+  StepRunner,
+} from "@screen-contract/core-execution";
+import type { ExecutionStep } from "@screen-contract/core-workflow";
 
 /**
  * live viewport のセッション。
@@ -31,6 +37,13 @@ export interface ViewportSubscription {
 
 export interface Viewport {
   subscribe(onFrame: (dataUri: string) => void): Promise<ViewportSubscription>;
+  /**
+   * 実行の相手。開いているセッションを包む。
+   *
+   * **セッションが無ければ undefined を返す。** 勝手に開くと、run の開始が
+   * 暗黙になり「いつ run が始まったか」が画面から読めなくなる。
+   */
+  runner(): StepRunner | undefined;
 }
 
 export function createViewport(options: ViewportOptions): Viewport {
@@ -65,6 +78,29 @@ export function createViewport(options: ViewportOptions): Viewport {
   }
 
   return {
+    runner(): StepRunner | undefined {
+      const opened = session;
+      if (opened === undefined) {
+        return undefined;
+      }
+      return {
+        observe: async (): Promise<Observation> => ({
+          url: new URL(await opened.currentUrl()).pathname,
+          title: "",
+          // 要素の可視判定は要素定義を知っている層が担う。entry の run は
+          // `url` しか見ないため、ここでは空でよい。
+          elements: new Map(),
+          counts: new Map(),
+        }),
+        perform: async (step: ExecutionStep): Promise<void> => {
+          if (step.action.kind !== "open") {
+            throw new Error(`viewport の run が扱えない action です: ${step.action.kind}`);
+          }
+          await opened.perform({ kind: "open", url: step.action.url });
+        },
+      };
+    },
+
     async subscribe(onFrame): Promise<ViewportSubscription> {
       listeners.add(onFrame);
       // 同時に繋いできても 1 セッションに収める。人数分開くとブラウザが増える。

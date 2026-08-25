@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -9,5 +10,5 @@ import { defineConfig } from "vite";
  * だけである (context/architecture.md の Runtime Boundary)。
  */
 export default defineConfig({
-  plugins: [tanstackStart({ spa: { enabled: true } }), viteReact()],
+  plugins: [tailwindcss(), tanstackStart({ spa: { enabled: true } }), viteReact()],
 });

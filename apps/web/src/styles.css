@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* 配色は 1 箇所に置く。部品側に色を直書きすると、片方だけ変えた状態が残る。 */
+@theme {
+  --color-surface: oklch(99% 0 0);
+  --color-panel: oklch(97.5% 0 0);
+  --color-line: oklch(90% 0 0);
+  --color-ink: oklch(20% 0 0);
+  --color-muted: oklch(52% 0 0);
+  --color-accent: oklch(55% 0.18 264);
+  --color-danger: oklch(55% 0.19 25);
+  --color-ok: oklch(58% 0.14 155);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface: oklch(18% 0 0);
+    --color-panel: oklch(22% 0 0);
+    --color-line: oklch(32% 0 0);
+    --color-ink: oklch(94% 0 0);
+    --color-muted: oklch(65% 0 0);
+  }
+}
+
+body {
+  @apply bg-surface text-ink;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Hiragino Sans",
+    "Noto Sans JP",
+    sans-serif;
+}

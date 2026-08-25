@@ -70,6 +70,7 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
       webRoot: env.webRoot,
       // **列挙した origin の先頭を開く。** 列挙外へ open しない (ADR-0017)。
       // 列挙が空なら起動時検査で中止しているため、ここには必ず 1 件ある。
+      entryUrl: allowedOrigins[0] as string,
       viewport: createViewport({
         browser: createAgentBrowserPort({ home: env.home }),
         entryUrl: allowedOrigins[0] as string,

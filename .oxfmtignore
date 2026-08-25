@@ -27,3 +27,5 @@ build/
 .wt/
 .ai-out/
 .rulesync/
+# 生成物。TanStack Router が routes から作る。手で直さない。
+apps/web/src/routeTree.gen.ts

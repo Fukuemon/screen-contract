@@ -1,4 +1,4 @@
-import type { ApprovalRequest, ApprovalResult } from "@screen-contract/api";
+import type { ApprovalRequest, ApprovalResult, ExecutionEvent } from "@screen-contract/api";
 import { httpBase, type ServerTarget } from "./state/connection.js";
 
 /**
@@ -8,7 +8,22 @@ import { httpBase, type ServerTarget } from "./state/connection.js";
  * use case を呼ぶ (context/architecture.md)。
  */
 
+/** server が持つ run の状態。判定の正本は server 側にある。 */
+export interface ViewportSnapshot {
+  readonly runId: string;
+  readonly status: "idle" | "paused" | "completed" | "failed";
+  readonly mode: "view" | "operate";
+  readonly recording: boolean;
+  readonly events: readonly ExecutionEvent[];
+  readonly entryUrl: string;
+}
+
 export interface ApiClient {
+  viewport(): Promise<ViewportSnapshot>;
+  startRun(): Promise<ViewportSnapshot>;
+  resumeRun(): Promise<ViewportSnapshot>;
+  setMode(mode: "view" | "operate"): Promise<ViewportSnapshot>;
+  setRecording(recording: boolean): Promise<ViewportSnapshot>;
   listApprovals(): Promise<readonly ApprovalRequest[]>;
   approve(requestId: string): Promise<ApprovalResult>;
   loadDraft(key: string): Promise<string>;
@@ -37,7 +52,26 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     return response;
   }
 
+  async function json(path: string, init?: RequestInit): Promise<ViewportSnapshot> {
+    return (await (await call(path, init)).json()) as ViewportSnapshot;
+  }
+
+  function post(path: string, body?: unknown): Promise<ViewportSnapshot> {
+    return json(path, {
+      method: "POST",
+      ...(body === undefined
+        ? {}
+        : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
+    });
+  }
+
   return {
+    viewport: () => json("/viewport"),
+    startRun: () => post("/viewport/start"),
+    resumeRun: () => post("/viewport/resume"),
+    setMode: (mode) => post("/viewport/mode", { mode }),
+    setRecording: (recording) => post("/viewport/recording", { recording }),
+
     async listApprovals(): Promise<readonly ApprovalRequest[]> {
       return (await (await call("/approvals")).json()) as readonly ApprovalRequest[];
     },

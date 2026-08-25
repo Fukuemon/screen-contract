@@ -45,6 +45,22 @@ export interface HttpAppOptions {
    * (`packages/api` は Node のファイルシステムに依存しない)。
    */
   readonly web?: WebAssets | undefined;
+  /**
+   * live viewport の run。
+   *
+   * **操作モードと記録は `paused` の run の枠内でしか使えない** (ADR-0002)。
+   * 渡さないと `/viewport` 系の endpoint を生やさない。
+   */
+  readonly viewport?: ViewportControl | undefined;
+}
+
+/** Web UI からの run 操作。判定は合成ルートが持つ実装に閉じる。 */
+export interface ViewportControl {
+  start(): Promise<unknown>;
+  resume(): Promise<unknown>;
+  setMode(mode: "view" | "operate"): unknown;
+  setRecording(recording: boolean): unknown;
+  snapshot(): unknown;
 }
 
 export interface WebAssets {
@@ -125,6 +141,30 @@ export function createHttpApp(options: HttpAppOptions): Hono {
 
   // 外部入力は必ず parse を通す。branded type は実行時の保証を持たないため、
   // 型アサーションで持ち上げると未検証の文字列が保存先のパス組み立てまで届く。
+  // live viewport の run。**接続で 1 本起こし、pause 予約を付けて走らせる。**
+  // 1 ステップ (entry への open) を終えた時点で paused に入り、そこから操作と
+  // 記録ができる (ADR-0002 / ADR-0026)。
+  const viewport = options.viewport;
+  if (viewport !== undefined) {
+    app.get("/viewport", (c) => c.json(viewport.snapshot()));
+    app.post("/viewport/start", async (c) => c.json(await viewport.start()));
+    app.post("/viewport/resume", async (c) => c.json(await viewport.resume()));
+    app.post("/viewport/mode", async (c) => {
+      const { mode } = (await c.req.json()) as { mode?: unknown };
+      if (mode !== "view" && mode !== "operate") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(viewport.setMode(mode));
+    });
+    app.post("/viewport/recording", async (c) => {
+      const { recording } = (await c.req.json()) as { recording?: unknown };
+      if (typeof recording !== "boolean") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(viewport.setRecording(recording));
+    });
+  }
+
   app.post("/runs", async (c) => {
     await options.useCases.startRun(parseStartRunInput(await c.req.json()));
     return c.json({ ok: true }, 202);

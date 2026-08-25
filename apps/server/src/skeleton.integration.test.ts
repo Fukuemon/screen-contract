@@ -386,3 +386,43 @@ describe("成果物", () => {
     expect(rawImageName(stateId)).toBe("default.raw.png");
   }, 120_000);
 });
+
+describe("操作モードの入力転送", () => {
+  it("一時停止した run の操作モードでだけ入力が対象ページへ届く", async () => {
+    // 中継条件は server 側の run 状態で判定する (ADR-0008)。client の自称では
+    // 満たせない。
+    const { createRunSession } = await import("./startup/run-session.js");
+    const runner = {
+      observe: async () => ({
+        url: new URL(await session.currentUrl()).pathname,
+        title: "",
+        elements: new Map<string, boolean>(),
+        counts: new Map<string, number>(),
+      }),
+      perform: async (step: ExecutionStep) => {
+        if (step.action.kind === "open") {
+          await session.perform({ kind: "open", url: step.action.url });
+        }
+      },
+    };
+    const run = createRunSession({ entryUrl: `${app.origin}/`, runner: () => runner });
+
+    // run を起こす前は中継しない。
+    expect(run.relayState()).toBeUndefined();
+
+    await run.start();
+    expect(run.relayState()).toEqual({ runId: "current", paused: true, mode: "view" });
+
+    // 選択モードのままでは中継条件を満たさない。
+    const { discardReason } = await import("@screen-contract/api");
+    expect(discardReason(run.relayState(), { requesterRunId: "current" })).toBe("not-operate-mode");
+
+    run.setMode("operate");
+    expect(discardReason(run.relayState(), { requesterRunId: "current" })).toBeUndefined();
+    // 他人の run を名乗った入力は、操作モードでも中継しない。
+    expect(discardReason(run.relayState(), { requesterRunId: "other" })).toBe("foreign-run");
+
+    await run.resume();
+    expect(discardReason(run.relayState(), { requesterRunId: "current" })).toBe("not-paused");
+  }, 120_000);
+});

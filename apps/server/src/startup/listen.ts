@@ -1,6 +1,7 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
+import { createRunSession } from "./run-session.js";
 import type { Viewport, ViewportSubscription } from "./viewport.js";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
@@ -35,8 +36,8 @@ export interface ListenOptions {
   /** 0 なら OS に割り当てさせる。 */
   readonly port?: number | undefined;
   readonly host?: LifecycleHost | undefined;
-  /** 中継条件の判定に使う run の状態。渡さないと入力はすべて破棄される。 */
-  readonly runState?: (() => RunState | undefined) | undefined;
+  /** run が最初に開く URL。プロダクト設定で列挙した origin の先頭を渡す。 */
+  readonly entryUrl?: string | undefined;
   /**
    * live viewport の映像源。
    *
@@ -67,7 +68,16 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
    * run を保持する層がまだ無いため、常に「run が無い」を返す。結果として
    * 入力はすべて `no-run` として破棄され、**素通しにはならない**。
    */
-  const runState = { current: (): RunState | undefined => options.runState?.() };
+  // **中継条件は server が持つ run 状態で判定する** (ADR-0008)。client の自称は
+  // 要求元の run しか渡せない。
+  const session =
+    options.viewport === undefined
+      ? undefined
+      : createRunSession({
+          entryUrl: options.entryUrl ?? "",
+          runner: () => options.viewport?.runner(),
+        });
+  const runState = { current: (): RunState | undefined => session?.relayState() };
 
   const stream = upgradeWebSocket((c) => {
     void c;
@@ -124,6 +134,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     stateDir: options.stateDir,
     policy: () => policy,
     stream,
+    viewport: session,
     // **トークンは配信する HTML へ埋め込む。** ブラウザは runtime.json を
     // 読めず、URL の query には載せられない (context/infrastructure.md)。
     web:
