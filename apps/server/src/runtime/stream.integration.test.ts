@@ -14,7 +14,6 @@ import type { BrowserPort } from "@screen-contract/core-execution";
  * 差し替え口が実際に効くことを確かめられる (context/testing.md)。
  */
 const fakeBrowser: BrowserPort = {
-  connect: () => ({ send: () => undefined, close: () => undefined }),
   createSession: () => Promise.reject(new Error("テストではセッションを開かない")),
 };
 

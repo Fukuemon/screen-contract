@@ -82,12 +82,10 @@ export interface ViewportOptions {
   /**
    * いま誰として実行しているか。
    *
-   * **保存の鍵と Baseline の識別に入る** (ADR-0022)。匿名を名乗ったまま
-   * 認証状態を注入すると、認証済みの結果が匿名の Baseline へ混ざる。
+   * **保存の鍵と Baseline の識別に入る** (ADR-0022)。中身 (Storage State) の
+   * 解決と注入は adapter が担うため、app はここまでしか知らない。
    */
   readonly auth?: (() => AuthContext) | undefined;
-  /** セッションを開く直前に注入する認証状態 (ADR-0022)。 */
-  readonly storageState?: (() => Promise<StorageState | undefined>) | undefined;
 }
 
 /**
@@ -103,15 +101,12 @@ export function createViewport(options: ViewportOptions): Viewport {
   const listeners = new Set<(dataUri: string) => void>();
 
   async function start(): Promise<void> {
-    // 注入は Port の中で行う。開いた後に入れても、既に描画された画面は
-    // 未ログインのままである (ADR-0022)。
-    const opened = await options.browser.createSession({
-      auth: options.auth?.() ?? { kind: "anonymous" },
-      storageState: await options.storageState?.(),
-    });
+    // 復号と注入は Port の中で完結する。app は誰として実行しているかだけを渡す
+    // (ADR-0022)。
+    const opened = await options.browser.createSession(options.auth?.() ?? { kind: "anonymous" });
     session = opened;
     await opened.perform({ kind: "open", url: options.entryUrl });
-    relay = options.browser.connect(await opened.stream(), (dataUri) => {
+    relay = await opened.connect((dataUri) => {
       for (const listener of listeners) {
         listener(dataUri);
       }

@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import type { AuthProfileStore } from "@screen-contract/app";
+import type { AuthProfileStore, StorageState } from "@screen-contract/app";
 import type { Keystore } from "./keystore.js";
 import { open, parseEnvelope, seal } from "./sealed.js";
 
@@ -86,6 +86,24 @@ function assertName(name: string): void {
       "認証プロファイル名の規則に合いません (小文字英数で始まり、. _ - を含む 64 文字以内)",
     );
   }
+}
+
+/**
+ * 復号した中身を Storage State として読む。
+ *
+ * **形を信用しない。** 保存形式を変えたときに、古いファイルが型だけ通って
+ * 中身が空のまま「認証済み」として実行されるのを防ぐ。
+ */
+function asStorageState(value: unknown): StorageState {
+  const raw = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  const local = raw["localStorage"];
+  return {
+    cookies: Array.isArray(raw["cookies"]) ? raw["cookies"] : [],
+    localStorage:
+      typeof local === "object" && local !== null && !Array.isArray(local)
+        ? (local as Record<string, unknown>)
+        : {},
+  };
 }
 
 export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthProfileStore {
@@ -169,7 +187,7 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
       return generation;
     },
 
-    load(name: string): unknown {
+    load(name: string): StorageState | undefined {
       const target = pathOf(name);
       let raw: string;
       try {
@@ -181,7 +199,10 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
         throw new AuthProfileError("認証状態を読めません");
       }
       // **認証に失敗したら中止する** (fail closed)。部分的に読めても続行しない。
-      return JSON.parse(open(parseEnvelope(raw), options.keystore.loadOrCreate(), name));
+      const decoded: unknown = JSON.parse(
+        open(parseEnvelope(raw), options.keystore.loadOrCreate(), name),
+      );
+      return asStorageState(decoded);
     },
 
     remove(name: string): void {

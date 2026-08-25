@@ -1,4 +1,9 @@
 {
   "$comment": "プロダクト設定。secret ではないためレビューできる場所に置く (context/infrastructure.md)。本リポジトリの対象は fixture 対象アプリであり、その origin を列挙する。既定を空にする安全装置は「列挙しない限り何も操作しない」ことであり、対象を明示的に 1 件書くことはこれを緩めない。",
-  "allowedOrigins": ["http://127.0.0.1:5174", "https://note.com"]
+  "allowedOrigins": [
+    "http://127.0.0.1:5174",
+    "https://note.com",
+    "https://ajisai.shisetsu-yoyaku.jp",
+    "https://shisetsu-yoyaku.jp"
+  ]
 }

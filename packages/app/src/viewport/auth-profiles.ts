@@ -8,6 +8,8 @@
  * 暗号化と置き場は adapter の責務である。app は名前と世代しか知らない。
  */
 
+import type { StorageState } from "@screen-contract/core-execution";
+
 export interface AuthProfileStore {
   /** 規則に合う名前か。合わなければ投げる。 */
   assertName(name: string): void;
@@ -20,8 +22,9 @@ export interface AuthProfileStore {
    *
    * @returns 取り込んだ後の generation
    */
-  save(name: string, state: unknown): number;
-  load(name: string): unknown;
+  save(name: string, state: StorageState): number;
+  /** 復号した認証状態。**app はこれを Port へ渡さない** — 解決は adapter が担う。 */
+  load(name: string): StorageState | undefined;
   /** 取り込みの世代。まだ無ければ 0。 */
   generation(name: string): number;
   remove(name: string): void;

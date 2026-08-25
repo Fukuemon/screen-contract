@@ -82,6 +82,21 @@ export interface WorkflowServerClientOptions {
   readonly fetch?: typeof globalThis.fetch | undefined;
 }
 
+/**
+ * server が返す理由。
+ *
+ * **status をそのまま出さない。** 「500 を返しました」では利用者に何もできない。
+ * 理由は列挙であり、外部入力を反射しない。
+ */
+const REASON: Readonly<Record<string, string>> = {
+  "bad-request": "指定の形式が正しくありません。",
+  conflict: "いまの状態では実行できません。接続し直してください。",
+  "browser-failed": "対象ブラウザで実行できませんでした。URL が開けるか確かめてください。",
+  forbidden: "この操作は許可されていません。",
+  unavailable: "サーバがまだ待ち受けを始めていません。",
+  internal: "サーバ側で想定外の失敗が起きました。",
+};
+
 export function createWorkflowServerClient(
   options: WorkflowServerClientOptions,
 ): WorkflowServerClient {
@@ -115,10 +130,11 @@ export function createWorkflowServerClient(
     headers.set("authorization", `Bearer ${options.token}`);
     const response = await doFetch(`${base}${path}`, { ...init, headers });
     if (!response.ok && !allow.includes(response.status)) {
-      // server が返す理由は列挙で、外部入力を反射しない。
+      // server が返す理由は列挙で、外部入力を反射しない。読める理由がある
+      // ものは、status ではなく理由を出す。
       const detail = ((await response.json().catch(() => ({}))) as { error?: string }).error;
       throw new Error(
-        `Workflow Server が ${String(response.status)} を返しました${detail === undefined ? "" : ` (${detail})`}`,
+        REASON[detail ?? ""] ?? `Workflow Server が ${String(response.status)} を返しました`,
       );
     }
     return response;

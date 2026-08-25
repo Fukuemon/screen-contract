@@ -513,3 +513,33 @@ describe("viewport を渡さないとき", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("対象ブラウザ側の失敗", () => {
+  it("実行基盤の失敗を 409 にする", async () => {
+    // **server の障害ではない。** 500 にすると、開けない URL を指しただけで
+    // 「壊れた」と読まれる。
+    class BrowserFailure extends Error {
+      readonly code = "browser/unresponsive";
+    }
+    const app = createHttpApp({
+      useCases: fakeUseCases(),
+      policy: () => POLICY,
+      viewport: {
+        ...fakeViewport([]),
+        navigate: () => Promise.reject(new BrowserFailure("操作の実行に失敗しました")),
+      },
+    });
+    const response = await app.request(`${ORIGIN}/viewport/navigate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        origin: ORIGIN,
+        host: HOST,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ url: "http://127.0.0.1:5174/missing" }),
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "browser-failed" });
+  });
+});

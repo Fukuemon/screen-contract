@@ -167,11 +167,6 @@ export interface Screenshot {
   readonly bytes: Uint8Array;
 }
 
-/** ライブ映像ストリームのハンドル。描画は web-editor、転送は adapter の責務。 */
-export interface StreamHandle {
-  readonly endpoint: string;
-}
-
 /**
  * 配信への接続。
  *
@@ -196,27 +191,14 @@ export interface ConsoleMessage {
   readonly text: string;
 }
 
-/**
- * セッションを開く要求。
- *
- * `auth` は**誰として実行しているか**であり、保存の鍵と Baseline の識別に使う
- * (ADR-0022)。`storageState` は**その中身**である。復号は保管側が担い、
- * 対象を開く前の注入を adapter が担う。
- */
-export interface CreateSessionInput {
-  readonly auth: AuthContext;
-  readonly storageState?: StorageState | undefined;
-}
-
 /** ブラウザ実行基盤を差し替え可能にする Port。実装は adapter/browser (ADR-0013)。 */
 export interface BrowserPort {
   /**
    * 認証コンテキストは必須とする。省略できると「認証なし」が既定になるため
-   * (ADR-0022)。注入は adapter/browser の責務であり、**対象を開く前に行う**。
+   * (ADR-0022)。**Storage State の復号と注入は adapter/browser の責務**であり、
+   * 復号した状態を core / app へ渡さない。注入は対象を開く前に行う。
    */
-  createSession(input: AuthContext | CreateSessionInput): Promise<BrowserSession>;
-  /** 配信へ繋ぐ。1 フレームぶんの data URI を渡す。 */
-  connect(handle: StreamHandle, onFrame: (dataUri: string) => void): StreamRelay;
+  createSession(auth: AuthContext): Promise<BrowserSession>;
 }
 
 /**
@@ -231,7 +213,13 @@ export interface BrowserSession {
   /** 座標から要素を解決するための box 付き要素一覧。 */
   observeElements(): Promise<readonly ObservedElement[]>;
   currentUrl(): Promise<string>;
-  stream(): Promise<StreamHandle>;
+  /**
+   * 配信へ繋ぐ。1 フレームぶんの data URI を渡す。
+   *
+   * **セッションに属する。** Port 側に置くと、返る relay の寿命がセッションと
+   * 型の上で無関係になり、閉じ忘れを型で防げない。`close()` が relay も閉じる。
+   */
+  connect(onFrame: (dataUri: string) => void): Promise<StreamRelay>;
   /** 一時停止中もセッションを生かし続ける。 */
   keepalive(): Promise<void>;
   /** 対象ページのコンソール出力。 */

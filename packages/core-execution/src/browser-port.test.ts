@@ -5,10 +5,7 @@ import {
   type BrowserAction,
   type BrowserPort,
   type BrowserSession,
-  type CreateSessionInput,
-  type StorageState,
 } from "./index.js";
-import { parseAuthProfileName } from "./index.js";
 
 /**
  * Port の相手は fake 実装を使う (context/testing.md)。ここで確かめるのは
@@ -23,7 +20,7 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
       { role: "button", name: "設定を開く", box: { x: 8, y: 90, width: 82, height: 27 } },
     ],
     currentUrl: async () => "http://127.0.0.1:5173/",
-    stream: async () => ({ endpoint: "ws://127.0.0.1:5173/stream" }),
+    connect: async () => ({ send: () => undefined, close: () => undefined }),
     keepalive: async () => undefined,
     consoleMessages: async () => [],
     setViewport: async () => undefined,
@@ -35,11 +32,10 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
   };
 }
 
-function fakePort(seen: (AuthContext | CreateSessionInput)[]): BrowserPort {
+function fakePort(seen: AuthContext[]): BrowserPort {
   return {
-    connect: () => ({ send: () => undefined, close: () => undefined }),
-    createSession: async (input) => {
-      seen.push(input);
+    createSession: async (auth) => {
+      seen.push(auth);
       return createFakeSession();
     },
   };
@@ -49,28 +45,24 @@ describe("BrowserPort の契約", () => {
   it("認証コンテキストを受け取ってセッションを開く", async () => {
     // 省略できると「認証なし」が既定になり、意図しないプロファイルでの実行と
     // Baseline の汚染を招く (ADR-0022)。匿名も明示して渡す。
-    const seen: (AuthContext | CreateSessionInput)[] = [];
+    const seen: AuthContext[] = [];
     await fakePort(seen).createSession({ kind: "anonymous" });
     expect(seen).toEqual([{ kind: "anonymous" }]);
   });
 
-  it("誰として実行しているかと、その中身を分けて受け取る", async () => {
-    // `auth` は保存の鍵と Baseline の識別に使い、`storageState` はその中身で
-    // ある (ADR-0022)。混ぜると、認証済みの実行を匿名として記録してしまう。
-    const seen: (AuthContext | CreateSessionInput)[] = [];
-    const storageState: StorageState = { cookies: [{ name: "s" }], localStorage: {} };
-    const auth: AuthContext = { kind: "profile", name: parseAuthProfileName("admin") };
-    await fakePort(seen).createSession({ auth, storageState });
-    expect(seen).toEqual([{ auth, storageState }]);
+  it("復号した認証状態を受け取らない", () => {
+    // **Storage State の解決と注入は adapter の責務である** (ADR-0022)。
+    // 復号した状態が Port の入力に現れると、core / app を素通りすることになる。
+    const port: BrowserPort = fakePort([]);
+    expect(Object.keys(port)).toEqual(["createSession"]);
   });
 
-  it("配信へ繋ぐ経路を Port が持つ", () => {
+  it("配信へ繋ぐ経路をセッションが持つ", async () => {
     // endpoint の形と protocol は adapter に閉じる (ADR-0008)。app が
-    // WebSocket を直接開くと、実行基盤のポートが app 層へ漏れる。
-    const frames: string[] = [];
-    const relay = fakePort([]).connect({ endpoint: "ws://127.0.0.1:1/" }, (frame) =>
-      frames.push(frame),
-    );
+    // WebSocket を直接開くと、実行基盤のポートが app 層へ漏れる。**セッション
+    // に属する**ため、閉じ忘れを型で防げる。
+    const session = createFakeSession();
+    const relay = await session.connect(() => undefined);
     relay.send({
       kind: "pointer",
       phase: "down",
@@ -80,7 +72,6 @@ describe("BrowserPort の契約", () => {
       modifiers: { alt: false, ctrl: false, meta: false, shift: false },
     });
     relay.close();
-    expect(frames).toEqual([]);
   });
 
   it("型付きの action を受け取る", async () => {
@@ -112,12 +103,11 @@ describe("BrowserPort の契約", () => {
     });
   });
 
-  it("Snapshot / スクリーンショット / 現在 URL / 配信ハンドルを取得できる", async () => {
+  it("Snapshot / スクリーンショット / 現在 URL を取得できる", async () => {
     const session = createFakeSession();
     expect((await session.snapshot()).capturedAt).toBe("2026-08-25T00:00:00.000Z");
     expect((await session.screenshot()).bytes.length).toBeGreaterThan(0);
     expect(await session.currentUrl()).toBe("http://127.0.0.1:5173/");
-    expect((await session.stream()).endpoint).toMatch(/^ws:/);
   });
 
   it("一時停止中もセッションを生かし続けられる", async () => {

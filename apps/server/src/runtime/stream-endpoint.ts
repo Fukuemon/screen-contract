@@ -70,7 +70,10 @@ export function createStreamEndpoint(options: StreamEndpointOptions): Middleware
             subscription = await options.viewport?.subscribe((dataUri) => {
               proxy.publishFrame(dataUri);
             });
-          } catch {
+          } catch (error) {
+            // **黙って閉じない。** 原因が server 側にも残らないと、ブラウザが
+            // 起動しないのか認証状態が読めないのか分からない。中身は出さない。
+            console.error("[viewport] 映像を購読できません", (error as Error).name);
             ws.close(1011, "viewport unavailable");
           }
         })();

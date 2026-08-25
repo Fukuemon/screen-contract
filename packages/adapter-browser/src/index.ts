@@ -5,8 +5,7 @@ import type {
   AuthContext,
   BrowserPort,
   BrowserSession,
-  CreateSessionInput,
-  StreamHandle,
+  StorageState,
   StreamRelay,
 } from "@screen-contract/core-execution";
 import { resolveCliPath } from "./cli.js";
@@ -43,6 +42,16 @@ export interface AgentBrowserOptions {
   readonly home: string;
   /** state と socket を隔離する名前。テストが利用者の状態を触らないようにする。 */
   readonly namespace?: string | undefined;
+  /**
+   * 認証コンテキストから Storage State を引く。
+   *
+   * **復号した状態を core / app へ渡さないための口である** (ADR-0022)。復号は
+   * 保管側 (adapter/store) が担うが、adapter 同士は直接依存できないため、合成
+   * ルートが関数として渡す。渡さないと匿名でしか開けない。
+   */
+  readonly resolveStorageState?:
+    | ((auth: AuthContext) => Promise<StorageState | undefined>)
+    | undefined;
 }
 
 /** セッション名の連番。同じ名前を使い回さないために持つ。 */
@@ -53,17 +62,14 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
   const chrome = resolveChromeInstall(options.home);
 
   return {
-    connect(handle: StreamHandle, onFrame: (dataUri: string) => void): StreamRelay {
-      return connectStream({ endpoint: handle.endpoint, onFrame });
-    },
-
-    async createSession(input: AuthContext | CreateSessionInput): Promise<BrowserSession> {
-      const { auth, storageState } =
-        "kind" in input ? { auth: input, storageState: undefined } : input;
+    async createSession(auth: AuthContext): Promise<BrowserSession> {
+      // **復号した状態を core / app へ渡さない** (ADR-0022)。解決も注入も
+      // adapter の中で完結させる。
+      const storageState = await options.resolveStorageState?.(auth);
       if (auth.kind !== "anonymous" && storageState === undefined) {
         // 匿名以外は Storage State が要る。中身を伴わないまま「認証済みのつもり」
         // で実行させない (ADR-0022)。
-        throw new Error("認証プロファイルの Storage State が渡されていません");
+        throw new Error("認証プロファイルの Storage State を解決できません");
       }
       // セッションごとに使い捨ての置き場を作る。要素一覧の取得は注釈
       // スクリーンショットを伴うが、その画像は保存せず捨てる。成果物の
@@ -90,12 +96,21 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
         storageState === undefined
           ? { skippedKeys: [] }
           : await session.restoreStorageState(storageState);
+      // 配信の relay はセッションに属する。閉じ忘れを防ぐため `close()` で
+      // 一緒に閉じる。
+      let relay: StreamRelay | undefined;
       return {
         ...session,
         // 注入で入らなかったものを覚えておく。呼び出し側が黙って進まないため。
         restoreReport: () => restored,
+        async connect(onFrame: (dataUri: string) => void): Promise<StreamRelay> {
+          const opened = connectStream({ endpoint: await session.streamEndpoint(), onFrame });
+          relay = opened;
+          return opened;
+        },
         async close(): Promise<void> {
           try {
+            relay?.close();
             await session.close();
           } finally {
             rmSync(discardDir, { recursive: true, force: true });

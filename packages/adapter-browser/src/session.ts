@@ -7,7 +7,6 @@ import type {
   BrowserSession,
   ObservedElement,
   Screenshot,
-  StreamHandle,
 } from "@screen-contract/core-execution";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -105,7 +104,12 @@ function actionArgs(action: BrowserAction): readonly string[] {
   }
 }
 
-export function createSession(options: CliOptions, discardPath: string): BrowserSession {
+/** 配信の接続先を持つ、Port へ出す前のセッション。 */
+export type RawSession = Omit<BrowserSession, "connect" | "restoreReport"> & {
+  streamEndpoint(): Promise<string>;
+};
+
+export function createSession(options: CliOptions, discardPath: string): RawSession {
   const call = async (args: readonly string[], what: string): Promise<unknown> =>
     requireSuccess(await runCli(options, args), what);
 
@@ -191,9 +195,6 @@ export function createSession(options: CliOptions, discardPath: string): Browser
      * へ置く対象は珍しくないため、通すと資格情報そのものが argv に載る。
      * 入らなかったことは戻り値で返し、黙って落とさない。
      */
-    // 個々のセッションは注入の結果を持たない。Port が包んで差し替える。
-    restoreReport: () => ({ skippedKeys: [] }),
-
     async restoreStorageState(state): Promise<StorageRestoreReport> {
       if (state.cookies.length > 0) {
         const file = join(mkdtempSync(join(tmpdir(), "sc-auth-")), "cookies.json");
@@ -235,7 +236,8 @@ export function createSession(options: CliOptions, discardPath: string): Browser
       });
     },
 
-    async stream(): Promise<StreamHandle> {
+    /** 配信の接続先。**adapter の外へ出さない。** */
+    async streamEndpoint(): Promise<string> {
       const data = readRecord(
         await call(["stream", "status"], "配信ハンドルの取得"),
         "配信ハンドルの取得",
@@ -247,7 +249,7 @@ export function createSession(options: CliOptions, discardPath: string): Browser
           "配信ハンドルの応答に port がありません",
         );
       }
-      return { endpoint: `ws://127.0.0.1:${String(port)}` };
+      return `ws://127.0.0.1:${String(port)}`;
     },
 
     async keepalive(): Promise<void> {

@@ -29,14 +29,6 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
   const port = {
     opened,
     sessions: 0,
-    // 配信への接続も Port が持つ。app が WebSocket を直接開かない (ADR-0008)。
-    connect: (_handle: unknown, onFrame: (uri: string) => void) => {
-      emit = onFrame;
-      return {
-        send: (input: { kind: string }) => void sent.push(JSON.stringify(input)),
-        close: () => void (closed += 1),
-      };
-    },
     createSession: (input: unknown) => {
       port.sessions += 1;
       requests.push(input);
@@ -47,7 +39,13 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
           }
           return Promise.resolve();
         },
-        stream: () => Promise.resolve({ endpoint: "ws://127.0.0.1:1" }),
+        connect: (onFrame: (uri: string) => void) => {
+          emit = onFrame;
+          return Promise.resolve({
+            send: (input: { kind: string }) => void sent.push(JSON.stringify(input)),
+            close: () => void (closed += 1),
+          });
+        },
         setViewport: (size: { width: number; height: number }) => {
           sizes.push(size);
           return Promise.resolve();
@@ -164,44 +162,27 @@ describe("対象と寸法の切り替え", () => {
 });
 
 describe("認証状態", () => {
-  it("セッションを開く要求へ認証の中身を載せる", async () => {
-    // **注入は Port の中で行う** (ADR-0022)。開いた後に入れても、既に描画された
-    // 画面は未ログインのままである。app が後から注入する形にすると、順序が
-    // app 側の実装の約束になり、Port の契約から読めない。
+  it("誰として実行しているかだけを Port へ渡す", async () => {
+    // **復号した状態は app を通らない** (ADR-0022)。解決も注入も adapter が
+    // 担う。匿名を名乗ったまま認証状態を注入すると、認証済みの結果が匿名の
+    // Baseline へ混ざる。
+    const auth = { kind: "profile", name: "admin" } as never;
     const browser = fakePort();
-    const storageState = { cookies: [{ name: "session" }], localStorage: {} };
     const viewport = createViewport({
       browser,
       entryUrl: "http://127.0.0.1:5174",
-      storageState: () => Promise.resolve(storageState),
+      auth: () => auth,
     });
     await viewport.subscribe(() => undefined);
-    expect(requests).toEqual([{ auth: { kind: "anonymous" }, storageState }]);
+    expect(requests).toEqual([auth]);
     expect(browser.opened).toEqual(["http://127.0.0.1:5174"]);
   });
 
-  it("誰として実行しているかを Port へ渡す", async () => {
-    // 匿名を名乗ったまま認証状態を注入すると、認証済みの結果が匿名の Baseline
-    // へ混ざる (ADR-0022)。
-    const auth = { kind: "profile", name: "admin" } as never;
-    const viewport = createViewport({
-      browser: fakePort(),
-      entryUrl: "http://127.0.0.1:5174",
-      auth: () => auth,
-      storageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
-    });
+  it("指定が無ければ匿名として開く", async () => {
+    // 省略できると「認証なし」が既定になる。匿名も明示して渡す。
+    const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
     await viewport.subscribe(() => undefined);
-    expect((requests[0] as { auth: unknown }).auth).toBe(auth);
-  });
-
-  it("無ければ注入しない", async () => {
-    const viewport = createViewport({
-      browser: fakePort(),
-      entryUrl: "http://127.0.0.1:5174",
-      storageState: () => Promise.resolve(undefined),
-    });
-    await viewport.subscribe(() => undefined);
-    expect(requests).toEqual([{ auth: { kind: "anonymous" }, storageState: undefined }]);
+    expect(requests).toEqual([{ kind: "anonymous" }]);
   });
 
   it("いまの認証状態を取り出せる", async () => {

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { UseCases, ViewportControl } from "@screen-contract/app";
-import { isConflictError, isValidationError } from "@screen-contract/app";
+import { isConflictError, isExecutionFailure, isValidationError } from "@screen-contract/app";
 import { registerViewportRoutes } from "./viewport-routes.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 import {
@@ -160,6 +160,11 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       // 入力は正しいが、いまの状態では実行できない。400 と混ぜると
       // 「入力を直せば通る」と読めてしまう。
       return c.json({ error: "conflict" }, 409);
+    }
+    if (isExecutionFailure(error)) {
+      // 対象ブラウザ側の失敗。**server の障害ではない。** 500 にすると、
+      // 開けない URL を指しただけで「壊れた」と読まれる。
+      return c.json({ error: "browser-failed" }, 409);
     }
     // 障害の一次観測点は標準出力である (context/infrastructure.md)。
     console.error("[api] 想定外の失敗", error.name);

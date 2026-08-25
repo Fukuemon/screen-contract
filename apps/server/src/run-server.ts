@@ -77,7 +77,13 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
 
     // **具象は 1 つだけ作る。** 2 つ作ると、home の解決元まで食い違い、
     // テストが差し替えた側と実際に動く側がずれる (ADR-0023)。
-    const browser = createAgentBrowserPort({ home: env.home });
+    const browser = createAgentBrowserPort({
+      home: env.home,
+      // **復号は保管側が担い、復号した状態は app を通らない** (ADR-0022)。
+      // adapter 同士は直接依存できないため、合成ルートが関数として渡す。
+      resolveStorageState: (auth) =>
+        Promise.resolve(auth.kind === "anonymous" ? undefined : authProfiles.load(auth.name)),
+    });
 
     const server = await listen({
       browser,
@@ -107,10 +113,6 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
           activeProfile === undefined
             ? { kind: "anonymous" }
             : { kind: "profile", name: parseAuthProfileName(activeProfile) },
-        storageState: () =>
-          Promise.resolve(
-            activeProfile === undefined ? undefined : (authProfiles.load(activeProfile) as never),
-          ),
       }),
     });
     return {
