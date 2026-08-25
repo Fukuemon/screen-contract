@@ -1,33 +1,56 @@
 @import "tailwindcss";
 
-/* 配色は 1 箇所に置く。部品側に色を直書きすると、片方だけ変えた状態が残る。 */
+/*
+ * 配色とタイポの正本は design-system/screen-contract/MASTER.md。
+ * **部品へ色を直書きしない。** 直書きすると、片方だけ変えた状態が残る。
+ *
+ * dark を既定にする。開発者が長時間見る画面であり、対象アプリの映像
+ * (多くは明るい) との対比で viewport の輪郭が読める。
+ */
 @theme {
-  --color-surface: oklch(99% 0 0);
-  --color-panel: oklch(97.5% 0 0);
-  --color-line: oklch(90% 0 0);
-  --color-ink: oklch(20% 0 0);
-  --color-muted: oklch(52% 0 0);
-  --color-accent: oklch(55% 0.18 264);
-  --color-danger: oklch(55% 0.19 25);
-  --color-ok: oklch(58% 0.14 155);
+  --color-bg: #0f172a;
+  --color-surface: #1b2336;
+  --color-elevated: #272f42;
+  --color-line: #475569;
+  --color-ink: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-accent: #22c55e;
+  --color-on-accent: #0f172a;
+  --color-danger: #ef4444;
+  --color-warn: #f59e0b;
+  --color-info: #60a5fa;
+
+  --font-sans:
+    "IBM Plex Sans", system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-surface: oklch(18% 0 0);
-    --color-panel: oklch(22% 0 0);
-    --color-line: oklch(32% 0 0);
-    --color-ink: oklch(94% 0 0);
-    --color-muted: oklch(65% 0 0);
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* 本文 16px、行間 1.5。小さくすると長時間の閲覧で読めなくなる。 */
+    font-size: 16px;
+    line-height: 1.5;
   }
-}
 
-body {
-  @apply bg-surface text-ink;
-  font-family:
-    system-ui,
-    -apple-system,
-    "Hiragino Sans",
-    "Noto Sans JP",
-    sans-serif;
+  /*
+   * **フォーカスリングを消さない。** キーボードだけで辿れなくなる。
+   * `:focus-visible` に限ることで、マウス操作では出さない。
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-info);
+    outline-offset: 2px;
+  }
+
+  /* 動きで意味を伝えるが、**減らす設定を尊重する**。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

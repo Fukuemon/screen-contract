@@ -13,6 +13,8 @@ vi.mock("@screen-contract/adapter-browser", () => ({
 let emit: ((uri: string) => void) | undefined;
 const sent: string[] = [];
 let closed = 0;
+const sizes: { width: number; height: number }[] = [];
+const restored: unknown[] = [];
 
 /** Port の相手は fake を使う (context/testing.md)。 */
 function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number } {
@@ -30,6 +32,15 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
           return Promise.resolve();
         },
         stream: () => Promise.resolve({ endpoint: "ws://127.0.0.1:1" }),
+        setViewport: (size: { width: number; height: number }) => {
+          sizes.push(size);
+          return Promise.resolve();
+        },
+        captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
+        restoreStorageState: (state: unknown) => {
+          restored.push(state);
+          return Promise.resolve();
+        },
         close: () => Promise.resolve(),
       } as unknown as BrowserSession;
       return Promise.resolve(session);
@@ -98,5 +109,63 @@ describe("createViewport", () => {
     } as unknown as BrowserPort;
     const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
     await expect(viewport.subscribe(() => undefined)).rejects.toThrow("開けません");
+  });
+});
+
+describe("対象と寸法の切り替え", () => {
+  it("開き直す", async () => {
+    const browser = fakePort();
+    const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
+    await viewport.subscribe(() => undefined);
+    await viewport.navigate("http://127.0.0.1:5174/settings");
+    expect(browser.opened).toEqual(["http://127.0.0.1:5174", "http://127.0.0.1:5174/settings"]);
+  });
+
+  it("viewport の寸法を変える", async () => {
+    sizes.length = 0;
+    const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
+    await viewport.subscribe(() => undefined);
+    await viewport.setSize({ width: 375, height: 667 });
+    expect(sizes).toEqual([{ width: 375, height: 667 }]);
+  });
+
+  it("セッションが開いていなければ黙って開かない", async () => {
+    // 開くと run の開始が暗黙になる。
+    const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
+    await expect(viewport.navigate("http://127.0.0.1:5174/x")).rejects.toThrow("開いていません");
+  });
+});
+
+describe("認証状態", () => {
+  it("対象を開く前に注入する", async () => {
+    // 開いた後では、既に描画された画面が未ログインのままになる (ADR-0022)。
+    restored.length = 0;
+    const browser = fakePort();
+    const state = { cookies: [{ name: "session" }], localStorage: {} };
+    const viewport = createViewport({
+      browser,
+      entryUrl: "http://127.0.0.1:5174",
+      storageState: () => Promise.resolve(state),
+    });
+    await viewport.subscribe(() => undefined);
+    expect(restored).toEqual([state]);
+    expect(browser.opened).toEqual(["http://127.0.0.1:5174"]);
+  });
+
+  it("無ければ注入しない", async () => {
+    restored.length = 0;
+    const viewport = createViewport({
+      browser: fakePort(),
+      entryUrl: "http://127.0.0.1:5174",
+      storageState: () => Promise.resolve(undefined),
+    });
+    await viewport.subscribe(() => undefined);
+    expect(restored).toEqual([]);
+  });
+
+  it("いまの認証状態を取り出せる", async () => {
+    const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
+    await viewport.subscribe(() => undefined);
+    expect(await viewport.captureStorageState()).toEqual({ cookies: [], localStorage: {} });
   });
 });

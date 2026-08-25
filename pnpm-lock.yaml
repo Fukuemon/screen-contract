@@ -71,6 +71,9 @@ importers:
       '@screen-contract/app':
         specifier: workspace:*
         version: link:../../packages/app
+      '@screen-contract/core-element':
+        specifier: workspace:*
+        version: link:../../packages/core-element
       '@screen-contract/core-execution':
         specifier: workspace:*
         version: link:../../packages/core-execution
@@ -87,9 +90,6 @@ importers:
       '@screen-contract/core-artifact':
         specifier: workspace:*
         version: link:../../packages/core-artifact
-      '@screen-contract/core-element':
-        specifier: workspace:*
-        version: link:../../packages/core-element
       '@screen-contract/core-workflow':
         specifier: workspace:*
         version: link:../../packages/core-workflow

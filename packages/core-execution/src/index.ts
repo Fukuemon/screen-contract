@@ -216,5 +216,38 @@ export interface BrowserSession {
   stream(): Promise<StreamHandle>;
   /** 一時停止中もセッションを生かし続ける。 */
   keepalive(): Promise<void>;
+  /**
+   * viewport の寸法を変える。
+   *
+   * **CSS ピクセルで指定する。** 対象アプリの responsive の分岐と対応させる
+   * ためであり、実機の画素数ではない。
+   */
+  setViewport(size: ViewportSize): Promise<void>;
+  /**
+   * 認証状態 (Storage State) を取り出す。
+   *
+   * Baseline は (screen, state, authProfile) で識別される (ADR-0022)。
+   * 取り出した状態は**暗号化して保存する** — 復号と注入は adapter の責務で
+   * あり、core は不透明な値として扱う。
+   */
+  captureStorageState(): Promise<StorageState>;
+  /** 認証状態を注入する。**注入してから対象を開く。** */
+  restoreStorageState(state: StorageState): Promise<void>;
   close(): Promise<void>;
+}
+
+export interface ViewportSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * ブラウザの認証状態。
+ *
+ * **core は中身を解釈しない。** Cookie と Web Storage の形は実行基盤の都合で
+ * あり、core が知ると基盤を差し替えられなくなる (ADR-0013)。
+ */
+export interface StorageState {
+  readonly cookies: readonly unknown[];
+  readonly localStorage: Readonly<Record<string, unknown>>;
 }

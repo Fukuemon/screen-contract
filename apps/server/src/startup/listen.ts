@@ -1,7 +1,9 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
+import type { AuthProfileStore } from "@screen-contract/adapter-store";
 import { createRunSession } from "./run-session.js";
+import { createViewportControl } from "./viewport-control.js";
 import type { Viewport, ViewportSubscription } from "./viewport.js";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
@@ -38,6 +40,12 @@ export interface ListenOptions {
   readonly host?: LifecycleHost | undefined;
   /** run が最初に開く URL。プロダクト設定で列挙した origin の先頭を渡す。 */
   readonly entryUrl?: string | undefined;
+  /** 実行してよい origin の列挙。UI はここから選ぶ (ADR-0017)。 */
+  readonly allowedOrigins?: readonly string[] | undefined;
+  /** 認証プロファイルの保管。渡さないと認証まわりの endpoint を生やさない。 */
+  readonly authProfiles?: AuthProfileStore | undefined;
+  /** いま使う認証プロファイルを合成ルートへ伝える。 */
+  readonly setActiveProfile?: ((name: string | undefined) => void) | undefined;
   /**
    * live viewport の映像源。
    *
@@ -70,14 +78,52 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
    */
   // **中継条件は server が持つ run 状態で判定する** (ADR-0008)。client の自称は
   // 要求元の run しか渡せない。
+  const viewportPort = options.viewport;
   const session =
-    options.viewport === undefined
+    viewportPort === undefined
       ? undefined
       : createRunSession({
           entryUrl: options.entryUrl ?? "",
-          runner: () => options.viewport?.runner(),
+          runner: () => viewportPort.runner(),
+          observe: () => viewportPort.observe(),
+          currentUrl: () => viewportPort.currentUrl(),
+        });
+  const control =
+    session === undefined || viewportPort === undefined || options.authProfiles === undefined
+      ? undefined
+      : createViewportControl({
+          run: session,
+          viewport: viewportPort,
+          allowedOrigins: options.allowedOrigins ?? [],
+          authProfiles: options.authProfiles,
+          setActiveProfile: options.setActiveProfile ?? (() => undefined),
         });
   const runState = { current: (): RunState | undefined => session?.relayState() };
+
+  /**
+   * 記録の対象になる入力かを見る。
+   *
+   * 記録するのは押下だけである。移動と離すまで記録すると、1 クリックが
+   * 3 手順になる。
+   */
+  function mousePressPoint(payload: string): { x: number; y: number } | undefined {
+    let value: unknown;
+    try {
+      value = JSON.parse(payload);
+    } catch {
+      return undefined;
+    }
+    if (typeof value !== "object" || value === null) {
+      return undefined;
+    }
+    const { type, eventType, x, y } = value as Record<string, unknown>;
+    return type === "input_mouse" &&
+      eventType === "mousePressed" &&
+      typeof x === "number" &&
+      typeof y === "number"
+      ? { x, y }
+      : undefined;
+  }
 
   const stream = upgradeWebSocket((c) => {
     void c;
@@ -92,8 +138,27 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     return {
       onOpen: (_event, ws) => {
         const proxy = createStreamProxy({
-          // 上流 (ブラウザ) への転送。viewport を繋いでいなければ捨てる。
-          upstream: { send: (payload) => subscription?.send(payload) },
+          /**
+           * 上流 (ブラウザ) への転送。
+           *
+           * **転送より前に記録する。** 操作後の状態で解決すると、ページが
+           * 自律的に変化していたときに「解決できない」ではなく間違った要素へ
+           * 解決する (ADR-0026)。順序をここで守る。
+           */
+          upstream: {
+            send: (payload) => {
+              const point = mousePressPoint(payload);
+              if (point === undefined || session === undefined) {
+                subscription?.send(payload);
+                return;
+              }
+              // 解決を待ってから転送する。待たないと順序が保てない。
+              void session
+                .observeClick(point)
+                .catch(() => undefined)
+                .finally(() => subscription?.send(payload));
+            },
+          },
           downstream: { send: (payload) => ws.send(payload) },
           runState,
         });
@@ -134,7 +199,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     stateDir: options.stateDir,
     policy: () => policy,
     stream,
-    viewport: session,
+    viewport: control,
     // **トークンは配信する HTML へ埋め込む。** ブラウザは runtime.json を
     // 読めず、URL の query には載せられない (context/infrastructure.md)。
     web:

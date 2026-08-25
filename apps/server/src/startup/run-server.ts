@@ -8,6 +8,7 @@ import { StartupAbort } from "./abort.js";
 import { runStartupChecks } from "./checks.js";
 import { loadProductConfig } from "./config.js";
 import { listen, type RunningServer } from "./listen.js";
+import { createAuthProfileStore, createKeystore } from "@screen-contract/adapter-store";
 import { resolveStateDir } from "./state-dir.js";
 import { createViewport } from "./viewport.js";
 
@@ -65,15 +66,28 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
   // ポートは OS に割り当てさせる。トークンと接続先ファイルは listen の後に
   // 確定する (待受アドレスが決まらないと接続先を書けない)。
   try {
+    // いま使う認証プロファイル。viewport がセッションを開くときに読む。
+    let activeProfile: string | undefined;
+    const authProfiles = createAuthProfileStore({ stateDir, keystore: createKeystore() });
+
     const server = await listen({
       stateDir,
       webRoot: env.webRoot,
+      allowedOrigins,
+      authProfiles,
+      setActiveProfile: (name) => {
+        activeProfile = name;
+      },
       // **列挙した origin の先頭を開く。** 列挙外へ open しない (ADR-0017)。
       // 列挙が空なら起動時検査で中止しているため、ここには必ず 1 件ある。
       entryUrl: allowedOrigins[0] as string,
       viewport: createViewport({
         browser: createAgentBrowserPort({ home: env.home }),
         entryUrl: allowedOrigins[0] as string,
+        storageState: () =>
+          Promise.resolve(
+            activeProfile === undefined ? undefined : (authProfiles.load(activeProfile) as never),
+          ),
       }),
     });
     return {

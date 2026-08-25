@@ -61,6 +61,17 @@ export interface ViewportControl {
   setMode(mode: "view" | "operate"): unknown;
   setRecording(recording: boolean): unknown;
   snapshot(): unknown;
+  /** 対象を開き直す。**列挙外の origin は実装側が弾く** (ADR-0017)。 */
+  navigate(url: string): Promise<unknown>;
+  setViewport(size: { readonly width: number; readonly height: number }): Promise<unknown>;
+  /** 座標を要素へ解決する。記録に残すのは Locator であり座標ではない。 */
+  resolveAt(point: { readonly x: number; readonly y: number }): Promise<unknown>;
+  /** 実行してよい origin。UI はここから選ぶ。 */
+  allowedOrigins(): readonly string[];
+  listAuthProfiles(): readonly string[];
+  saveAuthProfile(name: string): Promise<unknown>;
+  useAuthProfile(name: string | undefined): Promise<unknown>;
+  removeAuthProfile(name: string): unknown;
 }
 
 export interface WebAssets {
@@ -156,6 +167,55 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       }
       return c.json(viewport.setMode(mode));
     });
+    app.post("/viewport/navigate", async (c) => {
+      const { url } = (await c.req.json()) as { url?: unknown };
+      if (typeof url !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(await viewport.navigate(url));
+    });
+
+    app.post("/viewport/size", async (c) => {
+      const { width, height } = (await c.req.json()) as { width?: unknown; height?: unknown };
+      if (typeof width !== "number" || typeof height !== "number") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(await viewport.setViewport({ width, height }));
+    });
+
+    app.post("/viewport/resolve", async (c) => {
+      const { x, y } = (await c.req.json()) as { x?: unknown; y?: unknown };
+      if (typeof x !== "number" || typeof y !== "number") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      const picked = await viewport.resolveAt({ x, y });
+      return picked === undefined ? c.json({ picked: null }) : c.json({ picked });
+    });
+
+    app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));
+
+    app.get("/auth/profiles", (c) => c.json({ profiles: viewport.listAuthProfiles() }));
+
+    app.post("/auth/profiles", async (c) => {
+      const { name } = (await c.req.json()) as { name?: unknown };
+      if (typeof name !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(await viewport.saveAuthProfile(name));
+    });
+
+    app.post("/auth/use", async (c) => {
+      const { name } = (await c.req.json()) as { name?: unknown };
+      if (name !== undefined && name !== null && typeof name !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(await viewport.useAuthProfile(name ?? undefined));
+    });
+
+    app.delete("/auth/profiles/:name", (c) =>
+      c.json(viewport.removeAuthProfile(c.req.param("name"))),
+    );
+
     app.post("/viewport/recording", async (c) => {
       const { recording } = (await c.req.json()) as { recording?: unknown };
       if (typeof recording !== "boolean") {

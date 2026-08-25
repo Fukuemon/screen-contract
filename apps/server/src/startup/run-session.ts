@@ -1,4 +1,7 @@
 import type { RunState, StreamMode } from "@screen-contract/api";
+import { startRecording, type RecordedStep, type RecordingSession } from "@screen-contract/app";
+import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
+import type { ElementId } from "@screen-contract/domain";
 import type { ExecutionEvent, StepRunner } from "@screen-contract/core-execution";
 import { runSteps } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
@@ -27,15 +30,34 @@ interface RunSnapshot {
   readonly recording: boolean;
   readonly events: readonly ExecutionEvent[];
   readonly entryUrl: string;
+  /** 記録した手順。承認へ回す draft の中身になる。 */
+  readonly steps: readonly RecordedStep[];
+  readonly newElements: readonly ElementDef[];
 }
 
 export interface RunSessionOptions {
   readonly entryUrl: string;
   /** 実行の相手。viewport が開いたセッションを包んだもの。 */
   readonly runner: () => StepRunner | undefined;
+  /**
+   * 記録の材料。
+   *
+   * **転送より前に box 付き要素一覧を取る。** 操作後の状態で解決すると、
+   * ページが自律的に変化していたときに「解決できない」ではなく間違った要素へ
+   * 解決する (ADR-0026)。
+   */
+  readonly observe?: (() => Promise<readonly ObservedElement[]>) | undefined;
+  readonly currentUrl?: (() => Promise<string>) | undefined;
 }
 
 export interface RunSession {
+  /**
+   * 入力を記録する。**転送の直前に呼ぶ。**
+   *
+   * 記録していなければ何もしない。座標は解決して `ref` にし、解決できなければ
+   * `clickPoint` と警告で残す — 記録の途中で止めない (ADR-0026)。
+   */
+  observeClick(point: { readonly x: number; readonly y: number }): Promise<void>;
   /** run を起こす。1 ステップ実行して `paused` に入る。 */
   start(): Promise<RunSnapshot>;
   resume(): Promise<RunSnapshot>;
@@ -54,9 +76,30 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   let mode: StreamMode = "view";
   let recording = false;
   let events: readonly ExecutionEvent[] = [];
+  let session: RecordingSession | undefined;
+  let steps: readonly RecordedStep[] = [];
+  let newElements: readonly ElementDef[] = [];
 
   function snapshot(): RunSnapshot {
-    return { runId: RUN_ID, status, mode, recording, events, entryUrl: options.entryUrl };
+    return {
+      runId: RUN_ID,
+      status,
+      mode,
+      recording,
+      events,
+      entryUrl: options.entryUrl,
+      steps,
+      newElements,
+    };
+  }
+
+  /** 要素 ID は Locator から決定的に導く。同じ要素は同じ ID になる。 */
+  function nextId(locator: SemanticLocator): ElementId {
+    const slug = `${locator.role}-${locator.name}`
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff]+/g, "-")
+      .replace(/^-|-$/g, "");
+    return `el-${slug}` as ElementId;
   }
 
   /** entry へ到達する 1 ステップ。ここから記録した steps が積み上がる。 */
@@ -94,6 +137,24 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   }
 
   return {
+    async observeClick(point): Promise<void> {
+      // 記録していないときは何もしない。黙って記録しない (web-editor feature)。
+      if (!recording || session === undefined || options.observe === undefined) {
+        return;
+      }
+      const url = (await options.currentUrl?.()) ?? options.entryUrl;
+      const observation = { url, title: "", visibleRefs: [] };
+      await session.click(
+        { elements: await options.observe(), x: point.x, y: point.y, nextId },
+        // 転送そのものは Stream Proxy が行う。ここでは記録だけを担う。
+        () => Promise.resolve(),
+        () => Promise.resolve(observation),
+      );
+      const draft = session.finish();
+      steps = draft.steps;
+      newElements = draft.newElements;
+    },
+
     start: () => run(true),
     resume: () => run(false),
 
@@ -108,6 +169,13 @@ export function createRunSession(options: RunSessionOptions): RunSession {
 
     setRecording(next: RunSnapshot["recording"]): RunSnapshot {
       recording = status === "paused" && mode === "operate" ? next : false;
+      if (recording && session === undefined) {
+        // 記録した steps の遷移元は run の到達状態から決まる (ADR-0026)。
+        session = startRecording(RUN_ID, [...newElements]);
+      }
+      if (!recording) {
+        session = undefined;
+      }
       return snapshot();
     },
 

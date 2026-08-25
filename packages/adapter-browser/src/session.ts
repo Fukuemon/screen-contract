@@ -1,4 +1,5 @@
 import type {
+  StorageState,
   BoundingBox,
   BrowserAction,
   BrowserSession,
@@ -146,6 +147,40 @@ export function createSession(options: CliOptions, discardPath: string): Browser
         throw new AgentBrowserError("browser/unresponsive", "現在 URL の応答の形が想定と違います");
       }
       return url;
+    },
+
+    async setViewport(size): Promise<void> {
+      await call(["set", "viewport", String(size.width), String(size.height)], "viewport の変更");
+    },
+
+    async captureStorageState(): Promise<StorageState> {
+      const cookies = readRecord(
+        await call(["cookies", "get"], "認証状態の取得"),
+        "認証状態の取得",
+      );
+      const storage = readRecord(
+        await call(["storage", "local"], "認証状態の取得"),
+        "認証状態の取得",
+      );
+      return {
+        cookies: Array.isArray(cookies["cookies"]) ? cookies["cookies"] : [],
+        // `storage local` は `data` の下に入れて返す (実測)。
+        localStorage:
+          typeof storage["data"] === "object" && storage["data"] !== null
+            ? (storage["data"] as Record<string, unknown>)
+            : {},
+      };
+    },
+
+    async restoreStorageState(state): Promise<void> {
+      // **注入してから対象を開く。** 開いた後に入れても、既に描画された画面は
+      // 未ログインのままである。
+      if (state.cookies.length > 0) {
+        await call(["cookies", "set", JSON.stringify(state.cookies)], "認証状態の注入");
+      }
+      for (const [key, value] of Object.entries(state.localStorage)) {
+        await call(["storage", "local", "set", key, JSON.stringify(value)], "認証状態の注入");
+      }
     },
 
     async stream(): Promise<StreamHandle> {

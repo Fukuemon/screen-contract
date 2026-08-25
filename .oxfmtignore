@@ -5,6 +5,7 @@
 # 担当を分けるため、oxfmt にはこのファイルを渡す (context/toolchain.md)。
 
 # TypeScript / JavaScript 以外は prettier が担当する
+*.css
 *.json
 *.jsonc
 *.md

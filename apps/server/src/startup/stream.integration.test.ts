@@ -145,6 +145,13 @@ describe("live viewport の映像", () => {
       },
       // run を起こさないため、実行の相手は無い。
       runner: () => undefined,
+      navigate: () => Promise.resolve(),
+      setSize: () => Promise.resolve(),
+      captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
+      reset: () => Promise.resolve(),
+      resolveAt: () => Promise.resolve(undefined),
+      observe: () => Promise.resolve([]),
+      currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
     };
   }
 

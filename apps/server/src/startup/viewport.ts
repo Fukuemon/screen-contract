@@ -1,9 +1,17 @@
 import { connectStream, type StreamClient } from "@screen-contract/adapter-browser";
+import {
+  elementAt,
+  resolve,
+  type BoundingBox,
+  type ObservedElement,
+  type SemanticLocator,
+} from "@screen-contract/core-element";
 import type {
   BrowserPort,
   BrowserSession,
   Observation,
   StepRunner,
+  StorageState,
 } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
 
@@ -27,6 +35,22 @@ export interface ViewportOptions {
    * (ADR-0017)。列挙が空なら起動時に中止しているため、ここには必ず 1 件ある。
    */
   readonly entryUrl: string;
+  /**
+   * セッションを開いた直後に注入する認証状態。
+   *
+   * **開く前に注入する。** 開いた後に入れても、既に描画された画面は未ログイン
+   * のままである (ADR-0022)。
+   */
+  readonly storageState?: (() => Promise<StorageState | undefined>) | undefined;
+}
+
+/** 選択モードで指した要素。 */
+interface PickedElement {
+  readonly locator: SemanticLocator;
+  readonly box: BoundingBox;
+  /** Locator が一意に解決できるか。できなければ記録に使えない。 */
+  readonly unique: boolean;
+  readonly matches: number;
 }
 
 export interface ViewportSubscription {
@@ -36,6 +60,26 @@ export interface ViewportSubscription {
 }
 
 export interface Viewport {
+  /** 対象を開き直す。列挙外の URL は呼び出し側が弾く (ADR-0017)。 */
+  navigate(url: string): Promise<void>;
+  /** viewport の寸法を変える。 */
+  setSize(size: { readonly width: number; readonly height: number }): Promise<void>;
+  /** いまの認証状態を取り出す。保存は呼び出し側が行う。 */
+  captureStorageState(): Promise<StorageState>;
+  /**
+   * 座標を要素へ解決する。
+   *
+   * **座標は query にすぎない。** 記録に残すのは Semantic Locator (role+name)
+   * であり、座標ではない。viewport を変えると座標は意味を失うが、role+name は
+   * 解決できる (ADR-0026)。
+   */
+  resolveAt(point: { readonly x: number; readonly y: number }): Promise<PickedElement | undefined>;
+  /** box 付き要素一覧。記録の解決に使う。 */
+  observe(): Promise<readonly ObservedElement[]>;
+  /** いま開いている URL。記録の Expectation 候補に使う。 */
+  currentUrl(): Promise<string>;
+  /** 開いているセッションを閉じる。認証プロファイルを切り替えるときに使う。 */
+  reset(): Promise<void>;
   subscribe(onFrame: (dataUri: string) => void): Promise<ViewportSubscription>;
   /**
    * 実行の相手。開いているセッションを包む。
@@ -55,6 +99,11 @@ export function createViewport(options: ViewportOptions): Viewport {
   async function start(): Promise<void> {
     const opened = await options.browser.createSession({ kind: "anonymous" });
     session = opened;
+    const state = await options.storageState?.();
+    if (state !== undefined) {
+      // **開く前に注入する。** 開いた後では既に描画された画面が未ログインのまま。
+      await opened.restoreStorageState(state);
+    }
     await opened.perform({ kind: "open", url: options.entryUrl });
     const handle = await opened.stream();
     client = connectStream({
@@ -77,7 +126,43 @@ export function createViewport(options: ViewportOptions): Viewport {
     await opened?.close().catch(() => undefined);
   }
 
+  function require(): BrowserSession {
+    const opened = session;
+    if (opened === undefined) {
+      // 黙って開かない。開くと run の開始が暗黙になる。
+      throw new Error("セッションが開いていません");
+    }
+    return opened;
+  }
+
   return {
+    navigate: async (url) => require().perform({ kind: "open", url }),
+
+    observe: () => require().observeElements(),
+    currentUrl: () => require().currentUrl(),
+
+    async resolveAt(point): Promise<PickedElement | undefined> {
+      const observed = await require().observeElements();
+      const target = elementAt(observed, point.x, point.y);
+      if (target === undefined) {
+        return undefined;
+      }
+      const locator = { role: target.role, name: target.name };
+      const resolution = resolve(observed, locator);
+      return {
+        locator,
+        box: target.box,
+        // 一意にならない Locator を「選べた」と見せない。実行時に別の要素へ
+        // 当たる DSL ができる。
+        unique: resolution.kind === "resolved",
+        matches: resolution.kind === "ambiguous" ? resolution.matches : 1,
+      };
+    },
+
+    setSize: async (size) => require().setViewport(size),
+    captureStorageState: () => require().captureStorageState(),
+    reset: stop,
+
     runner(): StepRunner | undefined {
       const opened = session;
       if (opened === undefined) {

@@ -22,6 +22,9 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
     currentUrl: async () => "http://127.0.0.1:5173/",
     stream: async () => ({ endpoint: "ws://127.0.0.1:5173/stream" }),
     keepalive: async () => undefined,
+    setViewport: async () => undefined,
+    captureStorageState: async () => ({ cookies: [], localStorage: {} }),
+    restoreStorageState: async () => undefined,
     close: async () => undefined,
     ...overrides,
   };
