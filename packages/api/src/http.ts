@@ -246,7 +246,9 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       return c.json({ origins: viewport.addAllowedOrigin(origin) });
     });
 
-    app.get("/auth/profiles", (c) => c.json({ profiles: viewport.listAuthProfiles() }));
+    // 一覧・いま使っているもの・取り込みの世代を 1 つの形で返す。世代は
+    // Baseline の識別に入る (ADR-0022)。
+    app.get("/auth/profiles", (c) => c.json(viewport.listAuthProfiles()));
 
     app.post("/auth/profiles", async (c) => {
       const { name } = (await c.req.json()) as { name?: unknown };

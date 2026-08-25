@@ -23,11 +23,51 @@ function proxy(current: RunState | undefined) {
 
 const MINE = { requesterRunId: "run-1" };
 
+/** 中継してよい語彙の入力。列挙外の形は中継そのものが拒む。 */
+const CLICK = JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2 });
+const WHEEL = JSON.stringify({
+  type: "input_mouse",
+  eventType: "mouseWheel",
+  x: 1,
+  y: 2,
+  deltaY: -120,
+});
+
+describe("中継してよい語彙", () => {
+  it("列挙に無い形は中継条件を満たしていても送らない", () => {
+    // 認証を通した client が実行基盤の配信ソケットへ任意の命令を送れると、
+    // 中継の口が実行基盤の全機能を開ける口になる (ADR-0008)。
+    const { upstream, proxy: p } = proxy(state());
+    expect(p.forwardInput(MINE, JSON.stringify({ type: "eval", expression: "1" }))).toEqual({
+      kind: "input-discarded",
+      reason: "bad-input",
+      requesterRunId: "run-1",
+    });
+    expect(upstream.sent).toEqual([]);
+  });
+
+  it("スクロールは閲覧モードでも中継する", () => {
+    // スクロールは要素選択の前提であり、画面の外にある要素へ届くために要る。
+    const { upstream, proxy: p } = proxy(state({ mode: "view" }));
+    expect(p.forwardInput(MINE, WHEEL)).toBeUndefined();
+    expect(upstream.sent).toEqual([WHEEL]);
+  });
+
+  it("列挙に無い項目を混ぜても、そのままは送らない", () => {
+    const { upstream, proxy: p } = proxy(state());
+    p.forwardInput(
+      MINE,
+      JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2, script: "x" }),
+    );
+    expect(upstream.sent).toEqual([CLICK]);
+  });
+});
+
 describe("中継条件", () => {
   it("条件を満たす入力を転送する", () => {
     const { upstream, proxy: p } = proxy(state());
-    expect(p.forwardInput(MINE, "input_mouse")).toBeUndefined();
-    expect(upstream.sent).toEqual(["input_mouse"]);
+    expect(p.forwardInput(MINE, CLICK)).toBeUndefined();
+    expect(upstream.sent).toEqual([CLICK]);
   });
 
   it.each([
@@ -37,7 +77,7 @@ describe("中継条件", () => {
     ["run が無い", undefined, MINE, "no-run"],
   ])("%s の入力を破棄する", (_label, current, claim, reason) => {
     const { upstream, proxy: p } = proxy(current);
-    expect(p.forwardInput(claim, "input_mouse")).toEqual({
+    expect(p.forwardInput(claim, CLICK)).toEqual({
       kind: "input-discarded",
       reason,
       requesterRunId: claim.requesterRunId,
@@ -49,7 +89,7 @@ describe("中継条件", () => {
     // ADR-0008 が塞いだ迂回そのもの。paused / mode / runId は server 側から
     // 引き、client が渡せるのは要求元の run だけである。
     const { upstream, proxy: p } = proxy(state({ paused: false, mode: "view" }));
-    p.forwardInput({ requesterRunId: "run-1" }, "input_mouse");
+    p.forwardInput({ requesterRunId: "run-1" }, CLICK);
     expect(upstream.sent).toEqual([]);
     // 型の上でも paused / mode を渡す口が無い。
     expect(Object.keys(MINE)).toEqual(["requesterRunId"]);
@@ -65,8 +105,8 @@ describe("中継条件", () => {
   it("破棄を記録として残す", () => {
     // 黙って捨てると UI の不具合と迂回の試みを区別できない。
     const { proxy: p } = proxy(state({ paused: false }));
-    p.forwardInput(MINE, "a");
-    p.forwardInput(MINE, "b");
+    p.forwardInput(MINE, CLICK);
+    p.forwardInput(MINE, CLICK);
     expect(p.discarded().map((e) => e.reason)).toEqual(["not-paused", "not-paused"]);
     expect(p.discardedCount()).toBe(2);
   });
@@ -75,7 +115,7 @@ describe("中継条件", () => {
     // 迂回を試みる側が意図的に大量発生させられる。
     const { proxy: p } = proxy(state({ paused: false }));
     for (let i = 0; i < 500; i += 1) {
-      p.forwardInput(MINE, "x");
+      p.forwardInput(MINE, CLICK);
     }
     expect(p.discarded().length).toBeLessThanOrEqual(128);
     expect(p.discardedCount()).toBe(500);
@@ -85,7 +125,7 @@ describe("中継条件", () => {
     // 実行イベント列へ混ぜない。破棄は Stream Proxy で起き、foreign-run では
     // 結びつける run が定まらない (ADR-0008)。
     const { proxy: p } = proxy(state({ paused: false }));
-    p.forwardInput(MINE, "a");
+    p.forwardInput(MINE, CLICK);
     const executionEventKinds = new Set([
       "run-started",
       "step-started",

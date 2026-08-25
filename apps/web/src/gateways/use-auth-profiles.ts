@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import type { AuthProfilesView } from "@screen-contract/api";
 import type { WorkflowServerClient } from "./workflow-server.js";
 
 export interface AuthProfiles {
   readonly profiles: readonly string[];
   readonly active: string | undefined;
+  /** 取り込みの世代。Baseline の識別に入る (ADR-0022)。 */
+  readonly generation: number;
   readonly error: string | undefined;
   save(name: string): void;
   use(name: string | undefined): void;
@@ -15,71 +18,44 @@ export interface AuthProfiles {
  *
  * 保存するのはログイン後のブラウザ状態 (Cookie / localStorage) であり、
  * 資格情報そのものではない (ADR-0022)。
+ *
+ * **いま使っているものを画面側で数えない。** server が返す写しをそのまま持つ。
+ * 数えると、切り替えに失敗したときに画面だけが切り替わったつもりになる。
  */
 export function useAuthProfiles(client: WorkflowServerClient | undefined): AuthProfiles {
-  const [profiles, setProfiles] = useState<readonly string[]>([]);
-  const [active, setActive] = useState<string | undefined>(undefined);
+  const [view, setView] = useState<AuthProfilesView>({
+    profiles: [],
+    active: null,
+    generation: 0,
+  });
   const [error, setError] = useState<string | undefined>(undefined);
 
+  const run = useCallback(
+    (action: (api: WorkflowServerClient) => Promise<AuthProfilesView>) => {
+      if (client === undefined) {
+        return;
+      }
+      void action(client)
+        .then((next) => {
+          setView(next);
+          setError(undefined);
+        })
+        .catch((cause: Error) => setError(cause.message));
+    },
+    [client],
+  );
+
   useEffect(() => {
-    if (client === undefined) {
-      return;
-    }
-    void client
-      .listAuthProfiles()
-      .then(setProfiles)
-      .catch((cause: Error) => setError(cause.message));
-  }, [client]);
+    run((api) => api.listAuthProfiles());
+  }, [run]);
 
-  const save = useCallback(
-    (name: string) => {
-      if (client === undefined) {
-        return;
-      }
-      void client
-        .saveAuthProfile(name)
-        .then((next) => {
-          setProfiles(next);
-          setError(undefined);
-        })
-        .catch((cause: Error) => setError(cause.message));
-    },
-    [client],
-  );
-
-  const use = useCallback(
-    (name: string | undefined) => {
-      if (client === undefined) {
-        return;
-      }
-      void client
-        .useAuthProfile(name)
-        .then(() => {
-          setActive(name);
-          setError(undefined);
-        })
-        .catch((cause: Error) => setError(cause.message));
-    },
-    [client],
-  );
-
-  const remove = useCallback(
-    (name: string) => {
-      if (client === undefined) {
-        return;
-      }
-      void client
-        .removeAuthProfile(name)
-        .then((next) => {
-          setProfiles(next);
-          // 消したプロファイルを使っていたら匿名へ戻す。
-          setActive(active === name ? undefined : active);
-          setError(undefined);
-        })
-        .catch((cause: Error) => setError(cause.message));
-    },
-    [active, client],
-  );
-
-  return { profiles, active, error, save, use, remove };
+  return {
+    profiles: view.profiles,
+    active: view.active ?? undefined,
+    generation: view.generation,
+    error,
+    save: (name) => run((api) => api.saveAuthProfile(name)),
+    use: (name) => run((api) => api.useAuthProfile(name)),
+    remove: (name) => run((api) => api.removeAuthProfile(name)),
+  };
 }

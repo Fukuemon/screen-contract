@@ -1,4 +1,4 @@
-import type { ApprovalRequest, ApprovalResult } from "@screen-contract/api";
+import type { ApprovalRequest, ApprovalResult, AuthProfilesView } from "@screen-contract/api";
 import { parseSnapshot, type ElementDefView, type ViewportSnapshot } from "../entities/snapshot.js";
 import { httpBase, type ServerTarget } from "../lib/connection.js";
 
@@ -64,10 +64,10 @@ export interface WorkflowServerClient {
   moveBadge(id: ElementDefView["id"], to: number): Promise<ViewportSnapshot>;
   allowedOrigins(): Promise<readonly string[]>;
   addAllowedOrigin(origin: string): Promise<readonly string[]>;
-  listAuthProfiles(): Promise<readonly string[]>;
-  saveAuthProfile(name: string): Promise<readonly string[]>;
-  useAuthProfile(name: string | undefined): Promise<void>;
-  removeAuthProfile(name: string): Promise<readonly string[]>;
+  listAuthProfiles(): Promise<AuthProfilesView>;
+  saveAuthProfile(name: string): Promise<AuthProfilesView>;
+  useAuthProfile(name: string | undefined): Promise<AuthProfilesView>;
+  removeAuthProfile(name: string): Promise<AuthProfilesView>;
   listApprovals(): Promise<readonly ApprovalRequest[]>;
   approve(requestId: string): Promise<ApprovalResult>;
   loadDraft(key: string): Promise<string>;
@@ -174,25 +174,12 @@ export function createWorkflowServerClient(
       return (await post<{ origins: readonly string[] }>("/viewport/origins", { origin })).origins;
     },
 
-    async listAuthProfiles(): Promise<readonly string[]> {
-      return (await json<{ profiles: readonly string[] }>("/auth/profiles")).profiles;
-    },
-
-    async saveAuthProfile(name): Promise<readonly string[]> {
-      return (await post<{ profiles: readonly string[] }>("/auth/profiles", { name })).profiles;
-    },
-
-    async useAuthProfile(name): Promise<void> {
-      await post("/auth/use", { name: name ?? null });
-    },
-
-    async removeAuthProfile(name): Promise<readonly string[]> {
-      return (
-        await json<{ profiles: readonly string[] }>(`/auth/profiles/${encodeURIComponent(name)}`, {
-          method: "DELETE",
-        })
-      ).profiles;
-    },
+    listAuthProfiles: () => json<AuthProfilesView>("/auth/profiles"),
+    saveAuthProfile: (name) => post<AuthProfilesView>("/auth/profiles", { name }),
+    // null は「匿名」であって「指定なし」ではない。区別しないと戻せなくなる。
+    useAuthProfile: (name) => post<AuthProfilesView>("/auth/use", { name: name ?? null }),
+    removeAuthProfile: (name) =>
+      json<AuthProfilesView>(`/auth/profiles/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
     listApprovals: () => json<readonly ApprovalRequest[]>("/approvals"),
     approve: (requestId) =>

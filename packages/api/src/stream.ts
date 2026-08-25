@@ -9,6 +9,7 @@
 // 語彙の正本は app にある。run を保持している側が定め、Stream Proxy は読むだけ。
 export type { RunState, StreamMode } from "@screen-contract/app";
 import type { RunState } from "@screen-contract/app";
+import { relayableInput } from "./relayable-input.js";
 
 /** client が名乗った主張。信用しない値はここにだけ入る。 */
 export interface RelayClaim {
@@ -28,7 +29,13 @@ export interface RunStateSource {
  * 定まらない。api から core の語彙のイベントを起こす形は依存方向の規約とも
  * 擦れる。これは Stream Proxy 側の語彙である。
  */
-export type DiscardReason = "not-paused" | "not-operate-mode" | "foreign-run" | "no-run";
+export type DiscardReason =
+  | "not-paused"
+  | "not-operate-mode"
+  | "foreign-run"
+  | "no-run"
+  /** 中継してよい語彙に無い。実行基盤へ任意の JSON を送らせない。 */
+  | "bad-input";
 
 export interface InputDiscarded {
   readonly kind: "input-discarded";
@@ -129,7 +136,13 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
     },
 
     forwardInput(claim: RelayClaim, payload: string): InputDiscarded | undefined {
-      const reason = discardReason(deps.runState.current(), claim, inputKindOf(payload));
+      // **語彙の検査を先に行う。** 中継条件を満たしていても、列挙に無い形は
+      // 送らない。組み直した payload だけを上流へ渡す。
+      const relayable = relayableInput(payload);
+      const reason =
+        relayable === undefined
+          ? "bad-input"
+          : discardReason(deps.runState.current(), claim, inputKindOf(payload));
       if (reason !== undefined) {
         const event: InputDiscarded = {
           kind: "input-discarded",
@@ -143,7 +156,7 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
         }
         return event;
       }
-      deps.upstream.send(payload);
+      deps.upstream.send(relayable as string);
       return undefined;
     },
 

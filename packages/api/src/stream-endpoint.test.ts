@@ -25,7 +25,9 @@ function setup(state: RunState | undefined = { runId: "run-1", paused: true, mod
 }
 
 const AUTH = JSON.stringify({ kind: "auth", token: TOKEN, runId: "run-1" });
-const INPUT = JSON.stringify({ kind: "input", payload: "input_mouse" });
+/** 中継してよい語彙の入力。列挙外の形は Stream Proxy 側が拒む。 */
+const CLICK = JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2 });
+const INPUT = JSON.stringify({ kind: "input", payload: CLICK });
 
 describe("接続後の最初のフレームで認証する", () => {
   it("正しいトークンで認証を通す", () => {
@@ -58,7 +60,7 @@ describe("接続後の最初のフレームで認証する", () => {
       "already-authenticated",
     );
     connection.receive(INPUT);
-    expect(upstream.sent).toEqual(["input_mouse"]);
+    expect(upstream.sent).toEqual([CLICK]);
   });
 
   it.each([
@@ -80,7 +82,7 @@ describe("認証後の中継", () => {
     const { connection, upstream } = setup();
     connection.receive(AUTH);
     expect(connection.receive(INPUT)).toBeUndefined();
-    expect(upstream.sent).toEqual(["input_mouse"]);
+    expect(upstream.sent).toEqual([CLICK]);
   });
 
   it("再生中の入力は認証を通っていても転送しない", () => {

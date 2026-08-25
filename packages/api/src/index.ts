@@ -40,6 +40,7 @@ export {
   type AuthRejection,
   type OriginPolicy,
 } from "./auth.js";
+export { relayableInput } from "./relayable-input.js";
 export {
   createStreamProxy,
   discardReason,
