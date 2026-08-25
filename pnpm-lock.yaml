@@ -111,6 +111,9 @@ importers:
       '@screen-contract/core-execution':
         specifier: workspace:*
         version: link:../core-execution
+      '@screen-contract/domain':
+        specifier: workspace:*
+        version: link:../domain
       agent-browser:
         specifier: 0.34.0
         version: 0.34.0

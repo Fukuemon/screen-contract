@@ -108,6 +108,59 @@ export function parseRunId(raw: string): RunId {
   return raw as RunId;
 }
 
+/**
+ * DSL の action。意味論 (実行・検証の仕方) は core/execution が定める。
+ *
+ * skeleton で実行系が通すのは `open` と `click` だけである。語彙の残りは
+ * core/workflow が Schema として受け付け、正規化で未対応として弾く。
+ */
+export type BrowserAction =
+  | { readonly kind: "open"; readonly url: string }
+  | { readonly kind: "click"; readonly locator: SemanticLocator };
+
+/**
+ * Semantic Locator。要素の同一性は永続要素 ID が持ち、画面上の実要素は
+ * これで見つける (element-mapping feature)。
+ *
+ * 実行基盤の一時的な要素参照は保存しない。撮影ごとに振り直されるため、
+ * 版をまたいで持ち越せない。
+ */
+export interface SemanticLocator {
+  readonly role: string;
+  readonly name: string;
+}
+
+/** 画面上の位置。撮影時の viewport ピクセル座標。 */
+export interface BoundingBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * box 付きの要素 1 件。座標から要素を解決する入力になる。
+ *
+ * Accessibility Snapshot の応答に box が含まれるとは限らないため、取得手段は
+ * adapter に閉じる。core は入力値として受け取るだけで、取得手段を問わない
+ * (element-mapping feature)。
+ */
+export interface ObservedElement {
+  readonly role: string;
+  readonly name: string;
+  readonly box: BoundingBox;
+}
+
+/** スクリーンショットのバイナリ。注釈は core/artifact が別途重ねる。 */
+export interface Screenshot {
+  readonly bytes: Uint8Array;
+}
+
+/** ライブ映像ストリームのハンドル。描画は web-editor、転送は adapter の責務。 */
+export interface StreamHandle {
+  readonly endpoint: string;
+}
+
 /** ブラウザ実行基盤を差し替え可能にする Port。実装は adapter/browser (ADR-0013)。 */
 export interface BrowserPort {
   /**
@@ -117,10 +170,59 @@ export interface BrowserPort {
   createSession(auth: AuthContext): Promise<BrowserSession>;
 }
 
+/**
+ * セッションはページ状態と要素参照を保持する第一級の抽象である。
+ * 一時停止中も生存させる (execution feature)。
+ */
 export interface BrowserSession {
+  /** 型付きの action 実行。CLI の呼び出し形式と JSON のパースは adapter に閉じる。 */
+  perform(action: BrowserAction): Promise<void>;
   snapshot(): Promise<Snapshot>;
+  screenshot(): Promise<Screenshot>;
+  /** 座標から要素を解決するための box 付き要素一覧。 */
+  observeElements(): Promise<readonly ObservedElement[]>;
+  currentUrl(): Promise<string>;
+  stream(): Promise<StreamHandle>;
+  /** 一時停止中もセッションを生かし続ける。 */
+  keepalive(): Promise<void>;
   close(): Promise<void>;
 }
 
-/** 実行時エラーの機械可読コード。認証状態の失効を呼び出し側が判別できるようにする。 */
-export type ExecutionErrorCode = "auth/expired";
+/**
+ * 実行時エラーの機械可読コード。
+ *
+ * `auth/expired` は認証状態の失効を呼び出し側が判別できるようにする。
+ * `browser/unresponsive` はセッションが応答しなくなったことを表す。
+ *
+ * **不応答を adapter が握りつぶさない。** セッションは部分的に壊れる。
+ * Snapshot の取得は成功し続けるのにスクリーンショットの取得だけが恒久的に
+ * 失敗する状態が実在し、生存確認では検出できない。**セッションの再作成は
+ * ページ状態を失う操作**であり、adapter が黙って作り直すと、同一セッションでの
+ * 再実行を前提とする検証が静かに壊れる。再作成の可否は run の意味を知っている
+ * core/execution が決める (execution feature)。
+ */
+export type ExecutionErrorCode = "auth/expired" | "browser/unresponsive";
+
+/**
+ * 呼び出し側が機械的に分岐できる形の失敗。
+ *
+ * **構造で表す。** adapter は core の型だけを参照でき、実行時の値 (クラスや
+ * 関数) を受け取れない (context/architecture.md)。共通の基底クラスを core に
+ * 置くと adapter がそれを import することになり、境界を越える。adapter は
+ * 自前の Error を投げ、core はこの形に合うかどうかで判定する。
+ */
+export interface ExecutionFailure {
+  readonly code: ExecutionErrorCode;
+  readonly message: string;
+}
+
+const EXECUTION_ERROR_CODES = new Set<string>(["auth/expired", "browser/unresponsive"]);
+
+/** 未知の失敗を握り潰さないため、コードが語彙にあるものだけを分岐対象とする。 */
+export function isExecutionFailure(value: unknown): value is ExecutionFailure {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const { code, message } = value as Record<string, unknown>;
+  return typeof code === "string" && EXECUTION_ERROR_CODES.has(code) && typeof message === "string";
+}

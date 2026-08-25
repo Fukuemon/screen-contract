@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { createAgentBrowserPort } from "@screen-contract/adapter-browser";
 import { createFsStore } from "@screen-contract/adapter-store";
 import { createAgentHandlers } from "@screen-contract/agent";
@@ -19,7 +20,7 @@ export interface ComposeOptions {
 }
 
 export function compose(options: ComposeOptions = {}) {
-  const browser = options.browser ?? createAgentBrowserPort();
+  const browser = options.browser ?? createAgentBrowserPort({ home: homedir() });
   const store = options.store ?? createFsStore();
 
   const useCases = createUseCases({ browser, store });
