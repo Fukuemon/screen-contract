@@ -35,11 +35,13 @@ interface RunSnapshot {
   readonly recording: boolean;
   readonly events: readonly ExecutionEvent[];
   readonly entryUrl: string;
+  /** 構成番号が属する画面状態。**番号は画面ごとに別である。** */
+  readonly stateUrl: string;
   /** 記録した手順。承認へ回す draft の中身になる。 */
   readonly steps: readonly (RecordedStep & { readonly id: string })[];
   readonly newElements: readonly ElementDef[];
   /**
-   * 構成番号。**リストの位置がそのまま番号になる** (ADR-0005)。
+   * いま居る画面状態の構成番号。**リストの位置がそのまま番号になる** (ADR-0005)。
    *
    * 要素定義は番号を持たない。並びを変えれば番号が変わる。
    */
@@ -62,6 +64,14 @@ export interface RunSessionOptions {
 }
 
 export interface RunSession {
+  /**
+   * いま見ている画面状態を伝える。
+   *
+   * **構成番号は画面状態ごとに別に持つ** (ADR-0005 の「画面仕様書は状態単位」)。
+   * 1 本の列にすると、別の画面へ移ったあとも前の画面の番号が残り、居ない要素へ
+   * 番号を振ったままになる。
+   */
+  enterState(url: string): void;
   /**
    * run を未開始へ戻す。
    *
@@ -94,6 +104,22 @@ export interface RunSession {
 /** run の識別子。skeleton は 1 本しか動かさないため固定する。 */
 const RUN_ID = "current";
 
+/**
+ * 画面状態の鍵。
+ *
+ * query と fragment を落とす。同じ画面を指す URL が別の状態として増えると、
+ * 番号を振り直す先が分からなくなる。解釈できない URL はそのまま鍵にする —
+ * 落とすと、番号が黙ってどこかの画面へ紛れ込む。
+ */
+function stateKeyOf(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url;
+  }
+}
+
 export function createRunSession(options: RunSessionOptions): RunSession {
   let status: RunSnapshot["status"] = "idle";
   let mode: StreamMode = "view";
@@ -103,9 +129,15 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   /** 手順は追記のみで並べ替えない。連番をそのまま識別子にする。 */
   let steps: readonly (RecordedStep & { id: string })[] = [];
   let newElements: readonly ElementDef[] = [];
-  let badges: readonly string[] = [];
+  /** 画面状態ごとの構成番号。鍵は origin + pathname。 */
+  const badgesByState = new Map<string, readonly string[]>();
+  let stateKey = stateKeyOf(options.entryUrl);
   /** 記録を止めた時点までの手順。再開しても消さない。 */
   let confirmed: readonly (RecordedStep & { id: string })[] = [];
+
+  function badges(): readonly string[] {
+    return badgesByState.get(stateKey) ?? [];
+  }
 
   function snapshot(): RunSnapshot {
     return {
@@ -115,9 +147,10 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       recording,
       events,
       entryUrl: options.entryUrl,
+      stateUrl: stateKey,
       steps,
       newElements,
-      badges,
+      badges: badges(),
     };
   }
 
@@ -165,6 +198,10 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   }
 
   return {
+    enterState(url: string): void {
+      stateKey = stateKeyOf(url);
+    },
+
     reset(): RunSnapshot {
       status = "idle";
       mode = "view";
@@ -180,26 +217,30 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       if (!newElements.some((element) => element.id === id)) {
         newElements = [...newElements, { id, name: locator.name, type: locator.role, locator }];
       }
-      if (!badges.includes(id)) {
-        badges = [...badges, id];
+      if (!badges().includes(id)) {
+        badgesByState.set(stateKey, [...badges(), id]);
       }
       return snapshot();
     },
 
     removeBadge(id: string): RunSnapshot {
-      badges = badges.filter((badge) => badge !== id);
+      badgesByState.set(
+        stateKey,
+        badges().filter((badge) => badge !== id),
+      );
       return snapshot();
     },
 
     moveBadge(id: string, to: number): RunSnapshot {
-      const from = badges.indexOf(id);
-      if (from < 0 || to < 0 || to >= badges.length) {
+      const current = badges();
+      const from = current.indexOf(id);
+      if (from < 0 || to < 0 || to >= current.length) {
         return snapshot();
       }
-      const next = [...badges];
+      const next = [...current];
       next.splice(from, 1);
       next.splice(to, 0, id);
-      badges = next;
+      badgesByState.set(stateKey, next);
       return snapshot();
     },
 
@@ -238,6 +279,10 @@ export function createRunSession(options: RunSessionOptions): RunSession {
         () => Promise.resolve(),
         snapshotObservation,
       );
+      // 操作でページが移ることがある。移った先の画面状態へ番号の帳簿を切り替える。
+      if (currentUrl !== undefined) {
+        stateKey = stateKeyOf(await currentUrl());
+      }
       const draft = session.finish();
       // 記録を止めて再開しても前の手順を消さない。session は開始時点からの
       // 手順しか持たないため、確定済みの分へ追記する。

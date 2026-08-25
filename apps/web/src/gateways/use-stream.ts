@@ -10,7 +10,8 @@ import {
 export interface Stream {
   readonly frame: string | undefined;
   readonly error: string | undefined;
-  sendInput(payload: unknown): void;
+  /** メソッドではなく関数として持つ。取り出して渡す先が this を必要としない。 */
+  readonly sendInput: (payload: unknown) => void;
 }
 
 /**

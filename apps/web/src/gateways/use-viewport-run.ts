@@ -18,6 +18,10 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
   pickFailed: boolean;
   error: string | undefined;
   run: (action: (api: WorkflowServerClient) => Promise<ViewportSnapshot>) => void;
+  /** 写しを取り直す。対象が自分で移ったときに追いつくために要る。 */
+  refresh: () => void;
+  /** 選択を降ろす。画面が変われば、選んでいた要素はもう画面上に無い。 */
+  clearPick: () => void;
   addOrigin: (origin: string) => void;
   pick: (point: { readonly x: number; readonly y: number }) => void;
 } {
@@ -38,6 +42,21 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
       })
       .catch((cause: Error) => setError(cause.message));
   }, [client]);
+
+  const refresh = useCallback(() => {
+    if (client === undefined) {
+      return;
+    }
+    void client
+      .viewport()
+      .then(setSnapshot)
+      .catch((cause: Error) => setError(cause.message));
+  }, [client]);
+
+  const clearPick = useCallback(() => {
+    setPicked(undefined);
+    setPickFailed(false);
+  }, []);
 
   const run = useCallback(
     (action: (api: WorkflowServerClient) => Promise<ViewportSnapshot>) => {
@@ -87,5 +106,16 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
     [client, picked],
   );
 
-  return { snapshot, origins, picked, pickFailed, error, run, addOrigin, pick };
+  return {
+    snapshot,
+    origins,
+    picked,
+    pickFailed,
+    error,
+    run,
+    refresh,
+    clearPick,
+    addOrigin,
+    pick,
+  };
 }

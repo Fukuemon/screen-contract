@@ -77,8 +77,16 @@ export interface HttpAppOptions {
 
 /** Web UI からの run 操作。判定は合成ルートが持つ実装に閉じる。 */
 export interface ViewportControl {
-  start(): Promise<unknown>;
+  /** run を起こす。開く先を渡せる。**列挙外の origin は実装側が弾く** (ADR-0017)。 */
+  start(url?: string): Promise<unknown>;
   resume(): Promise<unknown>;
+  /**
+   * run を未開始へ戻す。
+   *
+   * **終端から戻る経路である。** run を走らせきると `completed` になり、
+   * `paused` を要求する操作モードと記録がどちらも使えなくなる (ADR-0002)。
+   */
+  stop(): unknown;
   setMode(mode: "view" | "operate"): unknown;
   setRecording(recording: boolean): unknown;
   snapshot(): unknown;
@@ -194,8 +202,16 @@ export function createHttpApp(options: HttpAppOptions): Hono {
   const viewport = options.viewport;
   if (viewport !== undefined) {
     app.get("/viewport", (c) => c.json(viewport.snapshot()));
-    app.post("/viewport/start", async (c) => c.json(await viewport.start()));
+    app.post("/viewport/start", async (c) => {
+      // 本文なしの POST も受ける。開く先の指定は任意である。
+      const { url } = (await c.req.json().catch(() => ({}))) as { url?: unknown };
+      if (url !== undefined && typeof url !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(await viewport.start(url));
+    });
     app.post("/viewport/resume", async (c) => c.json(await viewport.resume()));
+    app.post("/viewport/stop", (c) => c.json(viewport.stop()));
     app.post("/viewport/mode", async (c) => {
       const { mode } = (await c.req.json()) as { mode?: unknown };
       if (mode !== "view" && mode !== "operate") {

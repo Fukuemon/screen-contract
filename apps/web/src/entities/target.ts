@@ -5,41 +5,13 @@
  * 列挙する規則は変えない (ADR-0017)。パスは自由に入れられる。
  */
 
-export type TargetRejection = "unknown-origin" | "bad-path" | "empty-origin";
-
-export interface TargetInput {
-  readonly origin: string;
-  readonly path: string;
-}
-
-/**
- * 対象 URL を組み立てる。
- *
- * 列挙外の origin を弾く。弾かないと、設定の列挙という安全装置が UI から
- * 迂回できることになる。
- */
-export function buildTargetUrl(
-  input: TargetInput,
-  allowed: readonly string[],
-): { readonly url: string } | { readonly rejection: TargetRejection } {
-  if (input.origin.length === 0) {
-    return { rejection: "empty-origin" };
-  }
-  if (!allowed.includes(input.origin)) {
-    return { rejection: "unknown-origin" };
-  }
-  let url: URL;
+/** 入力から origin を取り出す。取り出せなければ undefined。 */
+export function originOf(raw: string): string | undefined {
   try {
-    // path 側に origin を書かれても、base の origin を保つ。
-    url = new URL(input.path === "" ? "/" : input.path, input.origin);
+    return new URL(raw).origin;
   } catch {
-    return { rejection: "bad-path" };
+    return undefined;
   }
-  if (url.origin !== input.origin) {
-    // `//evil.test/` のような入力で origin が入れ替わる。
-    return { rejection: "bad-path" };
-  }
-  return { url: url.toString() };
 }
 
 export interface ViewportPreset {

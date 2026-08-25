@@ -127,3 +127,64 @@ describe("中継条件へ渡す状態", () => {
     expect(run.relayState()?.paused).toBe(false);
   });
 });
+
+describe("構成番号", () => {
+  const button = { role: "button", name: "保存" };
+  const link = { role: "link", name: "戻る" };
+
+  it("リストの位置がそのまま番号になる", () => {
+    // 番号は 1..N の連番で、欠番を作らない (ADR-0005)。
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    const after = s.addBadge(link);
+    expect(after.badges).toEqual(["el-button-保存", "el-link-戻る"]);
+    expect(s.moveBadge("el-link-戻る", 0).badges).toEqual(["el-link-戻る", "el-button-保存"]);
+  });
+
+  it("同じ要素へ二重に番号を付けない", () => {
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    expect(s.addBadge(button).badges).toEqual(["el-button-保存"]);
+  });
+
+  it("画面を移ると番号を引き継がない", () => {
+    // 引き継ぐと、居ない要素へ番号を振ったまま別の画面を採番することになる。
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    s.enterState("http://127.0.0.1:5174/settings");
+    expect(s.snapshot().badges).toEqual([]);
+  });
+
+  it("元の画面へ戻ると番号も戻る", () => {
+    // 捨てるのではなく画面ごとに持つ。捨てると往復のたびに採番し直しになる。
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    s.enterState("http://127.0.0.1:5174/settings");
+    s.addBadge(link);
+    expect(s.snapshot().badges).toEqual(["el-link-戻る"]);
+    s.enterState(ENTRY);
+    expect(s.snapshot().badges).toEqual(["el-button-保存"]);
+  });
+
+  it("query と fragment の違いで画面を分けない", () => {
+    // 分けると同じ画面が別の状態として増え、番号を振り直す先が分からなくなる。
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    s.enterState("http://127.0.0.1:5174/?tab=1#top");
+    expect(s.snapshot().badges).toEqual(["el-button-保存"]);
+  });
+
+  it("要素の定義は画面をまたいで残す", () => {
+    // 定義は要素の同一性であって番号ではない。消すと枠の表示名が引けなくなる。
+    const s = session(fakeRunner());
+    s.addBadge(button);
+    s.enterState("http://127.0.0.1:5174/settings");
+    expect(s.snapshot().newElements.map((element) => element.id)).toEqual(["el-button-保存"]);
+  });
+
+  it("いま採番している画面を写しに載せる", () => {
+    const s = session(fakeRunner());
+    s.enterState("http://127.0.0.1:5174/settings?a=1");
+    expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
+  });
+});

@@ -7,6 +7,7 @@ const FULL = {
   mode: "operate",
   recording: true,
   entryUrl: "http://127.0.0.1:5174",
+  stateUrl: "http://127.0.0.1:5174/",
   steps: [{ id: "step-0", action: { kind: "click", ref: "el-a" }, expect: [{ kind: "url" }] }],
   newElements: [
     { id: "el-a", name: "開く", type: "button", locator: { role: "button", name: "開く" } },
@@ -31,6 +32,7 @@ describe("parseSnapshot", () => {
       mode: "view",
       recording: false,
       entryUrl: "",
+      stateUrl: "",
       steps: [],
       newElements: [],
       badges: [],

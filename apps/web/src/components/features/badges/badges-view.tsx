@@ -7,6 +7,8 @@ export interface BadgesViewProps {
   /** 構成番号順の要素 ID。リストの位置がそのまま番号になる (ADR-0005)。 */
   readonly badges: readonly string[];
   readonly elements: readonly ElementDefView[];
+  /** 番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。 */
+  readonly stateUrl: string;
   /** いま選択している要素。番号を付ける対象になる。 */
   readonly picked: { readonly role: string; readonly name: string } | undefined;
   readonly onAdd: (locator: { readonly role: string; readonly name: string }) => void;
@@ -29,6 +31,13 @@ export function BadgesView(props: BadgesViewProps) {
         <p className="text-xs leading-relaxed text-muted">
           選択モードで要素を選び、番号を付けます。並べ替えると番号が変わります。
         </p>
+        {/* どの画面の番号かを出す。出さないと、移動したのに前の画面の番号を
+            見ていることに気付けない。 */}
+        {props.stateUrl !== "" && (
+          <p className="truncate font-mono text-[11px] text-muted" title={props.stateUrl}>
+            {props.stateUrl}
+          </p>
+        )}
         <Button
           disabled={props.picked === undefined}
           onClick={() => {
@@ -45,7 +54,7 @@ export function BadgesView(props: BadgesViewProps) {
       </div>
 
       {props.badges.length === 0 ? (
-        <EmptyState>まだ番号を付けていません。</EmptyState>
+        <EmptyState>この画面にはまだ番号を付けていません。</EmptyState>
       ) : (
         <ol className="min-h-0 flex-1 overflow-auto">
           {props.badges.map((id, index) => {

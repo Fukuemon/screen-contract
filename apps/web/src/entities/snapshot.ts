@@ -5,6 +5,8 @@ export interface ViewportSnapshot {
   readonly mode: "view" | "operate";
   readonly recording: boolean;
   readonly entryUrl: string;
+  /** 構成番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。 */
+  readonly stateUrl: string;
   readonly steps: readonly RecordedStepView[];
   readonly newElements: readonly ElementDefView[];
   /** 構成番号順の要素 ID。位置がそのまま番号になる (ADR-0005)。 */
@@ -99,6 +101,7 @@ export function parseSnapshot(value: unknown): ViewportSnapshot {
     mode: mode === "operate" ? "operate" : "view",
     recording: raw["recording"] === true,
     entryUrl: typeof raw["entryUrl"] === "string" ? raw["entryUrl"] : "",
+    stateUrl: typeof raw["stateUrl"] === "string" ? raw["stateUrl"] : "",
     steps: Array.isArray(raw["steps"])
       ? raw["steps"].map(stepOf).filter((step): step is RecordedStepView => step !== undefined)
       : [],

@@ -42,8 +42,15 @@ function setup() {
   } as AuthProfileStore;
 
   let runResets = 0;
+  let starts = 0;
+  const states: string[] = [];
   const run = {
     snapshot: () => ({ status: "paused" }),
+    enterState: (url: string) => void states.push(url),
+    start: () => {
+      starts += 1;
+      return Promise.resolve({ status: "paused" });
+    },
     reset: () => {
       runResets += 1;
       return { status: "idle" };
@@ -80,6 +87,8 @@ function setup() {
     saved,
     resets: () => resets,
     runResets: () => runResets,
+    starts: () => starts,
+    states,
     active: () => active,
   };
 }
@@ -116,6 +125,45 @@ describe("対象の切り替え", () => {
     expect(s.added).toEqual(["https://added.test"]);
     await s.control.navigate("https://added.test/x");
     expect(s.navigated).toEqual(["https://added.test/x"]);
+  });
+
+  it("開く先を渡すと run を起こしてからそこへ移る", async () => {
+    // run の 1 ステップは entry への open のままにする。順を入れ替えると
+    // pause 意味論 (ステップ完了後に停止) を変えることになる (ADR-0002)。
+    const s = setup();
+    await s.control.start("https://example.test/login");
+    expect(s.starts()).toBe(1);
+    expect(s.navigated).toEqual(["https://example.test/login"]);
+  });
+
+  it("開く先を渡さなければ entry のままにする", async () => {
+    const s = setup();
+    await s.control.start();
+    expect(s.starts()).toBe(1);
+    expect(s.navigated).toEqual([]);
+  });
+
+  it("列挙外を渡されたら run を起こさない", async () => {
+    // 起こしてから断ると、開けない run が paused で残る。
+    const s = setup();
+    await expect(s.control.start("http://evil.test/")).rejects.toThrow("列挙されていません");
+    expect(s.starts()).toBe(0);
+  });
+
+  it("移動したら構成番号の帳簿もその画面へ切り替える", () => {
+    // 番号は画面ごとに別である (ADR-0005)。切り替えないと前の画面の番号が残る。
+    const s = setup();
+    return s.control.navigate("https://example.test/a").then(() => {
+      expect(s.states).toEqual(["https://example.test/a"]);
+    });
+  });
+
+  it("run を未開始へ戻せる", () => {
+    // 終端まで走らせると paused を離れ、操作モードと記録が使えなくなる。
+    // 戻る経路が無いと、そこで行き止まりになる (ADR-0002)。
+    const s = setup();
+    expect(s.control.stop()).toEqual({ status: "idle" });
+    expect(s.runResets()).toBe(1);
   });
 
   it("viewport の寸法を変える", async () => {

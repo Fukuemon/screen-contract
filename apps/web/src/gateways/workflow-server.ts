@@ -34,8 +34,19 @@ export interface PickedElementView {
 
 export interface WorkflowServerClient {
   viewport(): Promise<ViewportSnapshot>;
-  startRun(): Promise<ViewportSnapshot>;
-  resumeRun(): Promise<ViewportSnapshot>;
+  /**
+   * run を起こす。
+   *
+   * @param url - 開く先。省略すると列挙の先頭 (entry) を開く。
+   */
+  startRun(url?: string): Promise<ViewportSnapshot>;
+  /**
+   * run を未開始へ戻す。
+   *
+   * 操作モードと記録は `paused` の run の枠内でしか使えない (ADR-0002)。run を
+   * 終端まで走らせると `paused` を離れるため、**戻る経路をここが持つ**。
+   */
+  stopRun(): Promise<ViewportSnapshot>;
   setMode(mode: "view" | "operate"): Promise<ViewportSnapshot>;
   setRecording(recording: boolean): Promise<ViewportSnapshot>;
   navigate(url: string): Promise<ViewportSnapshot>;
@@ -119,8 +130,8 @@ export function createWorkflowServerClient(
 
   return {
     viewport: () => snapshot("/viewport"),
-    startRun: () => postSnapshot("/viewport/start"),
-    resumeRun: () => postSnapshot("/viewport/resume"),
+    startRun: (url) => postSnapshot("/viewport/start", url === undefined ? {} : { url }),
+    stopRun: () => postSnapshot("/viewport/stop"),
     setMode: (mode) => postSnapshot("/viewport/mode", { mode }),
     setRecording: (recording) => postSnapshot("/viewport/recording", { recording }),
     navigate: (url) => postSnapshot("/viewport/navigate", { url }),
@@ -153,8 +164,7 @@ export function createWorkflowServerClient(
     addBadge: (locator) => postSnapshot("/viewport/badges", locator),
     removeBadge: (id) =>
       snapshot(`/viewport/badges/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    moveBadge: (id, to) =>
-      post<ViewportSnapshot>(`/viewport/badges/${encodeURIComponent(id)}/move`, { to }),
+    moveBadge: (id, to) => postSnapshot(`/viewport/badges/${encodeURIComponent(id)}/move`, { to }),
 
     async allowedOrigins(): Promise<readonly string[]> {
       return (await json<{ origins: readonly string[] }>("/viewport/origins")).origins;
