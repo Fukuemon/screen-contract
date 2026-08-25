@@ -16,9 +16,13 @@ module.exports = {
     {
       name: "no-circular",
       severity: "error",
-      comment: "循環依存を禁じる。",
+      comment:
+        "循環依存を禁じる。TanStack Router の生成物 (routeTree.gen.ts) は router へ型の循環を持つが、" +
+        "生成物であり手で直せない。生成物を経由する循環だけを除く。",
       from: {},
-      to: { circular: true },
+      // 生成物を経由する循環だけを外す。生成物はモジュールとして残るため、
+      // 層をまたぐ依存の検査 (interface-not-to-core-adapter 等) は効いたまま。
+      to: { circular: true, viaNot: "[.]gen[.]ts$" },
     },
     {
       name: "packages-not-to-apps",

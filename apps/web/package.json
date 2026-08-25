@@ -4,12 +4,23 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --build",
-    "test": "vitest run --passWithNoTests"
+    "build": "vite build",
+    "test": "vitest run --passWithNoTests",
+    "dev": "vite dev"
   },
   "devDependencies": {
     "@screen-contract/api": "workspace:*",
     "@screen-contract/config": "workspace:*",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "vite": "^8.2.2",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-start": "^1.168.49",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }

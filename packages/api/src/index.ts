@@ -1,3 +1,20 @@
+/**
+ * interface 層 (web) が使う型の窓口。
+ *
+ * web は core / domain へ直接依存できない (context/architecture.md)。実行
+ * イベントのように表示へ要る型は、api が型として中継する。
+ */
+export type {
+  ApprovalRequest,
+  ApprovalResult,
+  EvaluationPhase,
+  ExecutionEvent,
+  RecordedExpectation,
+  RecordedStep,
+  RecordingDraft,
+  StepResult,
+} from "@screen-contract/app";
+
 export { createHttpApp, type HttpAppOptions } from "./http.js";
 export {
   isAllowedHost,

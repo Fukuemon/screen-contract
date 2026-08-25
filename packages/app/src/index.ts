@@ -127,3 +127,16 @@ export {
   type StopRecordingInput,
   type StopRecordingOutcome,
 } from "./recording.js";
+
+/**
+ * interface 層 (api / web) へ型を中継する。
+ *
+ * interface は core / domain へ直接依存できない (context/architecture.md)。
+ * 表示や応答に要る型は app が窓口になる。**値は中継しない。**
+ */
+export type {
+  EvaluationPhase,
+  ExecutionEvent,
+  StepResult,
+  TerminalRunStatus,
+} from "@screen-contract/core-execution";

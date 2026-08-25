@@ -1,0 +1,18 @@
+{
+  // React で描く SPA (apps/web)。
+  //
+  // `moduleResolution: bundler` にする。vite がバンドルするため拡張子無しの
+  // 相対 import が解決でき、**生成される routeTree.gen.ts がその形で書かれる**。
+  // nodenext のままだと生成物を手で直すことになり、生成の意味が消える。
+  //
+  // `skipLibCheck` は third-party の .d.ts だけを黙らせる (TanStack Router の
+  // 型が TypeScript 7 でそのままは通らない)。自分のコードの検査は緩めない。
+  "extends": "./browser.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "types": ["vite/client"],
+    "skipLibCheck": true
+  }
+}
