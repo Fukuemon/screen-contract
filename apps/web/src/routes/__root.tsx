@@ -1,4 +1,4 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router";
+import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 export const Route = createRootRoute({
@@ -21,8 +21,4 @@ function RootDocument({ children }: { readonly children: ReactNode }) {
       </body>
     </html>
   );
-}
-
-export function RootOutlet() {
-  return <Outlet />;
 }

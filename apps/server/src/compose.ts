@@ -2,10 +2,11 @@ import { homedir } from "node:os";
 import { createAgentBrowserPort } from "@screen-contract/adapter-browser";
 import { createFsStore } from "@screen-contract/adapter-store";
 import { createAgentHandlers } from "@screen-contract/agent";
-import { createApiApp, createHttpApp, type AuthPolicy } from "@screen-contract/api";
+import { createApiApp, createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
 import type { StorePort } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
+import type { MiddlewareHandler } from "hono";
 
 /**
  * 合成ルートの入口。adapter の具象を選ぶ唯一の場所である (ADR-0023)。
@@ -28,6 +29,10 @@ export interface ComposeOptions {
    * ポートを OS に割り当てさせる以上、組み立ての時点では未定である。
    */
   readonly policy?: () => AuthPolicy | undefined;
+  /** Stream Proxy の WebSocket を結線する middleware。合成ルートが選ぶ。 */
+  readonly stream?: MiddlewareHandler | undefined;
+  /** Web UI の配信。実体の読み込みは合成ルートが渡す。 */
+  readonly web?: WebAssets | undefined;
 }
 
 export function compose(options: ComposeOptions) {
@@ -39,6 +44,11 @@ export function compose(options: ComposeOptions) {
   return {
     api: createApiApp(useCases),
     agent: createAgentHandlers(useCases),
-    http: createHttpApp({ useCases, policy: options.policy ?? (() => undefined) }),
+    http: createHttpApp({
+      useCases,
+      policy: options.policy ?? (() => undefined),
+      stream: options.stream,
+      web: options.web,
+    }),
   };
 }

@@ -1,6 +1,9 @@
-import { serve } from "@hono/node-server";
+import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
+import { WebSocketServer } from "ws";
+import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
+import { createFsWebAssets } from "./web-assets.js";
 import { generateLocalToken } from "./token.js";
 import {
   processLifecycleHost,
@@ -21,9 +24,18 @@ const LOOPBACK = "127.0.0.1";
 
 export interface ListenOptions {
   readonly stateDir: string;
+  /**
+   * Web UI のビルド成果物のディレクトリ。
+   *
+   * Web UI は Workflow Server が配信する静的ファイルである
+   * (context/infrastructure.md)。渡さないと配信しない。
+   */
+  readonly webRoot?: string | undefined;
   /** 0 なら OS に割り当てさせる。 */
   readonly port?: number | undefined;
   readonly host?: LifecycleHost | undefined;
+  /** 中継条件の判定に使う run の状態。渡さないと入力はすべて破棄される。 */
+  readonly runState?: (() => RunState | undefined) | undefined;
 }
 
 export interface RunningServer {
@@ -39,7 +51,50 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
   // policy は関数で渡す。組み立ての時点ではポートが決まっておらず、値で渡すと
   // 未定のまま固定されてしまう。
   let policy: AuthPolicy | undefined;
-  const app = compose({ stateDir: options.stateDir, policy: () => policy }).http;
+
+  /**
+   * Stream Proxy の結線。
+   *
+   * **中継条件は server 側の run 状態で判定する** (ADR-0008)。skeleton では
+   * run を保持する層がまだ無いため、常に「run が無い」を返す。結果として
+   * 入力はすべて `no-run` として破棄され、**素通しにはならない**。
+   */
+  const runState = { current: (): RunState | undefined => options.runState?.() };
+
+  const stream = upgradeWebSocket((c) => {
+    void c;
+    let connection: ReturnType<typeof createStreamConnection> | undefined;
+    return {
+      onOpen: (_event, ws) => {
+        const proxy = createStreamProxy({
+          // 上流 (ブラウザ) への転送は adapter が繋ぐ。skeleton では捨てる。
+          upstream: { send: () => undefined },
+          downstream: { send: (payload) => ws.send(payload) },
+          runState,
+        });
+        connection = createStreamConnection({ token: policy?.token ?? "", proxy });
+      },
+      onMessage: (event, ws) => {
+        const raw = typeof event.data === "string" ? event.data : "";
+        // **最初のフレームで認証する。** 通らなければ接続を閉じる。
+        if (connection?.receive(raw) !== undefined) {
+          ws.close(1008, "rejected");
+        }
+      },
+    };
+  });
+
+  const app = compose({
+    stateDir: options.stateDir,
+    policy: () => policy,
+    stream,
+    // **トークンは配信する HTML へ埋め込む。** ブラウザは runtime.json を
+    // 読めず、URL の query には載せられない (context/infrastructure.md)。
+    web:
+      options.webRoot === undefined
+        ? undefined
+        : createFsWebAssets({ root: options.webRoot, token }),
+  }).http;
 
   // listen の完了を待つ。待たずに address() を読むと、ポートが決まる前の
   // null を掴んで接続先を書けない。
@@ -49,7 +104,18 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     address: string;
   }>((resolve, reject) => {
     const started = serve(
-      { fetch: app.fetch, hostname: LOOPBACK, port: options.port ?? 0 },
+      {
+        fetch: app.fetch,
+        hostname: LOOPBACK,
+        port: options.port ?? 0,
+        // `noServer: true` を要求される。自前で listen させると、HTTP と
+        // WebSocket が別のポートを持つことになる。
+        // `ws` の型は `options.noServer` を optional として持つが、
+        // adapter 側は必須で要求する。値は `true` で渡している。
+        websocket: {
+          server: new WebSocketServer({ noServer: true }) as unknown as WebSocketServerLike,
+        },
+      },
       (info) => {
         started.off("error", reject);
         resolve({ server: started, port: info.port, address: info.address });

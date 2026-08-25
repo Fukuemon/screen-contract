@@ -55,12 +55,18 @@ describe("Origin と Host", () => {
   it.each([
     ["別ポート", "http://127.0.0.1:5174"],
     ["別ホスト", "http://evil.test:5173"],
-    ["localhost 名", "http://localhost:5173"],
     ["ポートなし", "http://127.0.0.1"],
     ["file スキーム", "file:///tmp/x.html"],
     ["URL でない", "not-a-url"],
   ])("%s の Origin を拒否する", (_label, origin) => {
     expect(isAllowedOrigin(origin, POLICY)).toBe(false);
+  });
+
+  it("localhost の Origin も許す", () => {
+    // 利用者が localhost:<port> で開くことはある。Origin だけ許して Host で
+    // 拒むと画面が一切動かない。
+    expect(isAllowedOrigin("http://localhost:5173", POLICY)).toBe(true);
+    expect(isAllowedOrigin("http://localhost:5174", POLICY)).toBe(false);
   });
 
   it("Origin を送らない経路はトークンで守る", () => {
@@ -70,8 +76,12 @@ describe("Origin と Host", () => {
 
   it("自分の待受ポートの Host だけを通す", () => {
     expect(isAllowedHost("127.0.0.1:5173", POLICY)).toBe(true);
+    expect(isAllowedHost("localhost:5173", POLICY)).toBe(true);
+    // 防御を担っているのはポートの一致である。
     expect(isAllowedHost("127.0.0.1:5174", POLICY)).toBe(false);
-    expect(isAllowedHost("localhost:5173", POLICY)).toBe(false);
+    expect(isAllowedHost("localhost:5174", POLICY)).toBe(false);
+    expect(isAllowedHost("evil.test:5173", POLICY)).toBe(false);
+    expect(isAllowedHost("127.0.0.1", POLICY)).toBe(false);
     expect(isAllowedHost(undefined, POLICY)).toBe(false);
   });
 });

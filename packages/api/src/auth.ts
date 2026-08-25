@@ -31,8 +31,14 @@ export interface OriginPolicy {
   readonly port: number;
 }
 
-/** 待受アドレスは 127.0.0.1 に固定する。`localhost` は名前解決の結果を選べない。 */
-const LOOPBACK = "127.0.0.1";
+/**
+ * 受け付けるホスト名。
+ *
+ * bind するのは 127.0.0.1 だけだが、利用者が `localhost:<port>` で開くことは
+ * ある。**`localhost` は特別名で、DNS rebinding の対象にならない** (RFC 6761)。
+ * Origin だけ許して Host で拒むと、localhost で開いた画面が一切動かない。
+ */
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
 
 /**
  * Origin と Host を検査する。
@@ -49,7 +55,9 @@ export function isAllowedOrigin(value: string | undefined, policy: OriginPolicy)
     const url = new URL(value);
     return (
       (url.protocol === "http:" || url.protocol === "https:") &&
-      url.hostname === LOOPBACK &&
+      LOOPBACK_HOSTS.has(url.hostname) &&
+      // **任意のポートを許可しない。** 同じマシンで動く別のローカル Web アプリ
+      // からの cross-origin 要求が通ってしまう。
       url.port === String(policy.port)
     );
   } catch {
@@ -57,9 +65,22 @@ export function isAllowedOrigin(value: string | undefined, policy: OriginPolicy)
   }
 }
 
-/** Host は必ず送られる。自分の待受ポートと一致しなければ受けない。 */
+/**
+ * Host は必ず送られる。自分の待受ポートと一致しなければ受けない。
+ *
+ * DNS rebinding の主防御は Host 検査である。ポートを固定するため、rebind された
+ * 名前で来ても一致しない。
+ */
 export function isAllowedHost(value: string | undefined, policy: OriginPolicy): boolean {
-  return value === `${LOOPBACK}:${policy.port}`;
+  if (value === undefined) {
+    return false;
+  }
+  const separator = value.lastIndexOf(":");
+  return (
+    separator > 0 &&
+    LOOPBACK_HOSTS.has(value.slice(0, separator)) &&
+    value.slice(separator + 1) === String(policy.port)
+  );
 }
 
 export type AuthRejection = "missing-token" | "bad-token" | "bad-origin" | "bad-host";

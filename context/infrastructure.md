@@ -142,7 +142,9 @@ flowchart TD
 
 **任意のポートを許可しない。** 同じマシンで動く別のローカル Web アプリからの cross-origin 要求が通ってしまう。許可するのは自分の待受ポートだけである。
 
-あわせて **`Host` ヘッダも検査する。** DNS rebinding の主防御は Host 検査であり、Origin 検査だけでは足りない。`127.0.0.1:<自分の待受ポート>` 以外を拒否する。
+あわせて **`Host` ヘッダも検査する。** DNS rebinding の主防御は Host 検査であり、Origin 検査だけでは足りない。`127.0.0.1:<自分の待受ポート>` と `localhost:<自分の待受ポート>` 以外を拒否する。
+
+Host でも `localhost` を許すのは、Origin 側が既に許しているためである。**Origin だけ許して Host で拒むと、`localhost` で開いた画面が一切動かない。** `localhost` は特別名で常にループバックへ解決され、DNS rebinding の対象にならない (RFC 6761)。防御を担っているのは**ポートの一致**である。
 
 ### 認証状態 (Storage State)
 

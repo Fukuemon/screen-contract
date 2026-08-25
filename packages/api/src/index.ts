@@ -7,15 +7,18 @@
 export type {
   ApprovalRequest,
   ApprovalResult,
-  EvaluationPhase,
   ExecutionEvent,
-  RecordedExpectation,
   RecordedStep,
-  RecordingDraft,
-  StepResult,
 } from "@screen-contract/app";
 
-export { createHttpApp, type HttpAppOptions } from "./http.js";
+export { createHttpApp, type HttpAppOptions, type WebAssets } from "./http.js";
+export {
+  createStreamConnection,
+  type StreamConnection,
+  type StreamConnectionDeps,
+  type StreamFrame,
+  type StreamRejection,
+} from "./stream-endpoint.js";
 export {
   isAllowedHost,
   isAllowedOrigin,

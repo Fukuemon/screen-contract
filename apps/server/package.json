@@ -19,7 +19,8 @@
     "@screen-contract/api": "workspace:*",
     "@screen-contract/app": "workspace:*",
     "@screen-contract/core-execution": "workspace:*",
-    "hono": "^4.13.4"
+    "hono": "^4.13.4",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",
@@ -29,6 +30,7 @@
     "@screen-contract/domain": "workspace:*",
     "@screen-contract/fixture-app": "workspace:*",
     "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
     "vitest": "^4.1.10"
   }
 }

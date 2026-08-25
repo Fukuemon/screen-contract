@@ -57,6 +57,9 @@ export function parseStartRunInput(raw: unknown): StartRunInput {
 export interface UseCases {
   startRun(input: StartRunInput): Promise<void>;
   saveDraft(key: StoreKey, content: string): Promise<Revision>;
+  loadDraft(key: StoreKey): Promise<string | undefined>;
+  /** 差分表示のために正本を読む。書き込みは承認 use case だけが行う。 */
+  loadAuthoritative(key: StoreKey): Promise<string | undefined>;
   requestApproval(key: StoreKey): Promise<ApprovalRequest>;
   approve(requestId: string): Promise<ApprovalResult>;
   listPendingApprovals(): readonly ApprovalRequest[];
@@ -70,6 +73,8 @@ export function createUseCases(deps: UseCaseDeps): UseCases {
   );
   return {
     ...approvals,
+    loadDraft: (key: StoreKey) => deps.store.load("draft", key),
+    loadAuthoritative: (key: StoreKey) => deps.store.load("authoritative", key),
     async startRun(input: StartRunInput): Promise<void> {
       const session = await deps.browser.createSession(input.auth);
       try {

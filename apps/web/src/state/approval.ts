@@ -9,52 +9,63 @@ import type { ApprovalRequest, RecordedStep } from "@screen-contract/api";
 
 export interface DiffView {
   readonly requestId: string;
+  /** 表示した差分がどの版のものか。依頼の revision と突き合わせる。 */
+  readonly revision: string;
   readonly before: string;
   readonly after: string;
 }
 
 export interface ApprovalUiState {
-  readonly pending: readonly ApprovalRequest[];
-  /** 差分を表示済みの依頼。表示していない依頼は確定させない。 */
-  readonly reviewed: ReadonlySet<string>;
+  /**
+   * 差分を表示済みの依頼と、そのときの版。
+   *
+   * **版まで持つ。** id だけだと、差分を見た後に draft が変わった依頼も既読の
+   * まま承認できてしまう。
+   */
+  readonly reviewed: ReadonlyMap<string, string>;
   readonly shown: DiffView | undefined;
 }
 
-export const INITIAL_APPROVAL_UI: ApprovalUiState = {
-  pending: [],
-  reviewed: new Set(),
-  shown: undefined,
-};
+export const INITIAL_APPROVAL_UI: ApprovalUiState = { reviewed: new Map(), shown: undefined };
 
 export function showDiff(state: ApprovalUiState, diff: DiffView): ApprovalUiState {
-  return { ...state, shown: diff, reviewed: new Set([...state.reviewed, diff.requestId]) };
+  return {
+    shown: diff,
+    reviewed: new Map([...state.reviewed, [diff.requestId, diff.revision]]),
+  };
 }
 
-export function setPending(
+/** 一覧が入れ替わったら、消えた依頼の既読を落とす。 */
+export function forgetMissing(
   state: ApprovalUiState,
   pending: readonly ApprovalRequest[],
 ): ApprovalUiState {
   const ids = new Set(pending.map((request) => request.id));
-  // 消えた依頼の既読を持ち越さない。同じ id が再利用されることは無いが、
-  // 持ち越すと「見ていない依頼が既読」に見える状態を許すことになる。
   return {
     ...state,
-    pending,
-    reviewed: new Set([...state.reviewed].filter((id) => ids.has(id))),
+    reviewed: new Map([...state.reviewed].filter(([id]) => ids.has(id))),
   };
 }
 
-export type ApproveRejection = "not-reviewed" | "unknown-request";
+export type ApproveRejection = "not-reviewed" | "stale-review" | "unknown-request";
 
-/** 承認ボタンを押せるか。押せない理由を返す。 */
+/** 承認してよいか。押せない理由を返す。 */
 export function rejectApprove(
   state: ApprovalUiState,
+  pending: readonly ApprovalRequest[],
   requestId: string,
 ): ApproveRejection | undefined {
-  if (!state.pending.some((request) => request.id === requestId)) {
+  const request = pending.find((candidate) => candidate.id === requestId);
+  if (request === undefined) {
     return "unknown-request";
   }
-  return state.reviewed.has(requestId) ? undefined : "not-reviewed";
+  const reviewed = state.reviewed.get(requestId);
+  if (reviewed === undefined) {
+    return "not-reviewed";
+  }
+  // 見た差分と確定する内容がずれていたら止める。server も stale で弾くが、
+  // 押せてしまう時点で「内容を確かめた」ことの証拠にならない。
+  return reviewed === request.revision ? undefined : "stale-review";
 }
 
 /**

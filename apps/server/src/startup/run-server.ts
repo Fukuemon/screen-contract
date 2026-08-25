@@ -14,6 +14,8 @@ import { resolveStateDir } from "./state-dir.js";
  */
 export interface ServerEnv {
   readonly home: string;
+  /** Web UI のビルド成果物。無ければ配信しない。 */
+  readonly webRoot?: string | undefined;
   readonly xdgStateHome: string | undefined;
   readonly cwd: string;
   /** リポジトリと worktree のルート。置き場がここの配下なら中止する。 */
@@ -56,7 +58,7 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
   // ポートは OS に割り当てさせる。トークンと接続先ファイルは listen の後に
   // 確定する (待受アドレスが決まらないと接続先を書けない)。
   try {
-    const server = await listen({ stateDir });
+    const server = await listen({ stateDir, webRoot: env.webRoot });
     return {
       exitCode: 0,
       stderr: `screen-contract-server: http://127.0.0.1:${server.port} で待ち受けています\n`,

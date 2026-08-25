@@ -28,7 +28,6 @@ __pycache__/
 .rulesync/
 rulesync.jsonc
 scripts/link.sh
-apps/web/src/routeTree.gen.ts
 apps/web/.tanstack/
 apps/web/.output/
 apps/web/.nitro/

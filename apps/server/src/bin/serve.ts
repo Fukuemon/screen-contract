@@ -6,8 +6,11 @@ import { runServer } from "../startup/run-server.js";
 /** Workflow Server のプロセス入口。判断は runServer にあり、ここは環境を渡すだけ。 */
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
+const webRoot = fileURLToPath(new URL("../../../web/dist/client/", import.meta.url));
+
 const result = await runServer({
   home: homedir(),
+  webRoot,
   xdgStateHome: process.env["XDG_STATE_HOME"],
   cwd: process.cwd(),
   forbiddenRoots: [repoRoot],
