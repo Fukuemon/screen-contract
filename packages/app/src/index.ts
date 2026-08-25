@@ -1,49 +1,20 @@
+import { createApprovalQueue, type ApprovalRequest, type ApprovalResult } from "./approval.js";
+import { type Revision } from "./revision.js";
+import {
+  authoritativeWriterOf,
+  draftStoreOf,
+  parseStoreKey,
+  type StoreKey,
+  type StorePort,
+} from "./store.js";
 import {
   authContextKey,
-  isPortablePathSegment,
   parseAuthProfileName,
   parseRunId,
   type AuthContext,
   type BrowserPort,
   type RunId,
 } from "@screen-contract/core-execution";
-
-/**
- * 保存の鍵。
- *
- * 実装は adapter/store のファイルシステムであり、鍵は run や画面の識別子として
- * 外部入力 (HTTP / JSON-RPC / エージェント) 由来になる。検証していない文字列を
- * そのままパス組み立てへ渡すと、`../` で任意のファイルを上書きできる。
- * 生成経路を parseStoreKey に限ることで、未検証の値を型で弾く。
- */
-export type StoreKey = string & { readonly __brand: "StoreKey" };
-
-// 先頭を英数字に縛ることで `.` と `..` のセグメントも同時に弾く。
-const STORE_KEY_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-
-export function parseStoreKey(raw: string): StoreKey {
-  // 文字種の検査だけでは足りない。Windows は末尾のドットを落とすため `a.` が
-  // `a` と衝突し、予約デバイス名 (`con` 等) はそもそもファイルにできない。
-  const ok = raw
-    .split("/")
-    .every((segment) => STORE_KEY_SEGMENT.test(segment) && isPortablePathSegment(segment));
-  if (!ok) {
-    throw new Error(
-      "保存の鍵の規則に合いません (英数字で始まるセグメントを / で連結する。末尾のドットとプラットフォーム予約名は使えない)",
-    );
-  }
-  return raw as StoreKey;
-}
-
-/**
- * 保存は機能横断のため app が Port を定義する。実装は adapter/store。
- *
- * 実装側は、鍵から組み立てた絶対パスが保存先ディレクトリの配下に収まることを
- * 解決後にもう一度検証する。型は生成経路を縛るだけで、実装の検証を免除しない。
- */
-export interface StorePort {
-  save(key: StoreKey, value: string): Promise<void>;
-}
 
 export interface UseCaseDeps {
   readonly browser: BrowserPort;
@@ -85,11 +56,20 @@ export function parseStartRunInput(raw: unknown): StartRunInput {
 
 export interface UseCases {
   startRun(input: StartRunInput): Promise<void>;
+  saveDraft(key: StoreKey, content: string): Promise<Revision>;
+  requestApproval(key: StoreKey): Promise<ApprovalRequest>;
+  approve(requestId: string): Promise<ApprovalResult>;
+  listPendingApprovals(): readonly ApprovalRequest[];
 }
 
 /** adapter の具象を受け取らない。合成ルートが注入する (ADR-0023)。 */
 export function createUseCases(deps: UseCaseDeps): UseCases {
+  const approvals = createApprovalQueue(
+    draftStoreOf(deps.store),
+    authoritativeWriterOf(deps.store),
+  );
   return {
+    ...approvals,
     async startRun(input: StartRunInput): Promise<void> {
       const session = await deps.browser.createSession(input.auth);
       try {
@@ -98,7 +78,10 @@ export function createUseCases(deps: UseCaseDeps): UseCases {
         // 同じ場所へ混ざり、Baseline を (screen, state, authProfile) で
         // 識別する前提が壊れる (ADR-0022)。
         const key = parseStoreKey(`run/${input.runId}/${authContextKey(input.auth)}/snapshot`);
-        await deps.store.save(key, JSON.stringify(snapshot));
+        // 実行履歴は正本とも draft とも別の置き場に残す。**正本へ書かない。**
+        // 混ぜると、鍵を合わせた run.start が承認を経ずに正本を上書きできる
+        // (ADR-0017)。
+        await deps.store.save("history", key, JSON.stringify(snapshot));
       } finally {
         // close の失敗で元のエラーを握り潰さない。finally 内で reject すると
         // try 内の例外が置き換わり、本当の失敗理由が消える。
@@ -107,3 +90,40 @@ export function createUseCases(deps: UseCaseDeps): UseCases {
     },
   };
 }
+
+export {
+  authoritativeWriterOf,
+  draftStoreOf,
+  parseStoreKey,
+  type AuthoritativeWriter,
+  type DraftStore,
+  type StoreKey,
+  type StorePort,
+  type StoreSpace,
+} from "./store.js";
+export { contentRevision, type Revision } from "./revision.js";
+export {
+  createApprovalQueue,
+  type ApprovalQueue,
+  type ApprovalRequest,
+  type ApprovalResult,
+} from "./approval.js";
+export {
+  expectationCandidates,
+  recordClick,
+  startRecording,
+  stopRecording,
+  type ClickInput,
+  type ForwardInput,
+  type RecordClickInput,
+  type RecordedAction,
+  type RecordedClick,
+  type RecordedExpectation,
+  type RecordedObservation,
+  type RecordedStep,
+  type RecordingDraft,
+  type RecordingSession,
+  type SelectExpectations,
+  type StopRecordingInput,
+  type StopRecordingOutcome,
+} from "./recording.js";

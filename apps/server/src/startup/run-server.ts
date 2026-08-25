@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { isChromeAvailable, resolveChromeInstall } from "@screen-contract/adapter-browser";
-import { compose } from "../compose.js";
 import { StartupAbort } from "./abort.js";
 import { runStartupChecks } from "./checks.js";
 import { loadProductConfig } from "./config.js";
+import { listen, type RunningServer } from "./listen.js";
 import { resolveStateDir } from "./state-dir.js";
 
 /**
@@ -23,14 +23,17 @@ export interface ServerEnv {
 export interface ServerResult {
   readonly exitCode: number;
   readonly stderr: string;
+  /** 起動できたときだけ入る。呼び出し側が終了させるために持つ。 */
+  readonly server?: RunningServer | undefined;
 }
 
 const PRODUCT_CONFIG_NAME = "screen-contract.config.json";
 
-export function runServer(env: ServerEnv): ServerResult {
+export async function runServer(env: ServerEnv): Promise<ServerResult> {
+  let stateDir: string;
   try {
     const chrome = resolveChromeInstall(env.home);
-    runStartupChecks({
+    stateDir = runStartupChecks({
       stateDir: resolveStateDir(env.xdgStateHome, env.home),
       forbiddenRoots: env.forbiddenRoots,
       isBrowserAvailable: () => isChromeAvailable(chrome.executablePath),
@@ -50,17 +53,17 @@ export function runServer(env: ServerEnv): ServerResult {
     };
   }
 
-  // 検査を通ったが、まだ listen しない。framework は Hono に確定しているが
-  // (ADR-0024)、まだ組み込んでいない。**未確定だから保留しているのではない。**
-  // 127.0.0.1 への bind、トークンの要求、Origin 検査、接続先ファイルの書き出し
-  // (startRuntimeFile) は listen と同時に入れる。ポートを OS に割り当てさせる
-  // 以上、待受アドレスが決まらないと接続先を書けないためである。
-  //
-  // 未実装のまま成功終了しない。0 を返すと、起動したつもりの利用者と
-  // 起動を待つ検査の両方が気付けない。
-  const surfaces = Object.keys(compose()).join(" / ");
-  return {
-    exitCode: 1,
-    stderr: `screen-contract-server: ${surfaces} を組み立てました。listen は未実装です。\n`,
-  };
+  // ポートは OS に割り当てさせる。トークンと接続先ファイルは listen の後に
+  // 確定する (待受アドレスが決まらないと接続先を書けない)。
+  try {
+    const server = await listen({ stateDir });
+    return {
+      exitCode: 0,
+      stderr: `screen-contract-server: http://127.0.0.1:${server.port} で待ち受けています\n`,
+      server,
+    };
+  } catch {
+    // 例外の中身を出さない。listen の失敗にはトークンと接続先のパスが載りうる。
+    return { exitCode: 1, stderr: "screen-contract-server: 待ち受けを開始できませんでした\n" };
+  }
 }

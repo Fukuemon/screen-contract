@@ -36,36 +36,36 @@ function env(overrides: Partial<ServerEnv> = {}): ServerEnv {
 }
 
 describe("runServer", () => {
-  it("ブラウザ未取得なら終了コード 1 で中止し、導入コマンドを案内する", () => {
+  it("ブラウザ未取得なら終了コード 1 で中止し、導入コマンドを案内する", async () => {
     // home を空の一時ディレクトリにするとブラウザ本体は存在しない。
-    const result = runServer(env());
+    const result = await runServer(env());
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("ブラウザ本体が見つかりません");
     expect(result.stderr).toContain("pnpm browser:install");
     expect(result.stderr.endsWith("\n")).toBe(true);
   });
 
-  it("置き場がリポジトリ配下なら中止する", () => {
+  it("置き場がリポジトリ配下なら中止する", async () => {
     const repo = tempDir();
     const inside = join(repo, "state");
     mkdirSync(inside, { mode: 0o700 });
-    const result = runServer(env({ xdgStateHome: inside, forbiddenRoots: [repo] }));
+    const result = await runServer(env({ xdgStateHome: inside, forbiddenRoots: [repo] }));
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("リポジトリ");
   });
 
-  it("設定が壊れていても stack trace を出さない", () => {
+  it("設定が壊れていても stack trace を出さない", async () => {
     // 起動時に読むファイルは secret を含み、出力は端末とログに残る。
     const cwd = tempDir();
     writeFileSync(join(cwd, "screen-contract.config.json"), "{ broken");
-    const result = runServer(env({ cwd }));
+    const result = await runServer(env({ cwd }));
     expect(result.exitCode).toBe(1);
     expect(result.stderr).not.toContain("at ");
     expect(result.stderr.split("\n").filter((line) => line.length > 0)).toHaveLength(2);
   });
 
-  it("成功終了しない (listen が未実装のため)", () => {
-    // 0 を返すと、起動したつもりの利用者と起動を待つ検査の両方が気付けない。
-    expect(runServer(env()).exitCode).not.toBe(0);
+  it("中止したときに server を返さない", async () => {
+    // 返すと、呼び出し側が「起動できた」と読んで close を待ち続ける。
+    expect((await runServer(env())).server).toBeUndefined();
   });
 });

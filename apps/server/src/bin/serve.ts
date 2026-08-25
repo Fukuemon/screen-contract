@@ -6,7 +6,7 @@ import { runServer } from "../startup/run-server.js";
 /** Workflow Server のプロセス入口。判断は runServer にあり、ここは環境を渡すだけ。 */
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
-const result = runServer({
+const result = await runServer({
   home: homedir(),
   xdgStateHome: process.env["XDG_STATE_HOME"],
   cwd: process.cwd(),

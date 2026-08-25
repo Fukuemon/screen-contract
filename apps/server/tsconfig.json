@@ -1,16 +1,28 @@
 {
-  "extends": "@screen-contract/config/tsconfig/node.json",
+  "extends": "@screen-contract/config/tsconfig/server.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src"],
   "references": [
-    { "path": "../../packages/adapter-browser" },
-    { "path": "../../packages/adapter-store" },
-    { "path": "../../packages/agent" },
-    { "path": "../../packages/api" },
-    { "path": "../../packages/app" },
-    { "path": "../../packages/core-execution" }
+    {
+      "path": "../../packages/adapter-browser"
+    },
+    {
+      "path": "../../packages/adapter-store"
+    },
+    {
+      "path": "../../packages/agent"
+    },
+    {
+      "path": "../../packages/api"
+    },
+    {
+      "path": "../../packages/app"
+    },
+    {
+      "path": "../../packages/core-execution"
+    }
   ]
 }

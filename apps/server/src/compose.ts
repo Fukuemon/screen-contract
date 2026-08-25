@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { createAgentBrowserPort } from "@screen-contract/adapter-browser";
 import { createFsStore } from "@screen-contract/adapter-store";
 import { createAgentHandlers } from "@screen-contract/agent";
-import { createApiApp } from "@screen-contract/api";
+import { createApiApp, createHttpApp, type AuthPolicy } from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
 import type { StorePort } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
@@ -17,16 +17,28 @@ import type { BrowserPort } from "@screen-contract/core-execution";
 export interface ComposeOptions {
   readonly browser?: BrowserPort;
   readonly store?: StorePort;
+  /**
+   * 保存先のルート。**必須とする。** 省略を許すと、`ensureStateDir` の 4 つの
+   * 検査 (絶対パス / realpath / リポジトリ配下でない / 0700) を通っていない
+   * 置き場へ書ける。テストが素で呼べば利用者の実際の状態を触る。
+   */
+  readonly stateDir: string;
+  /**
+   * 待受ポートとトークン。**listen した後でなければ決まらない。**
+   * ポートを OS に割り当てさせる以上、組み立ての時点では未定である。
+   */
+  readonly policy?: () => AuthPolicy | undefined;
 }
 
-export function compose(options: ComposeOptions = {}) {
+export function compose(options: ComposeOptions) {
   const browser = options.browser ?? createAgentBrowserPort({ home: homedir() });
-  const store = options.store ?? createFsStore();
+  const store = options.store ?? createFsStore({ root: options.stateDir });
 
   const useCases = createUseCases({ browser, store });
 
   return {
     api: createApiApp(useCases),
     agent: createAgentHandlers(useCases),
+    http: createHttpApp({ useCases, policy: options.policy ?? (() => undefined) }),
   };
 }

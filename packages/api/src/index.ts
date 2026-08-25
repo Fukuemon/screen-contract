@@ -1,3 +1,28 @@
+export { createHttpApp, type HttpAppOptions } from "./http.js";
+export {
+  isAllowedHost,
+  isAllowedOrigin,
+  rejectRequest,
+  tokensMatch,
+  type AuthInput,
+  type AuthPolicy,
+  type AuthRejection,
+  type OriginPolicy,
+} from "./auth.js";
+export {
+  createStreamProxy,
+  discardReason,
+  type DiscardReason,
+  type InputDiscarded,
+  type RelayClaim,
+  type RunState,
+  type RunStateSource,
+  type StreamMode,
+  type StreamProxy,
+  type StreamProxyDeps,
+  type StreamSink,
+} from "./stream.js";
+
 import { parseStartRunInput, type UseCases } from "@screen-contract/app";
 
 /**
