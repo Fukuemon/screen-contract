@@ -1,7 +1,25 @@
-/** DSL を実行しやすい形へ正規化した内部表現。run 単位で version を固定する (ADR-0018)。 */
-export interface WorkflowIr {
-  readonly version: number;
-}
+export {
+  parseScreenDocument,
+  parseWorkflowDocument,
+  type Action,
+  type ActionKind,
+  type ElementDefinition,
+  type Expectation,
+  type ScreenDocument,
+  type ScreenState,
+  type Step,
+  type WorkflowDocument,
+} from "./document.js";
+export { WorkflowError, type WorkflowErrorCode } from "./errors.js";
+export {
+  flattenExecutionSteps,
+  normalizeScreen,
+  type ExecutionStep,
+  type NormalizeInput,
+  type ScreenIr,
+  type StateView,
+  type StepOrigin,
+} from "./ir.js";
 
 /** DSL 修正候補の Port。MVP では実装しない (ADR-0019)。 */
 export interface DslFixPort {
