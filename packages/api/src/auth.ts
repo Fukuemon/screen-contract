@@ -99,6 +99,16 @@ export interface AuthInput {
 
 export interface AuthPolicy extends OriginPolicy {
   readonly token: string;
+  /**
+   * 起動チケット。
+   *
+   * **トークンとは別物である。** トークンは全 endpoint の認可に使い、これは
+   * 「トークン入りの画面を配る相手か」だけを見る。起動ごとに作り直し、URL の
+   * query で 1 度だけ受け取って cookie へ移す (context/infrastructure.md)。
+   *
+   * これが無いと、`GET /` が同一マシンの任意プロセスへトークンを配る。
+   */
+  readonly bootKey: string;
 }
 
 /** 通れば undefined、通らなければ理由を返す。理由に受け取った値を含めない。 */

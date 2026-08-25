@@ -7,7 +7,7 @@ vi.mock("node:crypto", async (importOriginal) => {
   return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) };
 });
 
-const POLICY = { token: "a".repeat(64), port: 5173 };
+const POLICY = { token: "a".repeat(64), bootKey: "b".repeat(43), port: 5173 };
 
 describe("tokensMatch", () => {
   it("一致するトークンを通す", () => {

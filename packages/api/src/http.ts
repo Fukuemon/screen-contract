@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { UseCases, ViewportControl } from "@screen-contract/app";
 import { isConflictError, isExecutionFailure, isValidationError } from "@screen-contract/app";
+import { bootCookie, BOOT_QUERY, checkBootTicket } from "./boot-ticket.js";
 import { registerViewportRoutes } from "./viewport-routes.js";
 import { registerWorkflowRoutes } from "./workflow-routes.js";
 import {
@@ -57,7 +58,14 @@ export interface HttpAppOptions {
 
 export interface WebAssets {
   /** 配信する HTML。トークンは埋め込み済みで受け取る。 */
-  shell(): string;
+  /**
+   * 配信する HTML。
+   *
+   * @param authorized - 起動チケットを持つ相手か。**持たない相手へトークンを
+   *   埋め込まない** — 埋め込むと、ループバックへ繋げる任意プロセスが `curl`
+   *   1 本でトークンを取れる (context/infrastructure.md)。
+   */
+  shell(authorized: boolean): string;
   /** HTML 以外の資材。無ければ undefined。 */
   asset(path: string): { readonly body: Uint8Array; readonly contentType: string } | undefined;
 }
@@ -99,7 +107,27 @@ export function createHttpApp(options: HttpAppOptions): Hono {
     const web = options.web;
     app.use("/", browserFacing);
     app.use("/assets/*", browserFacing);
-    app.get("/", (c) => c.html(web.shell()));
+    /**
+     * 画面の配信。
+     *
+     * **起動チケットを見る。** `GET /` はトークンを埋め込んだ画面を返す唯一の
+     * 経路であり、無条件に開けると同一マシンの任意プロセスがトークンを取れる。
+     * チケットは query で 1 度受け取り、cookie へ移す。
+     */
+    app.get("/", (c) => {
+      const policy = options.policy();
+      if (policy === undefined) {
+        return c.json({ error: "unavailable" }, 503);
+      }
+      const outcome = checkBootTicket(
+        { query: c.req.query(BOOT_QUERY), cookie: c.req.header("cookie") },
+        policy.bootKey,
+      );
+      if (outcome.kind === "issue") {
+        c.header("set-cookie", bootCookie(policy.bootKey));
+      }
+      return c.html(web.shell(outcome.kind !== "denied"));
+    });
     app.get("/assets/*", (c) => {
       const asset = web.asset(c.req.path);
       return asset === undefined

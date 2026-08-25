@@ -26,6 +26,14 @@ export type {
 
 export { createHttpApp, type HttpAppOptions, type WebAssets } from "./http.js";
 export {
+  bootCookie,
+  BOOT_COOKIE,
+  BOOT_QUERY,
+  checkBootTicket,
+  type BootOutcome,
+  type BootRequest,
+} from "./boot-ticket.js";
+export {
   createStreamConnection,
   type StreamConnection,
   type StreamConnectionDeps,

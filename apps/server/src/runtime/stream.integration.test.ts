@@ -263,14 +263,42 @@ describe("live viewport の映像", () => {
 describe("Web UI の配信", () => {
   const WEB_ROOT = fileURLToPath(new URL("../../../web/dist/client/", import.meta.url));
 
-  it("配信する HTML へトークンを埋め込む", async () => {
+  it("起動チケット付きの URL へトークンを埋め込む", async () => {
     // ブラウザは runtime.json を読めず、URL の query には載せられない
     // (context/infrastructure.md)。
     server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
-    const response = await fetch(`http://127.0.0.1:${server.port}/`);
+    const response = await fetch(server.openUrl);
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain(`<meta name="screen-contract-token" content="${server.token}">`);
+  });
+
+  it("チケット無しではトークンを埋め込まない", async () => {
+    // **ここが本題である。** 埋め込むと、ループバックへ繋げる同一マシンの任意
+    // プロセスが curl 1 本でトークンを取り、以後すべての endpoint を呼べる。
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
+    const html = await (await fetch(`http://127.0.0.1:${server.port}/`)).text();
+    expect(html).not.toContain(server.token);
+    expect(html).not.toContain("screen-contract-token");
+  });
+
+  it("チケットを使うと cookie が出て、次からは query が要らない", async () => {
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
+    const first = await fetch(server.openUrl);
+    const cookie = first.headers.get("set-cookie");
+    expect(cookie).toContain("HttpOnly");
+    const second = await fetch(`http://127.0.0.1:${server.port}/`, {
+      headers: { cookie: (cookie ?? "").split(";")[0] ?? "" },
+    });
+    expect(await second.text()).toContain(server.token);
+  });
+
+  it("違うチケットではトークンを埋め込まない", async () => {
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
+    const html = await (
+      await fetch(`http://127.0.0.1:${server.port}/?boot=${"x".repeat(43)}`)
+    ).text();
+    expect(html).not.toContain(server.token);
   });
 
   it("配信ルートの外を読ませない", async () => {

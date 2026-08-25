@@ -117,7 +117,9 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
     });
     return {
       exitCode: 0,
-      stderr: `screen-contract-server: http://127.0.0.1:${server.port} で待ち受けています\n`,
+      // **チケット付きの URL を出す。** origin だけを開くとトークンが埋め込まれ
+      // ず、画面が動かない (context/infrastructure.md)。
+      stderr: `screen-contract-server: 次の URL を開いてください\n${server.openUrl}\n`,
       server,
     };
   } catch {

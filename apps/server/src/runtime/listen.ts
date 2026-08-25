@@ -1,6 +1,6 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
-import type { RunState } from "@screen-contract/api";
+import { BOOT_QUERY, type RunState } from "@screen-contract/api";
 import type { AuthProfileStore } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
 import { createRunSession, createViewportControl } from "@screen-contract/app";
@@ -14,7 +14,7 @@ import type {
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
 import { createFsWebAssets } from "../serving/web-assets.js";
-import { generateLocalToken } from "../startup/token.js";
+import { generateBootKey, generateLocalToken } from "../startup/token.js";
 import {
   processLifecycleHost,
   startRuntimeFile,
@@ -67,6 +67,13 @@ export interface ListenOptions {
 export interface RunningServer {
   readonly port: number;
   readonly token: string;
+  /**
+   * 画面を開くための URL。**チケットを含む。**
+   *
+   * 利用者にはこれを出す。origin だけを開くとトークンが埋め込まれず、画面が
+   * 動かない (context/infrastructure.md)。
+   */
+  readonly openUrl: string;
   /** 実際に bind したアドレス。ループバック限定であることを外から確かめられる。 */
   readonly address: string;
   close(): Promise<void>;
@@ -74,6 +81,8 @@ export interface RunningServer {
 
 export async function listen(options: ListenOptions): Promise<RunningServer> {
   const token = generateLocalToken();
+  // 画面を配る相手を絞るチケット。**トークンとは別物**で、認可には使えない。
+  const bootKey = generateBootKey();
   // policy は関数で渡す。組み立ての時点ではポートが決まっておらず、値で渡すと
   // 未定のまま固定されてしまう。
   let policy: AuthPolicy | undefined;
@@ -163,7 +172,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     // reject が黙って飲み込み、失敗を観測できなくなる。
     started.once("error", reject);
   });
-  policy = { token, port };
+  policy = { token, bootKey, port };
 
   let lifecycle: RuntimeLifecycle;
   try {
@@ -181,6 +190,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
   return {
     port,
     token,
+    openUrl: `http://${LOOPBACK}:${String(port)}/?${BOOT_QUERY}=${bootKey}`,
     address,
     close: () =>
       new Promise<void>((resolve, reject) => {

@@ -102,7 +102,10 @@ export function readEmbeddedToken(root: {
   const token = meta?.getAttribute("content");
   if (token === null || token === undefined || token.length === 0) {
     // 必須データの欠落を隠さない。無いまま進むと、原因の分からない 401 になる。
-    throw new ConnectionError("配信された HTML にトークンが埋め込まれていません");
+    // **次にすることを書く。** チケット付きの URL でしかトークンは埋まらない。
+    throw new ConnectionError(
+      "この URL では操作できません。server の起動時に出た URL (?boot= 付き) を開いてください。",
+    );
   }
   return token;
 }

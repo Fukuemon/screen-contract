@@ -15,3 +15,14 @@ import { randomBytes } from "node:crypto";
 export function generateLocalToken(): string {
   return randomBytes(32).toString("hex");
 }
+
+/**
+ * 起動チケットを生成する。
+ *
+ * **トークンとは別物である。** トークンは全 endpoint の認可に使い、これは
+ * 「トークン入りの画面を配る相手か」だけを見る。寿命はプロセス 1 回分で、
+ * URL の query に載せて利用者へ渡す (context/infrastructure.md)。
+ */
+export function generateBootKey(): string {
+  return randomBytes(32).toString("base64url");
+}

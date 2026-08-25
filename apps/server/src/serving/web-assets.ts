@@ -53,7 +53,17 @@ export function createFsWebAssets(options: FsWebAssetsOptions): WebAssets {
   // ないため、配信ルート配下に外を指す symlink があると前置き一致が通る。
   const realRoot = realpathSync(resolve(options.root));
   return {
-    shell: () => embedToken(readFileSync(join(realRoot, "_shell.html"), "utf8"), options.token),
+    /**
+     * 配信する HTML。
+     *
+     * **チケットを持たない相手にはトークンを埋めない。** 埋めると、ループバック
+     * へ繋げる任意プロセスが `curl` 1 本でトークンを取れる。画面は「開き直して
+     * ください」を出す。
+     */
+    shell: (authorized: boolean) => {
+      const html = readFileSync(join(realRoot, "_shell.html"), "utf8");
+      return authorized ? embedToken(html, options.token) : html;
+    },
 
     asset(path: string) {
       // 要求されたパスが配信ルートの配下に収まることを解決後に検査する。

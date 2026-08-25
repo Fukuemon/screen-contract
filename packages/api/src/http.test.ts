@@ -11,10 +11,11 @@ import type { AuthPolicy } from "./auth.js";
  * use case へ届く前にどこで止まるか**である。
  */
 
+const BOOT = "b".repeat(43);
 const TOKEN = "t".repeat(43);
 const ORIGIN = "http://127.0.0.1:4000";
 const HOST = "127.0.0.1:4000";
-const POLICY: AuthPolicy = { token: TOKEN, port: 4000 };
+const POLICY: AuthPolicy = { token: TOKEN, bootKey: BOOT, port: 4000 };
 
 const SNAPSHOT: ViewportSnapshot = {
   runId: "current",
