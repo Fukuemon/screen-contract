@@ -49,6 +49,8 @@ export interface Viewport {
    */
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<PickedElement | undefined>;
   observe(): Promise<readonly ObservedElement[]>;
+  /** 対象ページのコンソール出力。 */
+  consoleMessages(): Promise<readonly unknown[]>;
   currentUrl(): Promise<string>;
   /** 実行の相手。セッションが無ければ undefined。 */
   runner(): StepRunner | undefined;
@@ -117,6 +119,7 @@ export function createViewport(options: ViewportOptions): Viewport {
     setSize: async (size) => required().setViewport(size),
     captureStorageState: () => required().captureStorageState(),
     observe: () => required().observeElements(),
+    consoleMessages: () => required().consoleMessages(),
     currentUrl: () => required().currentUrl(),
     reset: stop,
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cdpButton, cdpModifiers, mouseInput, toViewportPoint } from "./input.js";
+import { cdpButton, cdpModifiers, mouseInput, toViewportPoint, wheelInput } from "./input.js";
 
 const RECT = { left: 100, top: 50, width: 640, height: 360 };
 const VIEWPORT = { width: 1280, height: 720 };
@@ -61,5 +61,27 @@ describe("CDP への写像", () => {
       "x",
       "y",
     ]);
+  });
+});
+
+describe("wheelInput", () => {
+  const NONE = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
+
+  it("スクロール量を載せる", () => {
+    expect(wheelInput({ x: 10, y: 20 }, { deltaX: 0, deltaY: 120 }, NONE)).toEqual({
+      type: "input_mouse",
+      eventType: "mouseWheel",
+      x: 10,
+      y: 20,
+      button: "none",
+      clickCount: 0,
+      modifiers: 0,
+      deltaX: 0,
+      deltaY: 120,
+    });
+  });
+
+  it("ボタンを押さない", () => {
+    expect(wheelInput({ x: 1, y: 1 }, { deltaX: 5, deltaY: -5 }, NONE).button).toBe("none");
   });
 });

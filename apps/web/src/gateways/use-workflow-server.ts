@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { createApiClient, type ApiClient } from "./client.js";
-import { readEmbeddedToken, serverTargetOf } from "./connection.js";
+import { createWorkflowServerClient, type WorkflowServerClient } from "./workflow-server.js";
+import { readEmbeddedToken, serverTargetOf } from "../lib/connection.js";
 
 /**
  * Workflow Server のクライアント。
@@ -11,13 +11,16 @@ import { readEmbeddedToken, serverTargetOf } from "./connection.js";
  * `location` と `document` は effect の中で読む。描画中に読むと、SSR や
  * prerender で `undefined` を触ることになる。
  */
-export function useApiClient(): { client: ApiClient | undefined; error: string | undefined } {
-  const [state, setState] = useState<{ client?: ApiClient; error?: string }>({});
+export function useWorkflowServer(): {
+  client: WorkflowServerClient | undefined;
+  error: string | undefined;
+} {
+  const [state, setState] = useState<{ client?: WorkflowServerClient; error?: string }>({});
 
   useEffect(() => {
     try {
       setState({
-        client: createApiClient({
+        client: createWorkflowServerClient({
           target: serverTargetOf(globalThis.location.origin),
           token: readEmbeddedToken(globalThis.document),
         }),

@@ -217,6 +217,12 @@ export interface BrowserSession {
   /** 一時停止中もセッションを生かし続ける。 */
   keepalive(): Promise<void>;
   /**
+   * 対象ページのコンソール出力。
+   *
+   * 形は実行基盤の都合であり、core は不透明な値として扱う (ADR-0013)。
+   */
+  consoleMessages(): Promise<readonly unknown[]>;
+  /**
    * viewport の寸法を変える。
    *
    * **CSS ピクセルで指定する。** 対象アプリの responsive の分岐と対応させる

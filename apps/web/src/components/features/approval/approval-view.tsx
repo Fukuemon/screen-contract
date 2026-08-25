@@ -1,14 +1,14 @@
 import { CircleCheck, FileDiff, TriangleAlert } from "lucide-react";
 import type { ApprovalRequest, RecordedStep } from "@screen-contract/api";
-import { Badge } from "../../shared/ui/badge.js";
-import { Button } from "../../shared/ui/button.js";
-import { EmptyState, Panel } from "../../shared/ui/panel.js";
+import { Badge } from "../../ui/badge.js";
+import { Button } from "../../ui/button.js";
+import { EmptyState, Panel } from "../../ui/panel.js";
 import {
   expectationWarnings,
   rejectApprove,
   type ApprovalUiState,
   type ApproveRejection,
-} from "./approval.js";
+} from "../../../entities/approval.js";
 
 /**
  * 承認画面 (presentation)。

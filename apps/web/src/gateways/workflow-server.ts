@@ -1,5 +1,5 @@
 import type { ApprovalRequest, ApprovalResult, ExecutionEvent } from "@screen-contract/api";
-import { httpBase, type ServerTarget } from "./connection.js";
+import { httpBase, type ServerTarget } from "../lib/connection.js";
 
 /**
  * Workflow Server の HTTP API を叩く。
@@ -36,6 +36,17 @@ export interface ViewportSnapshot {
   readonly newElements: readonly ElementDefView[];
 }
 
+export interface ObservedElementView {
+  readonly role: string;
+  readonly name: string;
+  readonly box: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
+}
+
 export interface PickedElementView {
   readonly locator: { readonly role: string; readonly name: string };
   readonly box: {
@@ -48,7 +59,7 @@ export interface PickedElementView {
   readonly matches: number;
 }
 
-export interface ApiClient {
+export interface WorkflowServerClient {
   viewport(): Promise<ViewportSnapshot>;
   startRun(): Promise<ViewportSnapshot>;
   resumeRun(): Promise<ViewportSnapshot>;
@@ -60,6 +71,10 @@ export interface ApiClient {
     readonly x: number;
     readonly y: number;
   }): Promise<PickedElementView | undefined>;
+  observeElements(): Promise<readonly ObservedElementView[]>;
+  consoleMessages(): Promise<
+    readonly { readonly id: string; readonly level: string; readonly text: string }[]
+  >;
   allowedOrigins(): Promise<readonly string[]>;
   addAllowedOrigin(origin: string): Promise<readonly string[]>;
   listAuthProfiles(): Promise<readonly string[]>;
@@ -72,13 +87,15 @@ export interface ApiClient {
   loadAuthoritative(key: string): Promise<string>;
 }
 
-export interface ApiClientOptions {
+export interface WorkflowServerClientOptions {
   readonly target: ServerTarget;
   readonly token: string;
   readonly fetch?: typeof globalThis.fetch | undefined;
 }
 
-export function createApiClient(options: ApiClientOptions): ApiClient {
+export function createWorkflowServerClient(
+  options: WorkflowServerClientOptions,
+): WorkflowServerClient {
   const base = httpBase(options.target);
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
@@ -126,6 +143,22 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
         point,
       );
       return picked ?? undefined;
+    },
+
+    async observeElements(): Promise<readonly ObservedElementView[]> {
+      return (await json<{ elements: readonly ObservedElementView[] }>("/viewport/elements"))
+        .elements;
+    },
+
+    async consoleMessages() {
+      const { messages } = await json<{
+        messages: readonly { level?: string; text?: string }[];
+      }>("/viewport/console");
+      return messages.map((message, index) => ({
+        id: `console-${String(index)}`,
+        level: message.level ?? "log",
+        text: message.text ?? "",
+      }));
     },
 
     async allowedOrigins(): Promise<readonly string[]> {

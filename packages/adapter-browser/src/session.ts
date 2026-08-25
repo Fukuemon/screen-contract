@@ -183,6 +183,11 @@ export function createSession(options: CliOptions, discardPath: string): Browser
       }
     },
 
+    async consoleMessages(): Promise<readonly unknown[]> {
+      const data = readRecord(await call(["console"], "コンソールの取得"), "コンソールの取得");
+      return Array.isArray(data["messages"]) ? data["messages"] : [];
+    },
+
     async stream(): Promise<StreamHandle> {
       const data = readRecord(
         await call(["stream", "status"], "配信ハンドルの取得"),

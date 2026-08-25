@@ -66,6 +66,10 @@ export interface ViewportControl {
   setViewport(size: { readonly width: number; readonly height: number }): Promise<unknown>;
   /** 座標を要素へ解決する。記録に残すのは Locator であり座標ではない。 */
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<unknown>;
+  /** 観測できる要素の一覧。枠と番号の描画に使う。 */
+  observeElements(): Promise<readonly unknown[]>;
+  /** 対象ページのコンソール出力。 */
+  consoleMessages(): Promise<readonly unknown[]>;
   /** 実行してよい origin。UI はここから選ぶ。 */
   allowedOrigins(): readonly string[];
   /**
@@ -198,6 +202,14 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       const picked = await viewport.resolveAt({ x, y });
       return picked === undefined ? c.json({ picked: null }) : c.json({ picked });
     });
+
+    app.get("/viewport/elements", async (c) =>
+      c.json({ elements: await viewport.observeElements() }),
+    );
+
+    app.get("/viewport/console", async (c) =>
+      c.json({ messages: await viewport.consoleMessages() }),
+    );
 
     app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));
 

@@ -1,9 +1,14 @@
 import { Circle, Square, TriangleAlert } from "lucide-react";
-import type { RecordedStepView } from "../../shared/api/client.js";
-import { Badge } from "../../shared/ui/badge.js";
-import { Button } from "../../shared/ui/button.js";
-import { EmptyState } from "../../shared/ui/panel.js";
-import { rejectUiAction, type UiAction, type UiRejection, type UiState } from "./mode.js";
+import type { RecordedStepView } from "../../../gateways/workflow-server.js";
+import { Badge } from "../../ui/badge.js";
+import { Button } from "../../ui/button.js";
+import { EmptyState } from "../../ui/panel.js";
+import {
+  rejectUiAction,
+  type UiAction,
+  type UiRejection,
+  type UiState,
+} from "../../../entities/mode.js";
 
 const REJECTION_TEXT: Readonly<Record<UiRejection, string>> = {
   "not-paused": "「接続」してから記録できます。",

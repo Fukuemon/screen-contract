@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ApiClient, PickedElementView, ViewportSnapshot } from "../../shared/api/client.js";
+import type {
+  WorkflowServerClient,
+  PickedElementView,
+  ViewportSnapshot,
+} from "./workflow-server.js";
 
 /**
  * run の状態と操作。
@@ -7,18 +11,20 @@ import type { ApiClient, PickedElementView, ViewportSnapshot } from "../../share
  * 正本は server が持つ。ここは直近の写しを保持し、操作のたびに取り直す
  * (context/architecture.md)。
  */
-export function useViewportRun(client: ApiClient | undefined): {
+export function useViewportRun(client: WorkflowServerClient | undefined): {
   snapshot: ViewportSnapshot | undefined;
   origins: readonly string[];
   picked: PickedElementView | undefined;
+  pickFailed: boolean;
   error: string | undefined;
-  run: (action: (api: ApiClient) => Promise<ViewportSnapshot>) => void;
+  run: (action: (api: WorkflowServerClient) => Promise<ViewportSnapshot>) => void;
   addOrigin: (origin: string) => void;
   pick: (point: { readonly x: number; readonly y: number }) => void;
 } {
   const [snapshot, setSnapshot] = useState<ViewportSnapshot | undefined>(undefined);
   const [origins, setOrigins] = useState<readonly string[]>([]);
   const [picked, setPicked] = useState<PickedElementView | undefined>(undefined);
+  const [pickFailed, setPickFailed] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -34,7 +40,7 @@ export function useViewportRun(client: ApiClient | undefined): {
   }, [client]);
 
   const run = useCallback(
-    (action: (api: ApiClient) => Promise<ViewportSnapshot>) => {
+    (action: (api: WorkflowServerClient) => Promise<ViewportSnapshot>) => {
       if (client === undefined) {
         return;
       }
@@ -71,11 +77,15 @@ export function useViewportRun(client: ApiClient | undefined): {
       }
       void client
         .resolveAt(point)
-        .then(setPicked)
+        .then((next) => {
+          // 解決できない位置を黙って無視しない。地の文には要素が無い。
+          setPicked(next ?? picked);
+          setPickFailed(next === undefined);
+        })
         .catch((cause: Error) => setError(cause.message));
     },
-    [client],
+    [client, picked],
   );
 
-  return { snapshot, origins, picked, error, run, addOrigin, pick };
+  return { snapshot, origins, picked, pickFailed, error, run, addOrigin, pick };
 }

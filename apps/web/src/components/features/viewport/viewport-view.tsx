@@ -1,0 +1,191 @@
+import {
+  useCallback,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type WheelEvent as ReactWheelEvent,
+} from "react";
+import { Grid3x3, Hand, MousePointerClick } from "lucide-react";
+import type { ObservedElementView, PickedElementView } from "../../../gateways/workflow-server.js";
+import {
+  mouseInput,
+  toViewportPoint,
+  wheelInput,
+  type MouseEventType,
+  type MouseInput,
+  type Point,
+} from "../../../entities/input.js";
+import { Badge } from "../../ui/badge.js";
+import { Button } from "../../ui/button.js";
+import { cn } from "../../../lib/cn.js";
+import { ElementOverlay } from "./element-overlay.js";
+
+export interface ViewportViewProps {
+  readonly frame: string | undefined;
+  /** 対象ページへ入力を届けてよいか。判定は `forwardsToPage` が持つ。 */
+  readonly forwards: boolean;
+  readonly mode: "view" | "operate";
+  readonly canOperate: boolean;
+  readonly elements: readonly ObservedElementView[];
+  readonly picked: PickedElementView | undefined;
+  readonly pickFailed: boolean;
+  readonly onModeChange: (mode: "view" | "operate") => void;
+  readonly onPageInput: (input: MouseInput) => void;
+  readonly onPick: (point: Point) => void;
+  readonly onSize: (size: { width: number; height: number }) => void;
+}
+
+/**
+ * live viewport。
+ *
+ * 選択モードのクリックは要素選択の座標 query であり、対象ページへ届けない
+ * (web-editor feature)。
+ */
+export function ViewportView(props: ViewportViewProps) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [scale, setScale] = useState(1);
+  const [size, setSize] = useState<{ width: number; height: number } | undefined>(undefined);
+  const [overlay, setOverlay] = useState(false);
+
+  const pointOf = useCallback((event: { clientX: number; clientY: number }): Point | undefined => {
+    const image = imageRef.current;
+    // 論理サイズは画像の実寸から取る。別経路だと表示中の画像と食い違う。
+    if (image === null || image.naturalWidth === 0) {
+      return undefined;
+    }
+    return toViewportPoint({ x: event.clientX, y: event.clientY }, image.getBoundingClientRect(), {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    });
+  }, []);
+
+  const { forwards, onPick, onPageInput } = props;
+
+  const send = useCallback(
+    (event: ReactMouseEvent, eventType: MouseEventType) => {
+      const point = pointOf(event);
+      if (point === undefined) {
+        return;
+      }
+      if (!forwards) {
+        if (eventType === "mousePressed") {
+          onPick(point);
+        }
+        return;
+      }
+      onPageInput(mouseInput(eventType, point, event.button, event));
+    },
+    [forwards, onPageInput, onPick, pointOf],
+  );
+
+  const scroll = useCallback(
+    (event: ReactWheelEvent) => {
+      const point = pointOf(event);
+      if (point === undefined || !forwards) {
+        return;
+      }
+      onPageInput(wheelInput(point, { deltaX: event.deltaX, deltaY: event.deltaY }, event));
+    },
+    [forwards, onPageInput, pointOf],
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-line/40 px-3">
+        <div className="flex gap-1" role="group" aria-label="モード">
+          <Button pressed={props.mode === "view"} onClick={() => props.onModeChange("view")}>
+            <MousePointerClick className="size-3.5" aria-hidden />
+            選択
+          </Button>
+          <Button
+            pressed={props.mode === "operate"}
+            disabled={!props.canOperate}
+            onClick={() => props.onModeChange("operate")}
+          >
+            <Hand className="size-3.5" aria-hidden />
+            操作
+          </Button>
+        </div>
+
+        <Button
+          pressed={overlay}
+          aria-pressed={overlay}
+          onClick={() => setOverlay((current) => !current)}
+        >
+          <Grid3x3 className="size-3.5" aria-hidden />
+          要素の枠
+        </Button>
+
+        {/* 選択した要素は座標ではなく Locator で示す (ADR-0026)。 */}
+        {props.mode === "view" && props.picked !== undefined && (
+          <div className="ml-1 flex min-w-0 items-center gap-1.5 text-xs">
+            <code className="shrink-0 text-accent">{props.picked.locator.role}</code>
+            <span className="truncate text-muted">{props.picked.locator.name}</span>
+            {!props.picked.unique && <Badge tone="warn">{props.picked.matches} 件で曖昧</Badge>}
+          </div>
+        )}
+        {props.mode === "view" && props.pickFailed && (
+          <span className="ml-1 text-xs text-muted">
+            この位置に選択できる要素がありません (地の文は選べません)
+          </span>
+        )}
+
+        {scale < 0.99 && (
+          <span className="ml-auto shrink-0 font-mono text-xs text-muted tabular-nums">
+            {Math.round(scale * 100)}%
+          </span>
+        )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-bg p-6">
+        {props.frame === undefined ? (
+          <p className="max-w-xs text-center text-sm leading-relaxed text-muted">
+            「接続」を押すと対象アプリを開き、ここに映像が出ます。
+          </p>
+        ) : (
+          <div className="relative max-h-full max-w-full">
+            <button
+              type="button"
+              aria-label={forwards ? "対象ページを操作する" : "要素を選択する"}
+              className={cn(
+                "block rounded border border-line/60 shadow-2xl",
+                forwards ? "cursor-crosshair" : "cursor-pointer",
+              )}
+              onMouseDown={(event) => send(event, "mousePressed")}
+              onMouseUp={(event) => send(event, "mouseReleased")}
+              onMouseMove={(event) => {
+                if (forwards) {
+                  send(event, "mouseMoved");
+                }
+              }}
+              onWheel={scroll}
+              onContextMenu={(event) => event.preventDefault()}
+            >
+              <img
+                ref={imageRef}
+                src={props.frame}
+                alt="対象アプリの画面"
+                draggable={false}
+                className="block max-h-full max-w-full select-none"
+                onLoad={(event) => {
+                  const image = event.currentTarget;
+                  const next = { width: image.naturalWidth, height: image.naturalHeight };
+                  setScale(image.getBoundingClientRect().width / image.naturalWidth);
+                  setSize(next);
+                  props.onSize(next);
+                }}
+              />
+            </button>
+            {overlay && size !== undefined && (
+              <ElementOverlay
+                elements={props.elements}
+                size={size}
+                picked={props.picked?.locator}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

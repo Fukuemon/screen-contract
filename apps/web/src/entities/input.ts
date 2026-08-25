@@ -37,7 +37,7 @@ export function toViewportPoint(
   };
 }
 
-export type MouseEventType = "mousePressed" | "mouseReleased" | "mouseMoved";
+export type MouseEventType = "mousePressed" | "mouseReleased" | "mouseMoved" | "mouseWheel";
 
 /** CDP のボタン名。既定は左。 */
 export function cdpButton(button: number): "left" | "middle" | "right" | "none" {
@@ -78,6 +78,8 @@ export interface MouseInput {
   readonly button: string;
   readonly clickCount: number;
   readonly modifiers: number;
+  readonly deltaX?: number;
+  readonly deltaY?: number;
 }
 
 export function mouseInput(
@@ -95,5 +97,24 @@ export function mouseInput(
     // 押下だけが「何回目のクリックか」を持つ。離す側に入れると二重に数える。
     clickCount: eventType === "mousePressed" ? 1 : 0,
     modifiers: cdpModifiers(modifiers),
+  };
+}
+
+/** ホイールを対象ページのスクロールとして送る。 */
+export function wheelInput(
+  point: Point,
+  delta: { readonly deltaX: number; readonly deltaY: number },
+  modifiers: Modifiers,
+): MouseInput {
+  return {
+    type: "input_mouse",
+    eventType: "mouseWheel",
+    x: point.x,
+    y: point.y,
+    button: "none",
+    clickCount: 0,
+    modifiers: cdpModifiers(modifiers),
+    deltaX: delta.deltaX,
+    deltaY: delta.deltaY,
   };
 }

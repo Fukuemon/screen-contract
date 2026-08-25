@@ -2,27 +2,27 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ApprovalRequest } from "@screen-contract/api";
-import { ApprovalView } from "../features/approval/approval-view.js";
+import { ApprovalView } from "../components/features/approval/approval-view.js";
 import {
   forgetMissing,
   INITIAL_APPROVAL_UI,
   rejectApprove,
   showDiff,
   type ApprovalUiState,
-} from "../features/approval/approval.js";
-import type { ApiClient } from "../shared/api/client.js";
-import { useApiClient } from "../shared/api/use-api-client.js";
+} from "../entities/approval.js";
+import type { WorkflowServerClient } from "../gateways/workflow-server.js";
+import { useWorkflowServer } from "../gateways/use-workflow-server.js";
 
 export const Route = createFileRoute("/approvals")({ component: ApprovalsRoute });
 
 /** 承認画面。承認待ちの正本は server が持ち、ここは写しを表示する。 */
 function ApprovalsRoute() {
-  const { client, error: clientError } = useApiClient();
+  const { client, error: clientError } = useWorkflowServer();
   const [pending, setPending] = useState<readonly ApprovalRequest[]>([]);
   const [state, setState] = useState<ApprovalUiState>(INITIAL_APPROVAL_UI);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  const refresh = useCallback((api: ApiClient) => {
+  const refresh = useCallback((api: WorkflowServerClient) => {
     void api
       .listApprovals()
       .then((next) => {

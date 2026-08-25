@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ButtonHTMLAttributes } from "react";
-import { cn } from "./cn.js";
+import { cn } from "../../lib/cn.js";
 
 /**
  * ボタン。

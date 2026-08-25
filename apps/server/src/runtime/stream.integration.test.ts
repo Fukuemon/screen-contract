@@ -152,6 +152,7 @@ describe("live viewport の映像", () => {
       resolveAt: () => Promise.resolve(undefined),
       observe: () => Promise.resolve([]),
       currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
+      consoleMessages: () => Promise.resolve([]),
     };
   }
 

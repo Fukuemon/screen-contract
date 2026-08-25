@@ -42,6 +42,8 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     setRecording: (recording) => options.run.setRecording(recording),
     snapshot: () => options.run.snapshot(),
     resolveAt: (point) => options.viewport.resolveAt(point),
+    observeElements: () => options.viewport.observe(),
+    consoleMessages: () => options.viewport.consoleMessages(),
     allowedOrigins: () => options.allowedOrigins.list(),
     addAllowedOrigin: (origin) => options.allowedOrigins.add(origin),
 

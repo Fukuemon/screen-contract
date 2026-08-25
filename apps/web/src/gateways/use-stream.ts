@@ -5,7 +5,7 @@ import {
   readEmbeddedToken,
   serverTargetOf,
   streamUrl,
-} from "../../shared/api/connection.js";
+} from "../lib/connection.js";
 
 export interface Stream {
   readonly frame: string | undefined;
