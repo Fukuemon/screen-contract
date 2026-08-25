@@ -8,6 +8,9 @@
   "references": [
     {
       "path": "../core-element"
+    },
+    {
+      "path": "../core-workflow"
     }
   ]
 }

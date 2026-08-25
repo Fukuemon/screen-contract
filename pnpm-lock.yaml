@@ -194,6 +194,9 @@ importers:
       '@screen-contract/core-element':
         specifier: workspace:*
         version: link:../core-element
+      '@screen-contract/core-workflow':
+        specifier: workspace:*
+        version: link:../core-workflow
     devDependencies:
       '@screen-contract/config':
         specifier: workspace:*
@@ -226,6 +229,9 @@ importers:
 
   packages/core-execution:
     dependencies:
+      '@screen-contract/core-workflow':
+        specifier: workspace:*
+        version: link:../core-workflow
       '@screen-contract/domain':
         specifier: workspace:*
         version: link:../domain
