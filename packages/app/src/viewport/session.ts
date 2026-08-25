@@ -59,6 +59,13 @@ export interface Viewport {
    */
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<PickedElement | undefined>;
   observe(): Promise<readonly ObservedElement[]>;
+  /**
+   * 可視な要素の Locator。**box を伴わない。**
+   *
+   * box の取得は対象ページへ描き込む実行基盤がある。期待状態の候補づくりの
+   * ように box が要らない用途では、こちらを使う (ADR-0013)。
+   */
+  observeVisible(): Promise<readonly SemanticLocator[]>;
   /** 最初に開く URL。run の 1 ステップはここへの `open` になる。 */
   entryUrl(): string;
   /** 対象ページのコンソール出力。 */
@@ -143,6 +150,7 @@ export function createViewport(options: ViewportOptions): Viewport {
     setSize: async (size) => required().setViewport(size),
     captureStorageState: () => required().captureStorageState(),
     observe: () => required().observeElements(),
+    observeVisible: () => required().observeVisible(),
     consoleMessages: () => required().consoleMessages(),
     currentUrl: () => required().currentUrl(),
     async reset(): Promise<void> {

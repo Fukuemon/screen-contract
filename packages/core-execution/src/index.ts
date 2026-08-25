@@ -210,8 +210,22 @@ export interface BrowserSession {
   perform(action: BrowserAction): Promise<void>;
   snapshot(): Promise<Snapshot>;
   screenshot(): Promise<Screenshot>;
-  /** 座標から要素を解決するための box 付き要素一覧。 */
+  /**
+   * 座標から要素を解決するための box 付き要素一覧。
+   *
+   * **対象ページへ描き込む実装がありうる。** box の取得に注釈スクリーンショット
+   * を使う実行基盤では、取得のたびに枠と番号がページへ描かれる (agent-browser
+   * 0.34.0 で実測)。それが配信の映像に映り、操作の邪魔にもなる。**box が要ら
+   * ない用途では `observeVisible` を使う。**
+   */
   observeElements(): Promise<readonly ObservedElement[]>;
+  /**
+   * 可視な要素の Locator。**box を伴わない。**
+   *
+   * 期待状態の候補を作るのに要るのは「何が見えているか」だけである。box まで
+   * 取ると、対象ページへ描き込む実装で操作の邪魔になる。
+   */
+  observeVisible(): Promise<readonly SemanticLocator[]>;
   currentUrl(): Promise<string>;
   /**
    * 配信へ繋ぐ。1 フレームぶんの data URI を渡す。

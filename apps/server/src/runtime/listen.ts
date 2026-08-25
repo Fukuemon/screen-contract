@@ -85,6 +85,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           entryUrl: options.entryUrl ?? viewportPort.entryUrl(),
           runner: () => viewportPort.runner(),
           observe: () => viewportPort.observe(),
+          observeVisible: () => viewportPort.observeVisible(),
           currentUrl: () => viewportPort.currentUrl(),
           warnings: () => viewportPort.authWarnings(),
         });

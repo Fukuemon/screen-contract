@@ -1,5 +1,6 @@
 import type {
   ConsoleMessage,
+  SemanticLocator,
   StorageRestoreReport,
   StorageState,
   BoundingBox,
@@ -66,33 +67,6 @@ function readBox(value: unknown): BoundingBox | undefined {
   return { x, y, width, height };
 }
 
-/** 注釈スクリーンショットの応答から box 付き要素一覧を取り出す。 */
-export function readObservedElements(data: unknown): readonly ObservedElement[] {
-  const record = readRecord(data, "要素一覧の取得");
-  const annotations = record["annotations"];
-  if (!Array.isArray(annotations)) {
-    throw new AgentBrowserError(
-      "browser/unresponsive",
-      "要素一覧の応答に annotations がありません",
-    );
-  }
-  const elements: ObservedElement[] = [];
-  for (const entry of annotations) {
-    if (typeof entry !== "object" || entry === null) {
-      continue;
-    }
-    const { role, name, box } = entry as Record<string, unknown>;
-    const parsedBox = readBox(box);
-    // role と name が無い要素は Semantic Locator へ解決できない。座標解決の
-    // 入力にならないため落とす。
-    if (typeof role !== "string" || typeof name !== "string" || parsedBox === undefined) {
-      continue;
-    }
-    elements.push({ role, name, box: parsedBox });
-  }
-  return elements;
-}
-
 function actionArgs(action: BrowserAction): readonly string[] {
   switch (action.kind) {
     case "open":
@@ -108,6 +82,9 @@ function actionArgs(action: BrowserAction): readonly string[] {
 export type RawSession = Omit<BrowserSession, "connect" | "restoreReport"> & {
   streamEndpoint(): Promise<string>;
 };
+
+/** box をまとめて引くときの同時実行数。1 件ずつ待つと要素数に比例して伸びる。 */
+const BOX_CONCURRENCY = 32;
 
 export function createSession(options: CliOptions, discardPath: string): RawSession {
   const call = async (args: readonly string[], what: string): Promise<unknown> =>
@@ -140,13 +117,60 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
       return { bytes: new Uint8Array(await readFile(path)) };
     },
 
+    /**
+     * box 付きの要素一覧。
+     *
+     * **注釈スクリーンショットを使わない。** `--annotate` は box を返す代わりに
+     * **対象ページへ赤い枠と番号を描き込む** (agent-browser 0.34.0 で実測)。
+     * その描画は配信の映像に映り、直後のクリックとも競合する。
+     *
+     * 代わりに `snapshot` で ref を取り、`get box` で 1 件ずつ引く。実測で
+     * 518 要素 892ms (`--annotate` は 314ms) だが、描き込まない。
+     */
     async observeElements(): Promise<readonly ObservedElement[]> {
-      // box は Accessibility Snapshot の応答に含まれない。注釈スクリーンショット
-      // の応答から得る。**生成された注釈済み画像は保存せず捨てる。** 残すと
-      // 成果物の注釈画像と紛らわしく、差分検知の対象を誤らせる。
-      return readObservedElements(
-        await call(["--annotate", "screenshot", discardPath], "要素一覧の取得"),
-      );
+      const data = readRecord(await call(["snapshot"], "要素一覧の取得"), "要素一覧の取得");
+      const refs = data["refs"];
+      if (typeof refs !== "object" || refs === null) {
+        return [];
+      }
+      const entries = Object.entries(refs as Record<string, unknown>).flatMap(([ref, value]) => {
+        const entry = (typeof value === "object" && value !== null ? value : {}) as Record<
+          string,
+          unknown
+        >;
+        return typeof entry["role"] === "string" && typeof entry["name"] === "string"
+          ? [{ ref, role: entry["role"], name: entry["name"] }]
+          : [];
+      });
+
+      const observed: ObservedElement[] = [];
+      // まとめて投げる。1 件ずつ待つと要素数に比例して線形に伸びる。
+      for (let at = 0; at < entries.length; at += BOX_CONCURRENCY) {
+        const chunk = entries.slice(at, at + BOX_CONCURRENCY);
+        const boxes = await Promise.all(
+          chunk.map(async (entry) => {
+            try {
+              return readRecord(
+                await call(["get", "box", `@${entry.ref}`], "要素の位置の取得"),
+                "要素の位置の取得",
+              );
+            } catch {
+              // 1 件取れないだけで一覧を落とさない。画面から消えた要素は
+              // ref が無効になる。
+              return undefined;
+            }
+          }),
+        );
+        for (const [index, raw] of boxes.entries()) {
+          const entry = chunk[index];
+          const box = readBox(raw);
+          if (entry === undefined || box === undefined) {
+            continue;
+          }
+          observed.push({ role: entry.role, name: entry.name, box });
+        }
+      }
+      return observed;
     },
 
     async currentUrl(): Promise<string> {
@@ -213,6 +237,32 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
             reason:
               "localStorage は復元していません (実行基盤が値を argv でしか受けず、秘密が他プロセスから読めるため)。cookie だけで認証が通らない対象では、手でログインし直してください",
           };
+    },
+
+    /**
+     * 可視な要素の Locator。
+     *
+     * **`snapshot` を使う。** `--annotate screenshot` は box を返す代わりに
+     * 対象ページへ枠と番号を描き込む (実測)。box が要らない用途で使うと、
+     * 描画が配信へ映り、操作の邪魔になる。
+     */
+    async observeVisible(): Promise<readonly SemanticLocator[]> {
+      const data = readRecord(await call(["snapshot"], "要素の取得"), "要素の取得");
+      const refs = data["refs"];
+      if (typeof refs !== "object" || refs === null) {
+        return [];
+      }
+      const locators: SemanticLocator[] = [];
+      for (const value of Object.values(refs as Record<string, unknown>)) {
+        const entry = (typeof value === "object" && value !== null ? value : {}) as Record<
+          string,
+          unknown
+        >;
+        if (typeof entry["role"] === "string" && typeof entry["name"] === "string") {
+          locators.push({ role: entry["role"], name: entry["name"] });
+        }
+      }
+      return locators;
     },
 
     async consoleMessages(): Promise<readonly ConsoleMessage[]> {

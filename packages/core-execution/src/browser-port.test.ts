@@ -19,6 +19,7 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
     observeElements: async () => [
       { role: "button", name: "設定を開く", box: { x: 8, y: 90, width: 82, height: 27 } },
     ],
+    observeVisible: async () => [{ role: "button", name: "設定を開く" }],
     currentUrl: async () => "http://127.0.0.1:5173/",
     connect: async () => ({ send: () => undefined, close: () => undefined }),
     keepalive: async () => undefined,

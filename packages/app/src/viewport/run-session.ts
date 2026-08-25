@@ -1,3 +1,4 @@
+import { createElementIdRegistry } from "@screen-contract/core-element";
 import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
 import type { PageInput } from "@screen-contract/core-execution";
 import type { RunState, StreamMode } from "./run-state.js";
@@ -108,6 +109,14 @@ export interface RunSessionOptions {
    * 解決する (ADR-0026)。
    */
   readonly observe?: (() => Promise<readonly ObservedElement[]>) | undefined;
+  /**
+   * 期待状態の候補づくりに使う観測。**box を伴わない。**
+   *
+   * box の取得は対象ページへ枠と番号を描き込む実行基盤がある (agent-browser
+   * 0.34.0 で実測)。反映を待つ間に繰り返し呼ぶため、描き込むものを使うと
+   * 映像が枠だらけになり、操作の邪魔にもなる。
+   */
+  readonly observeVisible?: (() => Promise<readonly SemanticLocator[]>) | undefined;
   readonly currentUrl?: (() => Promise<string>) | undefined;
   /** 利用者へ出す注意書きの取得元。 */
   readonly warnings?: (() => readonly string[]) | undefined;
@@ -184,6 +193,27 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   let stateKey = stateKeyOf(options.entryUrl);
   /** 記録を止めた時点までの手順。再開しても消さない。 */
   let confirmed: readonly (RecordedStep & { id: string })[] = [];
+  /**
+   * 転送の順番待ち。
+   *
+   * **順序を守るのは転送までである。**
+   *
+   * 押下は観測を挟んでから転送するのに対し、離すは即座に転送するため、並べないと
+   * 離すが押下を追い越す。対象ページはクリックとして解釈できず、1 回目が効かない。
+   *
+   * 一方、**反映待ちまで並べてはいけない。** 押下の反映は離すが届くまで起きない
+   * ため、待ちの中に離すを閉じ込めると永久に変化せず、期待状態が必ず空になる。
+   */
+  let forwarded: Promise<void> = Promise.resolve();
+  /**
+   * 直前に確定した状態の box 付き要素。
+   *
+   * **クリックの手前で取り直さない。** 取得は要素数に比例し、実測で 518 要素
+   * 892ms かかる。転送がそのぶん遅れると、押下と離すの間隔が開いてクリックとして
+   * 成立しなくなる。ADR-0026 が求めるのは「操作前の状態で解決する」ことであり、
+   * 直前に確定した状態はそれを満たす。
+   */
+  let resolvable: readonly ObservedElement[] = [];
 
   function badges(): readonly ElementId[] {
     return badgesByState.get(stateKey) ?? [];
@@ -205,13 +235,36 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     };
   }
 
-  /** 要素 ID は Locator から決定的に導く。同じ要素は同じ ID になる。 */
-  function nextId(locator: SemanticLocator): ElementId {
-    const slug = `${locator.role}-${locator.name}`
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff]+/g, "-")
-      .replace(/^-|-$/g, "");
-    return `el-${slug}` as ElementId;
+  /**
+   * 要素 ID の台帳。
+   *
+   * **名称を識別子にしない** (ADR-0012)。Locator は探し方であって同一性では
+   * ないため、対応は台帳が持つ。
+   */
+  const elementIds = createElementIdRegistry();
+  const nextId = (locator: SemanticLocator): ElementId => elementIds.idFor(locator);
+
+  /** 期待状態が指していて、まだ定義の無い要素。 */
+  function definitionsFor(
+    recorded: readonly RecordedStep[],
+    known: readonly ElementDef[],
+  ): readonly ElementDef[] {
+    const have = new Set(known.map((element) => element.id));
+    const added: ElementDef[] = [];
+    for (const step of recorded) {
+      for (const expectation of step.expect) {
+        if (expectation.kind !== "element" || have.has(expectation.ref)) {
+          continue;
+        }
+        const locator = elementIds.locatorOf(expectation.ref);
+        if (locator === undefined) {
+          continue;
+        }
+        have.add(expectation.ref);
+        added.push({ id: expectation.ref, name: locator.name, type: locator.role, locator });
+      }
+    }
+    return added;
   }
 
   /** entry へ到達する 1 ステップ。ここから記録した steps が積み上がる。 */
@@ -248,6 +301,117 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       recording = false;
     }
     return snapshot();
+  }
+
+  /**
+   * 入力を 1 つ処理する。
+   *
+   * **解決 → 転送 → 検証の順を内側で守る** (ADR-0026)。外へ出すと「操作後の
+   * 状態で解決する」経路が呼び出し側の書き方次第で生まれ、静かに壊れる。
+   */
+  async function handle(input: PageInput, forward: () => void): Promise<void> {
+    const point = pressPointOf(input);
+    // 記録していないときも転送する。記録の有無で操作が効いたり効かなくなったり
+    // しない。押下以外 (移動・離す・ホイール) は 1 手順に数えない — 数えると
+    // 1 クリックが 3 手順になる。
+    if (point === undefined || !recording || session === undefined) {
+      forward();
+      return;
+    }
+    const observe = options.observe;
+    if (observe === undefined) {
+      forward();
+      return;
+    }
+    const visible =
+      options.observeVisible ??
+      (async (): Promise<readonly SemanticLocator[]> =>
+        (await observe()).map((element) => ({ role: element.role, name: element.name })));
+    const currentUrl = options.currentUrl;
+    const settle = options.settle ?? DEFAULT_SETTLE;
+
+    /**
+     * 観測を 1 回取る。
+     *
+     * **呼ぶたびに取り直す。** 同じ値を返すと `expectationCandidates` が
+     * 「変化した項目」を 1 つも見つけられず、記録した手順が必ず期待状態を
+     * 持たなくなる。期待状態が無いと冪等スキップが効かない。
+     */
+    const observeOnce = async (): Promise<RecordedObservation> => {
+      const [url, locators] = await Promise.all([
+        currentUrl?.() ?? Promise.resolve(options.entryUrl),
+        // **box を取らない。** 取ると対象ページへ描き込まれ、映像が枠だらけに
+        // なるうえ、反映待ちの間に繰り返し描かれる。
+        visible(),
+      ]);
+      return {
+        // title は取得経路が無い。空文字で埋めると比較が一度も発火しない
+        // まま実装済みに見えるため、持たせない。
+        url: new URL(url).pathname,
+        visibleRefs: locators.map((locator) => nextId(locator)),
+      };
+    };
+
+    let before: RecordedObservation | undefined;
+    /**
+     * 前後の観測。
+     *
+     * 転送した直後の画面はまだ変わっていない。**変わるまで見る。** 見ないと、
+     * 期待状態の候補が常に空になる。待ち切れなければ諦める — 何も変わらない
+     * クリックは実在する。
+     */
+    const observeStep = async (): Promise<RecordedObservation> => {
+      if (before === undefined) {
+        before = await observeOnce();
+        return before;
+      }
+      let after = await observeOnce();
+      for (let attempt = 0; attempt < settle.attempts && same(before, after); attempt += 1) {
+        await delay(settle.intervalMs);
+        after = await observeOnce();
+      }
+      return after;
+    };
+
+    await session.click(
+      // **クリックの手前で取り直さない。** 取得は要素数に比例し、実測で
+      // 518 要素 892ms かかる。転送がそのぶん遅れると、押下と離すの間隔が
+      // 開いてクリックとして成立しない。
+      { elements: resolvable, x: point.x, y: point.y, nextId },
+      // **転送を session の内側で行う。** 外へ出すと、操作前の状態で「後」を
+      // 観測する経路が生まれ、期待状態が静かに空になる (ADR-0026)。
+      () => {
+        forward();
+        return Promise.resolve();
+      },
+      observeStep,
+    );
+    // 操作でページが移ることがある。移った先の画面状態へ番号の帳簿を切り替える。
+    if (currentUrl !== undefined) {
+      stateKey = stateKeyOf(await currentUrl());
+    }
+    // 落ち着いた状態の box を次のクリックの解決に使う。**転送の手前ではなく
+    // ここで取る** — 手前で取ると、その待ち時間だけ操作が遅れる。
+    resolvable = await observe();
+    const draft = session.finish();
+    // 記録を止めて再開しても前の手順を消さない。session は開始時点からの
+    // 手順しか持たないため、確定済みの分へ追記する。
+    steps = [
+      ...confirmed,
+      ...draft.steps.map((step, index) => ({
+        ...step,
+        id: `step-${String(confirmed.length + index)}`,
+      })),
+    ];
+    newElements = [
+      ...newElements.filter(
+        (element) => !draft.newElements.some((added) => added.id === element.id),
+      ),
+      ...draft.newElements,
+    ];
+    // **期待状態が指す要素にも定義を用意する。** 用意しないと、ID だけがあって
+    // 探し方の無い参照が残り、成果物の生成と再実行で解決できない。
+    newElements = [...newElements, ...definitionsFor(steps, newElements)];
   }
 
   return {
@@ -306,97 +470,23 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    async handleInput(input: PageInput, forward: () => void): Promise<void> {
-      const point = pressPointOf(input);
-      // 記録していないときも転送する。記録の有無で操作が効いたり効かなくなったり
-      // しない。押下以外 (移動・離す・ホイール) は 1 手順に数えない — 数えると
-      // 1 クリックが 3 手順になる。
-      if (
-        point === undefined ||
-        !recording ||
-        session === undefined ||
-        options.observe === undefined
-      ) {
-        forward();
-        return;
-      }
-      const observe = options.observe;
-      const currentUrl = options.currentUrl;
-      const settle = options.settle ?? DEFAULT_SETTLE;
-
-      /**
-       * 観測を 1 回取る。
-       *
-       * **呼ぶたびに取り直す。** 同じ値を返すと `expectationCandidates` が
-       * 「変化した項目」を 1 つも見つけられず、記録した手順が必ず期待状態を
-       * 持たなくなる。期待状態が無いと冪等スキップが効かない。
-       */
-      const observeOnce = async (): Promise<RecordedObservation> => {
-        const [url, elements] = await Promise.all([
-          currentUrl?.() ?? Promise.resolve(options.entryUrl),
-          observe(),
-        ]);
-        return {
-          // title は取得経路が無い。空文字で埋めると比較が一度も発火しない
-          // まま実装済みに見えるため、持たせない。
-          url: new URL(url).pathname,
-          visibleRefs: elements.map((element) =>
-            nextId({ role: element.role, name: element.name }),
-          ),
-        };
-      };
-
-      let before: RecordedObservation | undefined;
-      /**
-       * 前後の観測。
-       *
-       * 転送した直後の画面はまだ変わっていない。**変わるまで見る。** 見ないと、
-       * 期待状態の候補が常に空になる。待ち切れなければ諦める — 何も変わらない
-       * クリックは実在する。
-       */
-      const observeStep = async (): Promise<RecordedObservation> => {
-        if (before === undefined) {
-          before = await observeOnce();
-          return before;
-        }
-        let after = await observeOnce();
-        for (let attempt = 0; attempt < settle.attempts && same(before, after); attempt += 1) {
-          await delay(settle.intervalMs);
-          after = await observeOnce();
-        }
-        return after;
-      };
-
-      await session.click(
-        { elements: await observe(), x: point.x, y: point.y, nextId },
-        // **転送を session の内側で行う。** 外へ出すと、操作前の状態で「後」を
-        // 観測する経路が生まれ、期待状態が静かに空になる (ADR-0026)。
-        () => {
-          forward();
-          return Promise.resolve();
-        },
-        observeStep,
-      );
-      // 操作でページが移ることがある。移った先の画面状態へ番号の帳簿を切り替える。
-      if (currentUrl !== undefined) {
-        stateKey = stateKeyOf(await currentUrl());
-      }
-      const draft = session.finish();
-      // 記録を止めて再開しても前の手順を消さない。session は開始時点からの
-      // 手順しか持たないため、確定済みの分へ追記する。
-      steps = [
-        ...confirmed,
-        ...draft.steps.map((step, index) => ({
-          ...step,
-          id: `step-${String(confirmed.length + index)}`,
-        })),
-      ];
-      newElements = [
-        ...newElements.filter(
-          (element) => !draft.newElements.some((added) => added.id === element.id),
-        ),
-        ...draft.newElements,
-      ];
+    handleInput(input: PageInput, forward: () => void): Promise<void> {
+      let release = (): void => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const done = forwarded
+        .then(() =>
+          handle(input, () => {
+            forward();
+            // ここで次の入力を通す。反映待ちは鎖の外で続ける。
+            release();
+          }),
+        )
+        // 転送へ辿り着けなくても鎖を止めない。止めると以後の操作が届かない。
+        .finally(release);
+      forwarded = gate;
+      return done;
     },
 
     start: () => run(true),
@@ -416,6 +506,16 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       if (recording && session === undefined) {
         // 記録した steps の遷移元は run の到達状態から決まる (ADR-0026)。
         session = startRecording(RUN_ID, [...newElements]);
+        // 最初のクリックを解決する材料を先に取る。取らないと 1 手目だけが
+        // 座標のまま残る。
+        void options
+          .observe?.()
+          .then((elements) => {
+            resolvable = elements;
+          })
+          // 取れなくても記録は始める。1 手目が座標のまま残るだけで、警告付きで
+          // 記録は続く (ADR-0026)。
+          .catch(() => undefined);
       }
       if (!recording) {
         confirmed = steps;

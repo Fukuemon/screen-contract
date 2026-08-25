@@ -8,6 +8,7 @@ import type {
 // **同じ型を core ごとに持たない。** 片方へ項目を足した瞬間に、構造的型付けの
 // おかげで通ってしまう無音の不一致が生まれる (context/architecture.md)。
 export type { BoundingBox, ObservedElement, SemanticLocator } from "@screen-contract/domain";
+export { createElementIdRegistry, type ElementIdRegistry } from "./element-id.js";
 
 /**
  * 要素 ID の規則。

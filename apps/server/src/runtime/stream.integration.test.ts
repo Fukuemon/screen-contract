@@ -120,6 +120,7 @@ function fakeViewport(frames: readonly string[]) {
     reset: () => Promise.resolve(),
     resolveAt: () => Promise.resolve(undefined),
     observe: () => Promise.resolve([]),
+    observeVisible: () => Promise.resolve([]),
     currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
     entryUrl: () => "http://127.0.0.1:5174/",
     authWarnings: () => [],

@@ -2,7 +2,7 @@ import type { Observation, StepRunner } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
 import { describe, expect, it } from "vitest";
 import type { ElementId } from "@screen-contract/domain";
-import { createRunSession } from "./run-session.js";
+import { createRunSession, type RunSession } from "./run-session.js";
 
 const ENTRY = "http://127.0.0.1:5174/";
 
@@ -132,17 +132,15 @@ describe("構成番号", () => {
     const s = session(fakeRunner());
     s.addBadge(button);
     const after = s.addBadge(link);
-    expect(after.badges).toEqual(["el-button-保存", "el-link-戻る"]);
-    expect(s.moveBadge("el-link-戻る" as ElementId, 0).badges).toEqual([
-      "el-link-戻る",
-      "el-button-保存",
-    ]);
+    // ID は不透明な連番である。名称を識別子にしない (ADR-0012)。
+    expect(after.badges).toEqual(["el-0001", "el-0002"]);
+    expect(s.moveBadge("el-0002" as ElementId, 0).badges).toEqual(["el-0002", "el-0001"]);
   });
 
   it("同じ要素へ二重に番号を付けない", () => {
     const s = session(fakeRunner());
     s.addBadge(button);
-    expect(s.addBadge(button).badges).toEqual(["el-button-保存"]);
+    expect(s.addBadge(button).badges).toEqual(["el-0001"]);
   });
 
   it("画面を移ると番号を引き継がない", () => {
@@ -159,9 +157,9 @@ describe("構成番号", () => {
     s.addBadge(button);
     s.enterState("http://127.0.0.1:5174/settings");
     s.addBadge(link);
-    expect(s.snapshot().badges).toEqual(["el-link-戻る"]);
+    expect(s.snapshot().badges).toEqual(["el-0002"]);
     s.enterState(ENTRY);
-    expect(s.snapshot().badges).toEqual(["el-button-保存"]);
+    expect(s.snapshot().badges).toEqual(["el-0001"]);
   });
 
   it("query と fragment の違いで画面を分けない", () => {
@@ -169,7 +167,7 @@ describe("構成番号", () => {
     const s = session(fakeRunner());
     s.addBadge(button);
     s.enterState("http://127.0.0.1:5174/?tab=1#top");
-    expect(s.snapshot().badges).toEqual(["el-button-保存"]);
+    expect(s.snapshot().badges).toEqual(["el-0001"]);
   });
 
   it("要素の定義は画面をまたいで残す", () => {
@@ -177,7 +175,7 @@ describe("構成番号", () => {
     const s = session(fakeRunner());
     s.addBadge(button);
     s.enterState("http://127.0.0.1:5174/settings");
-    expect(s.snapshot().newElements.map((element) => element.id)).toEqual(["el-button-保存"]);
+    expect(s.snapshot().newElements.map((element) => element.id)).toEqual(["el-0001"]);
   });
 
   it("いま採番している画面を写しに載せる", () => {
@@ -186,6 +184,15 @@ describe("構成番号", () => {
     expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
   });
 });
+
+/** ID は不透明な連番である。どの要素かは定義の locator で引く。 */
+function idOf(s: RunSession, locator: { role: string; name: string }): string | undefined {
+  return s
+    .snapshot()
+    .newElements.find(
+      (element) => element.locator.role === locator.role && element.locator.name === locator.name,
+    )?.id;
+}
 
 describe("入力の記録と転送", () => {
   const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
@@ -249,9 +256,10 @@ describe("入力の記録と転送", () => {
     ]);
     const s = await record(page);
     expect(page.forwards).toBe(1);
-    expect(s.snapshot().steps[0]?.expect).toEqual([
-      { kind: "element", ref: "el-heading-設定", visible: true },
-    ]);
+    // ID は不透明である。どの要素かは定義の locator で確かめる。
+    const expected = s.snapshot().steps[0]?.expect ?? [];
+    expect(expected).toHaveLength(1);
+    expect(idOf(s, { role: "heading", name: "設定" })).toBe((expected[0] as { ref: string }).ref);
   });
 
   it("転送で消えた要素も期待状態に入る", async () => {
@@ -259,7 +267,7 @@ describe("入力の記録と転送", () => {
     const s = await record(page);
     expect(s.snapshot().steps[0]?.expect).toContainEqual({
       kind: "element",
-      ref: "el-button-開く",
+      ref: idOf(s, { role: "button", name: "開く" }),
       visible: false,
     });
   });
@@ -332,7 +340,7 @@ describe("入力の記録と転送", () => {
     const page = fakePage([{ role: "button", name: "開く" }]);
     const s = await record(page);
     await s.handleInput(press(5, 5), () => page.react());
-    expect(s.snapshot().newElements.map((element) => element.id)).toEqual(["el-button-開く"]);
+    expect(s.snapshot().newElements).toHaveLength(1);
   });
 
   it("反映を待つ", async () => {
@@ -361,7 +369,7 @@ describe("入力の記録と転送", () => {
     await s.handleInput(press(5, 5), () => undefined);
     expect(s.snapshot().steps[0]?.expect).toContainEqual({
       kind: "element",
-      ref: "el-heading-設定",
+      ref: idOf(s, { role: "heading", name: "設定" }),
       visible: true,
     });
   });
@@ -371,5 +379,100 @@ describe("入力の記録と転送", () => {
     const page = fakePage([{ role: "button", name: "開く" }]);
     const s = await record(page);
     expect(s.snapshot().steps[0]?.expect).toEqual([]);
+  });
+});
+
+describe("入力の順序", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const at = (phase: "down" | "up") =>
+    ({ kind: "pointer", phase, x: 5, y: 5, button: "left", modifiers: NONE }) as const;
+
+  it("受けた順に転送する", async () => {
+    // **押下だけが観測を挟む。** 並べないと離すが押下を追い越し、対象ページは
+    // クリックとして解釈できない。1 回目が効かない原因になる。
+    const order: string[] = [];
+    let elements = [{ role: "button", name: "開く", box: { x: 0, y: 0, width: 10, height: 10 } }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      runner: () => fakeRunner(),
+      observe: () => Promise.resolve(elements),
+      // 観測に時間がかかる状況を作る。実物では要素数に比例して伸びる。
+      observeVisible: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return elements.map((element) => ({ role: element.role, name: element.name }));
+      },
+      currentUrl: () => Promise.resolve(ENTRY),
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+
+    const pressed = s.handleInput(at("down"), () => {
+      order.push("down");
+      elements = [{ role: "heading", name: "設定", box: { x: 0, y: 0, width: 10, height: 10 } }];
+    });
+    const released = s.handleInput(at("up"), () => order.push("up"));
+    await Promise.all([pressed, released]);
+
+    expect(order).toEqual(["down", "up"]);
+  });
+
+  it("記録の失敗で後続の入力を止めない", async () => {
+    // 鎖が切れると、以後の操作が一切届かなくなる。
+    const order: string[] = [];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      runner: () => fakeRunner(),
+      observe: () => Promise.reject(new Error("取得できません")),
+      currentUrl: () => Promise.resolve(ENTRY),
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await s.handleInput(at("down"), () => order.push("down")).catch(() => undefined);
+    await s.handleInput(at("up"), () => order.push("up"));
+    expect(order).toContain("up");
+  });
+});
+
+describe("転送と反映待ちの分離", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const at = (phase: "down" | "up") =>
+    ({ kind: "pointer", phase, x: 5, y: 5, button: "left", modifiers: NONE }) as const;
+  const box = { x: 0, y: 0, width: 10, height: 10 };
+
+  it("離すが届いてから変わる画面でも期待状態を取れる", async () => {
+    // **反映待ちの中へ離すを閉じ込めない。** 押下の反映はクリックが成立する
+    // まで起きないため、閉じ込めると永久に変化せず、期待状態が必ず空になる。
+    let elements = [{ role: "button", name: "開く", box }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      runner: () => fakeRunner(),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      currentUrl: () => Promise.resolve(ENTRY),
+      settle: { attempts: 6, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    // 解決の材料が揃うのを待つ。
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const pressed = s.handleInput(at("down"), () => undefined);
+    // 離すは押下の転送が済み次第、反映待ちを待たずに届く。
+    const released = s.handleInput(at("up"), () => {
+      elements = [{ role: "heading", name: "設定", box }];
+    });
+    await Promise.all([pressed, released]);
+
+    expect(s.snapshot().steps[0]?.expect).toContainEqual({
+      kind: "element",
+      ref: idOf(s, { role: "heading", name: "設定" }),
+      visible: true,
+    });
   });
 });

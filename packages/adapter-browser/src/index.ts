@@ -20,7 +20,6 @@ export {
   type CliOptions,
   type CliResponse,
 } from "./cli.js";
-export { readObservedElements } from "./session.js";
 export { AgentBrowserError } from "./error.js";
 export {
   connectStream,
