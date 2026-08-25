@@ -39,7 +39,12 @@ export interface Viewport {
   navigate(url: string): Promise<void>;
   setSize(size: { readonly width: number; readonly height: number }): Promise<void>;
   captureStorageState(): Promise<StorageState>;
-  /** セッションを閉じる。認証プロファイルの切り替えで使う。 */
+  /**
+   * セッションを開き直す。認証プロファイルの切り替えで使う。
+   *
+   * 購読者が居れば新しいセッションで張り直す。落としたままにすると、誰も
+   * 開き直さないため映像が二度と来ない。
+   */
   reset(): Promise<void>;
   /**
    * 座標を要素へ解決する。
@@ -97,8 +102,6 @@ export function createViewport(options: ViewportOptions): Viewport {
   }
 
   async function stop(): Promise<void> {
-    // 購読も落とす。残すと、誰も start() を呼び直さないまま映像が来なくなる。
-    listeners.clear();
     client?.close();
     client = undefined;
     starting = undefined;
@@ -123,7 +126,14 @@ export function createViewport(options: ViewportOptions): Viewport {
     observe: () => required().observeElements(),
     consoleMessages: () => required().consoleMessages(),
     currentUrl: () => required().currentUrl(),
-    reset: stop,
+    async reset(): Promise<void> {
+      const hadListeners = listeners.size > 0;
+      await stop();
+      if (hadListeners) {
+        starting = start();
+        await starting;
+      }
+    },
 
     async resolveAt(point): Promise<PickedElement | undefined> {
       const observed = await required().observeElements();

@@ -1,4 +1,5 @@
-import type { ApprovalRequest, ApprovalResult, ExecutionEvent } from "@screen-contract/api";
+import type { ApprovalRequest, ApprovalResult } from "@screen-contract/api";
+import { parseSnapshot, type ViewportSnapshot } from "../entities/snapshot.js";
 import { httpBase, type ServerTarget } from "../lib/connection.js";
 
 /**
@@ -7,36 +8,6 @@ import { httpBase, type ServerTarget } from "../lib/connection.js";
  * **web はドメインロジックを持たない。** すべての操作は api 経由で app 層の
  * use case を呼ぶ (context/architecture.md)。
  */
-
-export interface RecordedStepView {
-  readonly id: string;
-  readonly action:
-    | { readonly kind: "click"; readonly ref: string }
-    | { readonly kind: "clickPoint"; readonly x: number; readonly y: number };
-  readonly expect: readonly { readonly kind: string }[];
-  readonly warning?: string | undefined;
-}
-
-export interface ElementDefView {
-  readonly id: string;
-  readonly name: string;
-  readonly type: string;
-  readonly locator: { readonly role: string; readonly name: string };
-}
-
-/** server が持つ run の状態。**判定の正本は server 側にある。** */
-export interface ViewportSnapshot {
-  readonly runId: string;
-  readonly status: "idle" | "paused" | "completed" | "failed";
-  readonly mode: "view" | "operate";
-  readonly recording: boolean;
-  readonly events: readonly ExecutionEvent[];
-  readonly entryUrl: string;
-  readonly steps: readonly RecordedStepView[];
-  readonly newElements: readonly ElementDefView[];
-  /** 構成番号順の要素 ID。位置がそのまま番号になる (ADR-0005)。 */
-  readonly badges: readonly string[];
-}
 
 export interface ObservedElementView {
   readonly role: string;
@@ -124,6 +95,19 @@ export function createWorkflowServerClient(
     return (await (await call(path, init)).json()) as T;
   }
 
+  async function snapshot(path: string, init?: RequestInit): Promise<ViewportSnapshot> {
+    return parseSnapshot(await json<unknown>(path, init));
+  }
+
+  function postSnapshot(path: string, body?: unknown): Promise<ViewportSnapshot> {
+    return snapshot(path, {
+      method: "POST",
+      ...(body === undefined
+        ? {}
+        : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
+    });
+  }
+
   function post<T>(path: string, body?: unknown): Promise<T> {
     return json<T>(path, {
       method: "POST",
@@ -134,13 +118,13 @@ export function createWorkflowServerClient(
   }
 
   return {
-    viewport: () => json<ViewportSnapshot>("/viewport"),
-    startRun: () => post<ViewportSnapshot>("/viewport/start"),
-    resumeRun: () => post<ViewportSnapshot>("/viewport/resume"),
-    setMode: (mode) => post<ViewportSnapshot>("/viewport/mode", { mode }),
-    setRecording: (recording) => post<ViewportSnapshot>("/viewport/recording", { recording }),
-    navigate: (url) => post<ViewportSnapshot>("/viewport/navigate", { url }),
-    setViewport: (size) => post<ViewportSnapshot>("/viewport/size", size),
+    viewport: () => snapshot("/viewport"),
+    startRun: () => postSnapshot("/viewport/start"),
+    resumeRun: () => postSnapshot("/viewport/resume"),
+    setMode: (mode) => postSnapshot("/viewport/mode", { mode }),
+    setRecording: (recording) => postSnapshot("/viewport/recording", { recording }),
+    navigate: (url) => postSnapshot("/viewport/navigate", { url }),
+    setViewport: (size) => postSnapshot("/viewport/size", size),
 
     async resolveAt(point): Promise<PickedElementView | undefined> {
       const { picked } = await post<{ picked: PickedElementView | null }>(
@@ -166,9 +150,9 @@ export function createWorkflowServerClient(
       }));
     },
 
-    addBadge: (locator) => post<ViewportSnapshot>("/viewport/badges", locator),
+    addBadge: (locator) => postSnapshot("/viewport/badges", locator),
     removeBadge: (id) =>
-      json<ViewportSnapshot>(`/viewport/badges/${encodeURIComponent(id)}`, { method: "DELETE" }),
+      snapshot(`/viewport/badges/${encodeURIComponent(id)}`, { method: "DELETE" }),
     moveBadge: (id, to) =>
       post<ViewportSnapshot>(`/viewport/badges/${encodeURIComponent(id)}/move`, { to }),
 
@@ -207,3 +191,5 @@ export function createWorkflowServerClient(
     loadAuthoritative: async (key) => (await call(`/authoritative/${key}`)).text(),
   };
 }
+
+export type { ElementDefView, RecordedStepView, ViewportSnapshot } from "../entities/snapshot.js";

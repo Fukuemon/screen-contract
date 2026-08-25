@@ -169,3 +169,37 @@ describe("認証状態", () => {
     expect(await viewport.captureStorageState()).toEqual({ cookies: [], localStorage: {} });
   });
 });
+
+describe("開き直し", () => {
+  it("購読者が居れば新しいセッションで張り直す", async () => {
+    // 落としたままにすると、誰も開き直さないため映像が二度と来ない。
+    const browser = fakePort();
+    const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
+    await viewport.subscribe(() => undefined);
+    await viewport.reset();
+    expect(browser.sessions).toBe(2);
+    expect(viewport.runner()).toBeDefined();
+  });
+
+  it("購読者が居なければ開き直さない", async () => {
+    const browser = fakePort();
+    const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
+    const subscription = await viewport.subscribe(() => undefined);
+    await subscription.close();
+    await viewport.reset();
+    expect(browser.sessions).toBe(1);
+    expect(viewport.runner()).toBeUndefined();
+  });
+
+  it("開き直した後もフレームが届く", async () => {
+    const viewport = createViewport({
+      browser: fakePort(),
+      entryUrl: "http://127.0.0.1:5174",
+    });
+    const frames: string[] = [];
+    await viewport.subscribe((uri) => void frames.push(uri));
+    await viewport.reset();
+    emit?.("data:image/jpeg;base64,AAA");
+    expect(frames).toEqual(["data:image/jpeg;base64,AAA"]);
+  });
+});

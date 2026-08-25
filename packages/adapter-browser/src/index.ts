@@ -32,6 +32,9 @@ export interface AgentBrowserOptions {
   readonly namespace?: string | undefined;
 }
 
+/** セッション名の連番。同じ名前を使い回さないために持つ。 */
+let sequence = 0;
+
 export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPort {
   const cliPath = resolveCliPath();
   const chrome = resolveChromeInstall(options.home);
@@ -53,7 +56,11 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
           executablePath: chrome.executablePath,
           // セッション名は adapter 内で完結する識別子である。Baseline の鍵とは
           // 別物なので、core の正規化関数を持ち込まない。
-          session: `sc-${auth.kind}-${String(process.pid)}`,
+          //
+          // **作るたびに違う名前にする。** 同じ名前だと、閉じた直後に開き直す
+          // ときに前のセッションの後始末と競合する (認証プロファイルの切り替え
+          // で実際に起きた)。
+          session: `sc-${auth.kind}-${String(process.pid)}-${String((sequence += 1))}`,
           namespace: options.namespace,
         },
         join(discardDir, "discard.png"),
