@@ -1,10 +1,11 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
-import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
+import type { RunState } from "@screen-contract/api";
 import type { AuthProfileStore } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
 import { createRunSession, createViewportControl } from "@screen-contract/app";
-import type { AllowedOrigins, Viewport, ViewportSubscription } from "@screen-contract/app";
+import { createStreamEndpoint } from "./stream-endpoint.js";
+import type { AllowedOrigins, Viewport } from "@screen-contract/app";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
 import { createFsWebAssets } from "../serving/web-assets.js";
@@ -102,74 +103,12 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
         });
   const runState = { current: (): RunState | undefined => session?.relayState() };
 
-  const stream = upgradeWebSocket(() => {
-    let connection: ReturnType<typeof createStreamConnection> | undefined;
-    let subscription: ViewportSubscription | undefined;
-    // **接続ごとに持つ。** 共有すると、1 本目が認証を通しただけで 2 本目にも
-    // 映像が流れる。
-    let resolveAuthenticated = (): void => undefined;
-    const authenticated = new Promise<void>((resolve) => {
-      resolveAuthenticated = resolve;
-    });
-    return {
-      onOpen: (_event, ws) => {
-        const proxy = createStreamProxy({
-          /**
-           * 上流 (ブラウザ) への転送。
-           *
-           * **順序 (解決 → 転送 → 検証) は app が持つ** (ADR-0026)。ここは
-           * 転送の手段を渡すだけにする。合成ルートに置くと、記録の規則が
-           * 依存検査の効かない場所に入り、単体テストも当たらない (ADR-0023)。
-           */
-          upstream: {
-            send: (input) => {
-              if (session === undefined) {
-                subscription?.send(input);
-                return;
-              }
-              void session
-                .handleInput(input, () => subscription?.send(input))
-                .catch(() => {
-                  // **黙って捨てない。** 捨てると「操作は効いたのに手順が
-                  // 記録されていない」が無音で起きる。中身は出さない。
-                  console.error("[viewport] 操作の記録に失敗しました");
-                });
-            },
-          },
-          downstream: { send: (payload) => ws.send(payload) },
-          runState,
-        });
-        connection = createStreamConnection({ token: policy?.token ?? "", proxy });
-
-        // **認証を通す前に映像を流さない。** 流すと、トークンを持たない接続へ
-        // 対象アプリの画面が届く。
-        void (async () => {
-          await authenticated;
-          try {
-            subscription = await options.viewport?.subscribe((dataUri) => {
-              proxy.publishFrame(dataUri);
-            });
-          } catch {
-            ws.close(1011, "viewport unavailable");
-          }
-        })();
-      },
-      onMessage: (event, ws) => {
-        const raw = typeof event.data === "string" ? event.data : "";
-        // **最初のフレームで認証する。** 通らなければ接続を閉じる。
-        if (connection === undefined || connection.receive(raw) !== undefined) {
-          ws.close(1008, "rejected");
-          return;
-        }
-        if (connection.authenticated()) {
-          resolveAuthenticated();
-        }
-      },
-      onClose: () => {
-        void subscription?.close();
-        subscription = undefined;
-      },
-    };
+  const stream = createStreamEndpoint({
+    upgradeWebSocket,
+    viewport: options.viewport,
+    session,
+    runState,
+    token: () => policy?.token ?? "",
   });
 
   const app = compose({

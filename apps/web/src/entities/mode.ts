@@ -3,6 +3,11 @@ import type { StreamMode } from "@screen-contract/api";
 /**
  * モードと記録の状態。
  *
+ * **正本は server が持つ。** ここは写しから導ける表示条件だけを扱い、状態機械を
+ * 持たない (context/architecture.md の「client state は正本を持たない」)。持つと
+ * 同じ遷移規則が 2 つになり、片方を直し忘れると「UI は記録中に見えるのに server
+ * は記録していない」が型検査を通る。
+ *
  * **モード切替は一時停止中だけ有効。** 再生中は viewport への入力を受け付け
  * ない (閲覧のみ)。**記録中であることは常時表示する。** 黙って記録しない
  * (web-editor feature)。
@@ -14,8 +19,6 @@ export interface UiState {
   /** 既定は切り。開始と停止は明示操作とする。 */
   readonly recording: boolean;
 }
-
-export const INITIAL_UI_STATE: UiState = { mode: "view", recording: false };
 
 export type UiAction =
   | { readonly kind: "set-mode"; readonly mode: StreamMode }
@@ -29,7 +32,12 @@ export interface UiContext {
 
 export type UiRejection = "not-paused" | "not-operate-mode" | "already-recording" | "not-recording";
 
-/** 受け付けない操作の理由。undefined なら受け付ける。 */
+/**
+ * 受け付けない操作の理由。undefined なら受け付ける。
+ *
+ * **判定の正本は server である。** ここは押す前に理由を出し、通らない要求を
+ * 投げないための写しにすぎない。
+ */
 export function rejectUiAction(
   state: UiState,
   action: UiAction,
@@ -54,24 +62,6 @@ export function rejectUiAction(
   }
 }
 
-export function reduceUi(state: UiState, action: UiAction, context: UiContext): UiState {
-  if (rejectUiAction(state, action, context) !== undefined) {
-    return state;
-  }
-  switch (action.kind) {
-    case "set-mode":
-      // 選択モードへ戻したら記録も止める。記録中に入力が届かなくなるのに
-      // 「記録中」の表示だけが残ると、何が起きているか読めない。
-      return action.mode === "operate"
-        ? { ...state, mode: "operate" }
-        : { mode: "view", recording: false };
-    case "start-recording":
-      return { ...state, recording: true };
-    case "stop-recording":
-      return { ...state, recording: false };
-  }
-}
-
 /**
  * viewport のクリックを対象ページへ転送してよいか。
  *
@@ -80,9 +70,4 @@ export function reduceUi(state: UiState, action: UiAction, context: UiContext): 
  */
 export function forwardsToPage(state: UiState, context: UiContext): boolean {
   return context.paused && state.mode === "operate";
-}
-
-/** run が動き出したら、操作モードと記録を降ろす。 */
-export function syncWithRun(state: UiState, context: UiContext): UiState {
-  return context.paused ? state : INITIAL_UI_STATE;
 }
