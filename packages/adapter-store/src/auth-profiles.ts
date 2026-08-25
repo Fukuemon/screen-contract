@@ -64,6 +64,9 @@ function isPortable(name: string): boolean {
 }
 
 export class AuthProfileError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
   constructor(message: string) {
     super(message);
     this.name = "AuthProfileError";
@@ -93,6 +96,31 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
     return join(directory, `${name}${EXTENSION}`);
   }
 
+  /**
+   * 取り込みの世代。まだ無ければ 0。
+   *
+   * **復号を通して読む。** 世代は封筒の平文にあるため、読むだけでは改ざんを
+   * 検知できない。AAD は暗号文と世代の組を固定するだけで、復号しない読み手には
+   * 何も保証しない (ADR-0022)。
+   */
+  function generationOf(name: string): number {
+    let raw: string;
+    try {
+      raw = readFileSync(pathOf(name), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        // まだ取り込んでいない。破損と区別する。
+        return 0;
+      }
+      throw new AuthProfileError("認証状態を読めません");
+    }
+    const envelope = parseEnvelope(raw);
+    // 復号が通らなければ投げる。0 を返すと、破損したプロファイルが匿名の
+    // Baseline へ黙って潰れる。
+    open(envelope, options.keystore.loadOrCreate(), name);
+    return envelope.generation;
+  }
+
   return {
     assertName,
 
@@ -112,27 +140,14 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
       );
     },
 
-    generation(name: string): number {
-      // 復号せずに読む。世代は封筒の平文にあり、AAD が改ざんを検知する。
-      try {
-        return parseEnvelope(readFileSync(pathOf(name), "utf8")).generation;
-      } catch {
-        return 0;
-      }
-    },
+    generation: generationOf,
 
     save(name: string, state: unknown): number {
       const target = pathOf(name);
       mkdirSync(directory, { recursive: true, mode: 0o700 });
       // **取り込みのたびに世代を進める** (ADR-0022)。進めないと、同じ名前へ
       // 別のアカウントを入れた瞬間から権限の違う結果が同じ Baseline へ混ざる。
-      let previous = 0;
-      try {
-        previous = parseEnvelope(readFileSync(target, "utf8")).generation;
-      } catch {
-        previous = 0;
-      }
-      const generation = previous + 1;
+      const generation = generationOf(name) + 1;
       const envelope = seal(
         JSON.stringify(state),
         options.keystore.loadOrCreate(),

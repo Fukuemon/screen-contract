@@ -79,13 +79,16 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
         },
         join(discardDir, "discard.png"),
       );
-      if (storageState !== undefined) {
-        // **対象を開く前に注入する** (ADR-0022)。開いた後に入れても、既に描画
-        // された画面は未ログインのままである。
-        await session.restoreStorageState(storageState);
-      }
+      // **対象を開く前に注入する** (ADR-0022)。開いた後に入れても、既に描画
+      // された画面は未ログインのままである。
+      const restored =
+        storageState === undefined
+          ? { skippedKeys: [] }
+          : await session.restoreStorageState(storageState);
       return {
         ...session,
+        // 注入で入らなかったものを覚えておく。呼び出し側が黙って進まないため。
+        restoreReport: () => restored,
         async close(): Promise<void> {
           try {
             await session.close();

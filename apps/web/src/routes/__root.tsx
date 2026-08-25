@@ -17,7 +17,9 @@ function RootDocument({ children }: { readonly children: ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="h-dvh overflow-hidden">
+      <body // 拡大やフォントサイズの変更ではみ出したとき、横だけはたどれるようにする。
+        className="h-dvh overflow-x-auto overflow-y-hidden"
+      >
         {children}
         <Scripts />
       </body>

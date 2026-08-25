@@ -155,3 +155,32 @@ describe("取り込みの世代", () => {
     expect(profiles.load("admin")).toEqual({ cookies: [{ name: "b" }], localStorage: {} });
   });
 });
+
+describe("世代の改ざん", () => {
+  it("世代を書き換えたら読めない", () => {
+    // **復号を通して読む。** 平文の世代を直接読むと、Baseline の識別子を
+    // 攻撃者の指定値にできる (ADR-0022)。
+    const profiles = store();
+    profiles.save("admin", STATE);
+    const target = join(stateDir, "auth", "admin.enc");
+    const envelope = JSON.parse(readFileSync(target, "utf8")) as Record<string, unknown>;
+    writeFileSync(target, JSON.stringify({ ...envelope, generation: 99 }));
+    expect(() => profiles.generation("admin")).toThrow();
+  });
+
+  it("暗号文を書き換えたら世代も読めない", () => {
+    const profiles = store();
+    profiles.save("admin", STATE);
+    const target = join(stateDir, "auth", "admin.enc");
+    const envelope = JSON.parse(readFileSync(target, "utf8")) as { ciphertext: string };
+    const bytes = Buffer.from(envelope.ciphertext, "base64");
+    bytes[0] = (bytes[0] ?? 0) ^ 0xff;
+    writeFileSync(target, JSON.stringify({ ...envelope, ciphertext: bytes.toString("base64") }));
+    expect(() => profiles.generation("admin")).toThrow();
+  });
+
+  it("まだ無いプロファイルは 0 のままにする", () => {
+    // 破損と「まだ取り込んでいない」を区別する。
+    expect(store().generation("admin")).toBe(0);
+  });
+});

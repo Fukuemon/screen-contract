@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import type { ApprovalRequest } from "@screen-contract/api";
 import { ApprovalView } from "../components/features/approval/approval-view.js";
 import {
@@ -10,7 +10,8 @@ import {
   showDiff,
   type ApprovalUiState,
 } from "../entities/approval.js";
-import type { WorkflowServerClient } from "../gateways/workflow-server.js";
+import { Button } from "../components/ui/button.js";
+import type { RecordedStepView, WorkflowServerClient } from "../gateways/workflow-server.js";
 import { useWorkflowServer } from "../gateways/use-workflow-server.js";
 
 export const Route = createFileRoute("/approvals")({ component: ApprovalsRoute });
@@ -20,13 +21,20 @@ function ApprovalsRoute() {
   const { client, error: clientError } = useWorkflowServer();
   const [pending, setPending] = useState<readonly ApprovalRequest[]>([]);
   const [state, setState] = useState<ApprovalUiState>(INITIAL_APPROVAL_UI);
+  /**
+   * 依頼のもとになった手順。
+   *
+   * **skeleton は run を 1 本しか持たない** ため、いま記録している手順が依頼の
+   * 中身である。run を複数持つ段では、依頼ごとに引く経路が要る。
+   */
+  const [steps, setSteps] = useState<readonly RecordedStepView[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
 
   const refresh = useCallback((api: WorkflowServerClient) => {
-    void api
-      .listApprovals()
-      .then((next) => {
+    void Promise.all([api.listApprovals(), api.viewport()])
+      .then(([next, snapshot]) => {
         setPending(next);
+        setSteps(snapshot.steps);
         // 消えた依頼の既読を持ち越さない。
         setState((current) => forgetMissing(current, next));
         setError(undefined);
@@ -54,11 +62,23 @@ function ApprovalsRoute() {
         </Link>
         <span className="text-sm font-semibold">承認</span>
         <span className="text-xs text-muted">確定すると画面仕様書の正本になります</span>
+        {/* **開いたまま届いた依頼が見えないと「ありません」と誤表示する。** */}
+        <Button
+          className="ml-auto"
+          onClick={() => {
+            if (client !== undefined) {
+              refresh(client);
+            }
+          }}
+        >
+          <RefreshCw className="size-3.5" aria-hidden />
+          読み直す
+        </Button>
       </header>
 
       <ApprovalView
         pending={pending}
-        steps={[]}
+        steps={steps}
         state={state}
         onShowDiff={(request) => {
           if (client === undefined) {
@@ -92,7 +112,7 @@ function ApprovalsRoute() {
       {showing !== undefined && (
         <p
           role="alert"
-          className="shrink-0 border-t border-line/40 bg-danger/10 px-4 py-2 text-sm text-danger"
+          className="shrink-0 border-t border-danger/50 bg-danger/10 px-4 py-2 text-sm text-danger-fg"
         >
           {showing}
         </p>

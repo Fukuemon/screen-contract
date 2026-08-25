@@ -49,6 +49,8 @@ export interface WorkflowServerClient {
   stopRun(): Promise<ViewportSnapshot>;
   setMode(mode: "view" | "operate"): Promise<ViewportSnapshot>;
   setRecording(recording: boolean): Promise<ViewportSnapshot>;
+  /** 記録した手順をすべて捨てる。要素の定義と構成番号は残す。 */
+  clearSteps(): Promise<ViewportSnapshot>;
   navigate(url: string): Promise<ViewportSnapshot>;
   setViewport(size: { readonly width: number; readonly height: number }): Promise<ViewportSnapshot>;
   resolveAt(point: {
@@ -134,6 +136,7 @@ export function createWorkflowServerClient(
     stopRun: () => postSnapshot("/viewport/stop"),
     setMode: (mode) => postSnapshot("/viewport/mode", { mode }),
     setRecording: (recording) => postSnapshot("/viewport/recording", { recording }),
+    clearSteps: () => snapshot("/viewport/recording", { method: "DELETE" }),
     navigate: (url) => postSnapshot("/viewport/navigate", { url }),
     setViewport: (size) => postSnapshot("/viewport/size", size),
 

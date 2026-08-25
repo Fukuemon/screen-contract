@@ -1,5 +1,6 @@
 import type {
   ConsoleMessage,
+  StorageRestoreReport,
   StorageState,
   BoundingBox,
   BrowserAction,
@@ -182,9 +183,18 @@ export function createSession(options: CliOptions, discardPath: string): Browser
      *
      * **値を argv へ載せない。** argv は同一利用者の任意プロセスから `ps` で
      * 読め、Linux では `/proc/<pid>/cmdline` が他利用者にも見える。暗号化して
-     * 保管した意味が注入の 1 ホップで消える。0600 の一時ファイル経由で渡す。
+     * 保管した意味が注入の 1 ホップで消える。cookie は 0600 の一時ファイル経由。
+     *
+     * **Web Storage は入れない。** `storage local set <key> <value>` は値を
+     * argv で受ける口しか持たず、`@file` も `-` も文字列として保存される
+     * (agent-browser 0.34.0 で実測)。JWT やリフレッシュトークンを localStorage
+     * へ置く対象は珍しくないため、通すと資格情報そのものが argv に載る。
+     * 入らなかったことは戻り値で返し、黙って落とさない。
      */
-    async restoreStorageState(state): Promise<void> {
+    // 個々のセッションは注入の結果を持たない。Port が包んで差し替える。
+    restoreReport: () => ({ skippedKeys: [] }),
+
+    async restoreStorageState(state): Promise<StorageRestoreReport> {
       if (state.cookies.length > 0) {
         const file = join(mkdtempSync(join(tmpdir(), "sc-auth-")), "cookies.json");
         writeFileSync(file, JSON.stringify(state.cookies), { encoding: "utf8", mode: 0o600 });
@@ -194,13 +204,14 @@ export function createSession(options: CliOptions, discardPath: string): Browser
           rmSync(dirname(file), { recursive: true, force: true });
         }
       }
-      for (const [key, value] of Object.entries(state.localStorage)) {
-        // localStorage の値はページ側で読み書きする。`eval` は対象ページで任意
-        // JS を実行するため使わず、CLI の storage 操作へ渡す。鍵と値のうち値だけ
-        // が秘密になりうるが、CLI にファイル経由の口が無いため argv で渡す。
-        // 秘密が入りうる場合は cookie 側へ寄せる運用とする。
-        await call(["storage", "local", "set", key, JSON.stringify(value)], "認証状態の注入");
-      }
+      const skippedKeys = Object.keys(state.localStorage);
+      return skippedKeys.length === 0
+        ? { skippedKeys: [] }
+        : {
+            skippedKeys,
+            reason:
+              "localStorage は復元していません (実行基盤が値を argv でしか受けず、秘密が他プロセスから読めるため)。cookie だけで認証が通らない対象では、手でログインし直してください",
+          };
     },
 
     async consoleMessages(): Promise<readonly ConsoleMessage[]> {

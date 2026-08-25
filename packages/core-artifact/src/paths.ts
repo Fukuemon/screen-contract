@@ -26,6 +26,9 @@ export type PathRejection =
  * そのまま露出する (context/testing.md)。
  */
 export class ArtifactPathError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
   readonly code: PathRejection;
   readonly at: string | undefined;
 

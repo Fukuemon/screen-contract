@@ -36,6 +36,9 @@ export interface SealedEnvelope {
 }
 
 export class SealError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
   constructor(message: string) {
     super(message);
     this.name = "SealError";

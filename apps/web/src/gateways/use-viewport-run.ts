@@ -16,6 +16,8 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
   origins: readonly string[];
   picked: PickedElementView | undefined;
   pickFailed: boolean;
+  /** 応答待ちか。接続はブラウザの起動を伴い数秒かかる。 */
+  busy: boolean;
   error: string | undefined;
   run: (action: (api: WorkflowServerClient) => Promise<ViewportSnapshot>) => void;
   /** 写しを取り直す。対象が自分で移ったときに追いつくために要る。 */
@@ -29,6 +31,7 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
   const [origins, setOrigins] = useState<readonly string[]>([]);
   const [picked, setPicked] = useState<PickedElementView | undefined>(undefined);
   const [pickFailed, setPickFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -63,12 +66,14 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
       if (client === undefined) {
         return;
       }
+      setBusy(true);
       void action(client)
         .then((next) => {
           setSnapshot(next);
           setError(undefined);
         })
-        .catch((cause: Error) => setError(cause.message));
+        .catch((cause: Error) => setError(cause.message))
+        .finally(() => setBusy(false));
     },
     [client],
   );
@@ -98,12 +103,14 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
         .resolveAt(point)
         .then((next) => {
           // 解決できない位置を黙って無視しない。地の文には要素が無い。
-          setPicked(next ?? picked);
+          // **関数更新子で書く。** 値を依存に載せると識別子が選択のたびに
+          // 変わり、連続で押すと古い選択を書き戻す。
+          setPicked((previous) => next ?? previous);
           setPickFailed(next === undefined);
         })
         .catch((cause: Error) => setError(cause.message));
     },
-    [client, picked],
+    [client],
   );
 
   return {
@@ -111,6 +118,7 @@ export function useViewportRun(client: WorkflowServerClient | undefined): {
     origins,
     picked,
     pickFailed,
+    busy,
     error,
     run,
     refresh,

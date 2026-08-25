@@ -1,4 +1,5 @@
 import type { UseCases, ViewportControl, ViewportSnapshot } from "@screen-contract/app";
+import { ConflictError, ValidationError } from "@screen-contract/app";
 import { describe, expect, it } from "vitest";
 import { createHttpApp } from "./http.js";
 import type { AuthPolicy } from "./auth.js";
@@ -26,6 +27,7 @@ const SNAPSHOT: ViewportSnapshot = {
   steps: [],
   newElements: [],
   badges: [],
+  warnings: [],
 };
 
 function fakeUseCases(calls: string[] = []): UseCases & { readonly calls: string[] } {
@@ -52,6 +54,7 @@ function fakeViewport(calls: string[]): ViewportControl {
     stop: () => snapshot("stop"),
     setMode: (mode) => snapshot(`mode:${mode}`),
     setRecording: (recording) => snapshot(`recording:${String(recording)}`),
+    clearSteps: () => snapshot("clearSteps"),
     snapshot: () => SNAPSHOT,
     navigate: (url) => Promise.resolve(snapshot(`navigate:${url}`)),
     setViewport: (size) =>
@@ -229,6 +232,13 @@ describe("live viewport の操作", () => {
     expect(s.calls).toEqual(["recording:true", "recording:false"]);
   });
 
+  it("記録した手順を捨てられる", async () => {
+    // 記録は追記しかしない。捨てる口が無いと、やり直しに server の再起動が要る。
+    const s = setup();
+    expect((await s.call("DELETE", "/viewport/recording")).status).toBe(200);
+    expect(s.calls).toEqual(["clearSteps"]);
+  });
+
   it("記録の指定が真偽値でなければ 400", async () => {
     const s = setup();
     expect((await s.call("POST", "/viewport/recording", { recording: "true" })).status).toBe(400);
@@ -401,7 +411,8 @@ describe("失敗の分類", () => {
       policy: () => POLICY,
       viewport: {
         ...fakeViewport([]),
-        navigate: () => Promise.reject(new Error("実行してよい origin として列挙されていません")),
+        navigate: () =>
+          Promise.reject(new ValidationError("実行してよい origin として列挙されていません")),
       },
     });
     const response = await app.request(`${ORIGIN}/viewport/navigate`, {
@@ -415,6 +426,54 @@ describe("失敗の分類", () => {
       body: JSON.stringify({ url: "http://evil.test/" }),
     });
     expect(response.status).toBe(400);
+  });
+
+  it("いまの状態で実行できない失敗を 409 にする", async () => {
+    // **400 と混ぜない。** 混ぜると「入力を直せば通る」と読めるが、実際に要る
+    // のは接続である。
+    const app = createHttpApp({
+      useCases: fakeUseCases(),
+      policy: () => POLICY,
+      viewport: {
+        ...fakeViewport([]),
+        navigate: () => Promise.reject(new ConflictError("セッションが開いていません")),
+      },
+    });
+    const response = await app.request(`${ORIGIN}/viewport/navigate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        origin: ORIGIN,
+        host: HOST,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ url: "http://127.0.0.1:5174/" }),
+    });
+    expect(response.status).toBe(409);
+  });
+
+  it("素の Error を検証由来として扱わない", async () => {
+    // **列挙に `Error` を入れない。** 入れると server 側の状態異常まで
+    // 「client の入力ミス」として 400 で返り、障害を観測できなくなる。
+    const app = createHttpApp({
+      useCases: fakeUseCases(),
+      policy: () => POLICY,
+      viewport: {
+        ...fakeViewport([]),
+        navigate: () => Promise.reject(new Error("何かが壊れました")),
+      },
+    });
+    const response = await app.request(`${ORIGIN}/viewport/navigate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${TOKEN}`,
+        origin: ORIGIN,
+        host: HOST,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ url: "http://127.0.0.1:5174/" }),
+    });
+    expect(response.status).toBe(500);
   });
 
   it("想定外の失敗を 500 にし、中身を出さない", async () => {

@@ -61,6 +61,9 @@ export type StoreErrorCode = "outside-root" | "io";
  * 含む絶対パスを載せるため、そのまま外へ出さない (context/testing.md)。
  */
 export class StoreError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
   readonly code: StoreErrorCode;
 
   constructor(code: StoreErrorCode, cause?: unknown) {

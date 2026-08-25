@@ -15,7 +15,6 @@
     "@hono/node-server": "^2.1.1",
     "@screen-contract/adapter-browser": "workspace:*",
     "@screen-contract/adapter-store": "workspace:*",
-    "@screen-contract/agent": "workspace:*",
     "@screen-contract/api": "workspace:*",
     "@screen-contract/app": "workspace:*",
     "@screen-contract/core-element": "workspace:*",

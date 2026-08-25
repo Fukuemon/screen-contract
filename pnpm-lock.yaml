@@ -62,9 +62,6 @@ importers:
       '@screen-contract/adapter-store':
         specifier: workspace:*
         version: link:../../packages/adapter-store
-      '@screen-contract/agent':
-        specifier: workspace:*
-        version: link:../../packages/agent
       '@screen-contract/api':
         specifier: workspace:*
         version: link:../../packages/api

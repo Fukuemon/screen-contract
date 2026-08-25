@@ -35,8 +35,12 @@ export function useEditor() {
 
   const snapshot = viewport.snapshot;
   const status = snapshot?.status ?? "idle";
-  const paused = status === "paused";
-  // 終端 (completed / failed) は接続の続きではない。接続し直せる状態として扱う。
+  /**
+   * 操作と記録ができる状態か。
+   *
+   * `paused` の run の枠内でしか使えない (ADR-0002)。終端 (completed / failed)
+   * は接続の続きではなく、接続し直せる状態として扱う。
+   */
   const connected = status === "paused";
   const mode = snapshot?.mode ?? "view";
   const recording = snapshot?.recording ?? false;
@@ -68,6 +72,8 @@ export function useEditor() {
     }
   }, [connected, overlay, refreshElements]);
 
+  const clearSteps = useCallback(() => dispatch((api) => api.clearSteps()), [dispatch]);
+
   const clearLogs = useCallback(() => setMessages([]), []);
 
   const refreshLogs = useCallback(() => {
@@ -83,7 +89,7 @@ export function useEditor() {
   const { sendInput } = stream;
   const onUi = useCallback(
     (action: UiAction) => {
-      if (rejectUiAction({ mode, recording }, action, { paused }) !== undefined) {
+      if (rejectUiAction({ mode, recording }, action, { paused: connected }) !== undefined) {
         return;
       }
       switch (action.kind) {
@@ -97,7 +103,7 @@ export function useEditor() {
           dispatch((api) => api.setRecording(false));
       }
     },
-    [dispatch, mode, paused, recording],
+    [connected, dispatch, mode, recording],
   );
 
   /**
@@ -131,12 +137,14 @@ export function useEditor() {
 
   return {
     auth,
+    busy: viewport.busy,
     clearLogs,
+    clearSteps,
     connected,
     dispatch,
     elements,
     error: error ?? clientError ?? viewport.error ?? stream.error ?? auth.error,
-    forwards: forwardsToPage({ mode, recording }, { paused }),
+    forwards: forwardsToPage({ mode, recording }, { paused: connected }),
     frame: stream.frame,
     messages,
     mode,
@@ -145,7 +153,6 @@ export function useEditor() {
     origin,
     origins: viewport.origins,
     overlay,
-    paused,
     recording,
     refreshElements,
     refreshLogs,

@@ -9,9 +9,10 @@ const badge = cva(
       tone: {
         muted: "bg-elevated text-muted",
         accent: "bg-accent/15 text-accent",
-        danger: "bg-danger/15 text-danger",
+        // 文字には明るい側を使う。`--color-danger` は面の上で 4.12:1 しかない。
+        danger: "bg-danger/15 text-danger-fg",
         warn: "bg-warn/15 text-warn",
-        info: "bg-info/15 text-info",
+        info: "bg-info/15 text-info-fg",
       },
     },
     defaultVariants: { tone: "muted" },

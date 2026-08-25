@@ -37,10 +37,12 @@ export function ApprovalView(props: ApprovalViewProps) {
   return (
     <div className="flex min-h-0 flex-1">
       <Panel title="承認待ち" className="w-96 shrink-0 border-r border-line/40">
+        {/* `<li>` へ role を置くと listitem を上書きし、リストが「0 件」に
+            なる。初回描画では alert も発火しない。 */}
         {warnings.length > 0 && (
-          <ul className="flex flex-col gap-1 border-b border-line/40 p-3">
+          <ul aria-label="承認前の注意" className="flex flex-col gap-1 border-b border-line/40 p-3">
             {warnings.map((warning) => (
-              <li key={warning} role="alert" className="flex gap-1.5 text-xs text-warn">
+              <li key={warning} className="flex gap-1.5 text-xs text-warn">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                 {warning}
               </li>
@@ -64,7 +66,11 @@ export function ApprovalView(props: ApprovalViewProps) {
                     </Button>
                     <Button
                       tone="primary"
-                      disabled={rejection !== undefined}
+                      // **`disabled` にしない。** フォーカス順から外れると、
+                      // 押せない理由へ辿り着けない。判定の正本はハンドラ側。
+                      aria-disabled={rejection !== undefined}
+                      aria-describedby={rejection === undefined ? undefined : `why-${request.id}`}
+                      className={rejection === undefined ? "" : "cursor-not-allowed opacity-40"}
                       onClick={() => props.onApprove(request.id)}
                     >
                       <CircleCheck className="size-3.5" aria-hidden />
@@ -72,7 +78,9 @@ export function ApprovalView(props: ApprovalViewProps) {
                     </Button>
                   </div>
                   {rejection !== undefined && (
-                    <p className="text-xs text-muted">{REJECTION_TEXT[rejection]}</p>
+                    <p id={`why-${request.id}`} className="text-xs text-muted">
+                      {REJECTION_TEXT[rejection]}
+                    </p>
                   )}
                 </li>
               );

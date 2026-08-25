@@ -11,7 +11,8 @@ import { Button } from "../../ui/button.js";
  */
 export interface EditorHeaderProps {
   readonly connected: boolean;
-  readonly paused: boolean;
+  /** 応答待ちか。接続はブラウザの起動を伴い数秒かかる。 */
+  readonly busy: boolean;
   readonly url: string;
   /** 列挙外の origin を指しているか。指していれば移動の代わりに許可を促す。 */
   readonly needsAllow: boolean;
@@ -26,14 +27,16 @@ export function EditorHeader(props: EditorHeaderProps) {
   return (
     <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line/40 px-3">
       {props.connected ? (
-        <Button onClick={props.onDisconnect}>
+        <Button disabled={props.busy} onClick={props.onDisconnect}>
           <PlugZap className="size-4" aria-hidden />
           切断
         </Button>
       ) : (
-        <Button tone="primary" onClick={props.onConnect}>
+        // **応答待ちを出す。** 出さないと「押したのに何も起きない」と読まれ、
+        // もう一度押される。接続はブラウザの起動を伴い数秒かかる。
+        <Button tone="primary" disabled={props.busy} onClick={props.onConnect}>
           <Plug className="size-4" aria-hidden />
-          接続
+          {props.busy ? "接続しています…" : "接続"}
         </Button>
       )}
 
@@ -47,7 +50,7 @@ export function EditorHeader(props: EditorHeaderProps) {
         placeholder="http://127.0.0.1:5174/"
         onChange={(event) => props.onUrlChange(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !props.needsAllow) {
+          if (event.key === "Enter" && !props.needsAllow && props.connected) {
             props.onNavigate();
           }
         }}
@@ -60,11 +63,27 @@ export function EditorHeader(props: EditorHeaderProps) {
           この対象を許可
         </Button>
       ) : (
-        <Button onClick={props.onNavigate}>移動</Button>
+        // 未接続で押すと server の失敗メッセージが出る。先に接続を促す。
+        <Button
+          aria-disabled={!props.connected}
+          title={props.connected ? undefined : "接続すると移動できます"}
+          className={props.connected ? "" : "cursor-not-allowed opacity-40"}
+          onClick={() => {
+            if (props.connected) {
+              props.onNavigate();
+            }
+          }}
+        >
+          移動
+        </Button>
       )}
 
-      <Badge tone={props.paused ? "accent" : props.connected ? "info" : "muted"}>
-        {props.paused ? "一時停止中" : props.connected ? "実行中" : "未接続"}
+      {/* **run の内部語彙 (`paused`) を出さない。** 正常に繋がった状態を
+          「一時停止中」と読ませると、色 (緑) と文字が矛盾する。 */}
+      <Badge tone={props.connected ? "accent" : "muted"}>
+        <span role="status" aria-atomic="true">
+          {props.busy ? "接続しています…" : props.connected ? "接続中 — 操作できます" : "未接続"}
+        </span>
       </Badge>
     </header>
   );

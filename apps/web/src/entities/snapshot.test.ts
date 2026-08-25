@@ -14,6 +14,7 @@ const FULL = {
     { id: "el-a", name: "開く", type: "button", locator: { role: "button", name: "開く" } },
   ],
   badges: ["el-a"],
+  warnings: [],
 };
 
 describe("parseSnapshot", () => {
@@ -38,6 +39,7 @@ describe("parseSnapshot", () => {
       steps: [],
       newElements: [],
       badges: [],
+      warnings: [],
     });
   });
 

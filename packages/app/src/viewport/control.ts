@@ -5,6 +5,7 @@ import type {
   ViewportSize,
 } from "@screen-contract/core-execution";
 import type { ElementId } from "@screen-contract/domain";
+import { ValidationError } from "../errors.js";
 import type { AuthProfileStore } from "./auth-profiles.js";
 import type { AllowedOrigins } from "./origins.js";
 import type { RunSession, ViewportSnapshot } from "./run-session.js";
@@ -47,6 +48,8 @@ export interface ViewportControl {
   stop(): ViewportSnapshot;
   setMode(mode: StreamMode): ViewportSnapshot;
   setRecording(recording: boolean): ViewportSnapshot;
+  /** 記録した手順をすべて捨てる。要素の定義と構成番号は残す。 */
+  clearSteps(): ViewportSnapshot;
   snapshot(): ViewportSnapshot;
   navigate(url: string): Promise<ViewportSnapshot>;
   setViewport(size: ViewportSize): Promise<ViewportSnapshot>;
@@ -92,19 +95,27 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     try {
       origin = new URL(url).origin;
     } catch {
-      throw new Error("開く URL を解釈できません");
+      throw new ValidationError("開く URL を解釈できません");
     }
     if (!options.allowedOrigins.has(origin)) {
       // 列挙という安全装置を UI から迂回させない。
-      throw new Error("実行してよい origin として列挙されていません");
+      throw new ValidationError("実行してよい origin として列挙されていません");
     }
   }
 
-  function profiles(): AuthProfilesView {
+  /**
+   * 一覧の写し。
+   *
+   * `generation` は**いま使っているプロファイル**のものである。匿名なら 0。
+   * 取り込んだ直後だけは、取り込んだ側の世代を出す — 匿名のまま保存したときに
+   * 「保存できたのに世代 0」と読めてしまうため。
+   */
+  function profiles(generation?: number): AuthProfilesView {
     return {
       profiles: options.authProfiles.list(),
       active: active ?? null,
-      generation: active === undefined ? 0 : options.authProfiles.generation(active),
+      generation:
+        generation ?? (active === undefined ? 0 : options.authProfiles.generation(active)),
     };
   }
 
@@ -137,6 +148,7 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     stop: () => options.run.reset(),
     setMode: (mode) => options.run.setMode(mode),
     setRecording: (recording) => options.run.setRecording(recording),
+    clearSteps: () => options.run.clearSteps(),
     snapshot: () => options.run.snapshot(),
     resolveAt: (point) => options.viewport.resolveAt(point),
     consoleMessages: () => options.viewport.consoleMessages(),
@@ -167,8 +179,11 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
 
     async saveAuthProfile(name: string): Promise<AuthProfilesView> {
       // いま開いている画面の状態を取り込む。人間が手でログインした直後に押す。
-      options.authProfiles.save(name, await options.viewport.captureStorageState());
-      return profiles();
+      const generation = options.authProfiles.save(
+        name,
+        await options.viewport.captureStorageState(),
+      );
+      return profiles(generation);
     },
 
     async useAuthProfile(name: string | undefined): Promise<AuthProfilesView> {

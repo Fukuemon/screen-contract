@@ -1,8 +1,5 @@
-import { homedir } from "node:os";
-import { createAgentBrowserPort } from "@screen-contract/adapter-browser";
 import { createFsStore } from "@screen-contract/adapter-store";
-import { createAgentHandlers } from "@screen-contract/agent";
-import { createApiApp, createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
+import { createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
 import type { StorePort, ViewportControl } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
@@ -16,7 +13,14 @@ import type { MiddlewareHandler } from "hono";
  * テスト専用の分岐が入らない。
  */
 export interface ComposeOptions {
-  readonly browser?: BrowserPort;
+  /**
+   * ブラウザ実行基盤。**必須とする。**
+   *
+   * 省略を許すとここでも具象を作れてしまい、選択点が 2 箇所へ割れる
+   * (ADR-0023 は「唯一の場所」と定める)。1 プロセスに 2 つの実装が立ち、
+   * E2E で fake へ差し替えても片方にしか届かない (context/testing.md)。
+   */
+  readonly browser: BrowserPort;
   readonly store?: StorePort;
   /**
    * 保存先のルート。**必須とする。** 省略を許すと、`ensureStateDir` の 4 つの
@@ -38,14 +42,14 @@ export interface ComposeOptions {
 }
 
 export function compose(options: ComposeOptions) {
-  const browser = options.browser ?? createAgentBrowserPort({ home: homedir() });
   const store = options.store ?? createFsStore({ root: options.stateDir });
 
-  const useCases = createUseCases({ browser, store });
+  const useCases = createUseCases({ browser: options.browser, store });
 
+  // **使わないものを組み立てない。** 組み立てた時点で「使っている」ように
+  // 読めるが、`createApiApp` は `/runs` と同じ処理を二重に持つだけで誰も
+  // 呼んでいない。JSON-RPC の入口を生やすときに、そこで組み立てる。
   return {
-    api: createApiApp(useCases),
-    agent: createAgentHandlers(useCases),
     http: createHttpApp({
       useCases,
       policy: options.policy ?? (() => undefined),

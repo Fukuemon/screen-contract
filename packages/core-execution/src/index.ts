@@ -270,9 +270,35 @@ export interface BrowserSession {
    * あり、core は不透明な値として扱う。
    */
   captureStorageState(): Promise<StorageState>;
-  /** 認証状態を注入する。**注入してから対象を開く。** */
-  restoreStorageState(state: StorageState): Promise<void>;
+  /**
+   * 認証状態を注入する。**注入してから対象を開く。**
+   *
+   * 入れられなかった項目を返す。**黙って落とさない** — 入ったつもりで
+   * 未ログインの画面を撮ると、その差分が仕様の変更として記録される。
+   */
+  restoreStorageState(state: StorageState): Promise<StorageRestoreReport>;
+  /**
+   * このセッションを開くときの注入で入らなかったもの。
+   *
+   * **利用者へ出すために持つ。** ログだけに残すと届かず、入ったつもりで
+   * 未ログインの画面を撮ることになる。
+   */
+  restoreReport(): StorageRestoreReport;
   close(): Promise<void>;
+}
+
+/**
+ * 認証状態の注入の結果。
+ *
+ * 実行基盤によっては入れられない領域がある。**入らなかったことを値で返す。**
+ * 例外にすると cookie だけでも入る場合に全部が失敗し、ログを見るだけにすると
+ * 利用者に届かない。
+ */
+export interface StorageRestoreReport {
+  /** 入れられなかった Web Storage の鍵。**値は含めない。** */
+  readonly skippedKeys: readonly string[];
+  /** 入れられなかった理由。利用者へそのまま出せる 1 文にする。 */
+  readonly reason?: string | undefined;
 }
 
 export interface ViewportSize {

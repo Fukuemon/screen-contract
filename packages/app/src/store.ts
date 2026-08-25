@@ -1,4 +1,5 @@
 import { isPortablePathSegment } from "@screen-contract/core-execution";
+import { ValidationError } from "./errors.js";
 
 /**
  * 保存の鍵。
@@ -38,7 +39,7 @@ export function parseStoreKey(raw: string): StoreKey {
     );
   if (!ok) {
     // 拒否した値をメッセージへ入れない。ログや API 応答へ外部入力が反射する。
-    throw new Error(
+    throw new ValidationError(
       "保存の鍵の規則に合いません (小文字英数で始まるセグメントを / で連結する。1 セグメント 64 文字・8 段まで。末尾のドットとプラットフォーム予約名は使えない)",
     );
   }

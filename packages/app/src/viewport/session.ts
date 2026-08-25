@@ -16,6 +16,7 @@ import type {
   StreamRelay,
 } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
+import { ConflictError, ValidationError } from "../errors.js";
 
 /** 選択モードで指した要素。 */
 export interface PickedElement {
@@ -58,6 +59,13 @@ export interface Viewport {
   observe(): Promise<readonly ObservedElement[]>;
   /** 対象ページのコンソール出力。 */
   consoleMessages(): Promise<readonly ConsoleMessage[]>;
+  /**
+   * 認証状態の注入で入らなかったもの。
+   *
+   * **黙って進まない。** 入ったつもりで未ログインの画面を撮ると、その差分が
+   * 仕様の変更として記録される (ADR-0022)。
+   */
+  authWarnings(): readonly string[];
   currentUrl(): Promise<string>;
   /** 実行の相手。セッションが無ければ undefined。 */
   runner(): StepRunner | undefined;
@@ -118,14 +126,20 @@ export function createViewport(options: ViewportOptions): Viewport {
   function required(): BrowserSession {
     const opened = session;
     if (opened === undefined) {
-      // 黙って開かない。開くと run の開始が暗黙になる。
-      throw new Error("セッションが開いていません");
+      // 黙って開かない。開くと run の開始が暗黙になる。**入力の誤りではない。**
+      throw new ConflictError("セッションが開いていません");
     }
     return opened;
   }
 
   return {
     navigate: async (url) => required().perform({ kind: "open", url }),
+
+    authWarnings(): readonly string[] {
+      const report = session?.restoreReport();
+      return report === undefined || report.reason === undefined ? [] : [report.reason];
+    },
+
     setSize: async (size) => required().setViewport(size),
     captureStorageState: () => required().captureStorageState(),
     observe: () => required().observeElements(),
@@ -170,7 +184,9 @@ export function createViewport(options: ViewportOptions): Viewport {
         }),
         perform: async (step: ExecutionStep): Promise<void> => {
           if (step.action.kind !== "open") {
-            throw new Error(`viewport の run が扱えない action です: ${step.action.kind}`);
+            throw new ValidationError(
+              `viewport の run が扱えない action です: ${step.action.kind}`,
+            );
           }
           await opened.perform({ kind: "open", url: step.action.url });
         },

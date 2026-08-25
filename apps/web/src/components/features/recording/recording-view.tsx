@@ -1,4 +1,4 @@
-import { Circle, Square, TriangleAlert } from "lucide-react";
+import { Circle, Square, TriangleAlert, Trash2 } from "lucide-react";
 import type { RecordedStepView } from "../../../gateways/workflow-server.js";
 import { Badge } from "../../ui/badge.js";
 import { Button } from "../../ui/button.js";
@@ -22,6 +22,8 @@ export interface RecordingViewProps {
   readonly paused: boolean;
   readonly steps: readonly RecordedStepView[];
   readonly onUi: (action: UiAction) => void;
+  /** 記録した手順をすべて捨てる。**追記しかしないため、やり直す手段が要る。** */
+  readonly onClear: () => void;
 }
 
 /** 記録の操作と、記録した手順の一覧。 */
@@ -41,7 +43,11 @@ export function RecordingView(props: RecordingViewProps) {
           ) : (
             <Button
               tone="danger"
-              disabled={blocked !== undefined}
+              // **`disabled` にしない。** フォーカス順から外れると、理由文へ
+              // 辿り着けない。判定の正本はハンドラ側にある。
+              aria-disabled={blocked !== undefined}
+              title={blocked === undefined ? undefined : REJECTION_TEXT[blocked]}
+              className={blocked === undefined ? "" : "cursor-not-allowed opacity-40"}
               onClick={() => props.onUi({ kind: "start-recording" })}
             >
               <Circle className="size-3 fill-current" aria-hidden />
@@ -54,10 +60,33 @@ export function RecordingView(props: RecordingViewProps) {
               記録中
             </Badge>
           )}
+          {props.steps.length > 0 && (
+            <Button className="ml-auto" onClick={props.onClear}>
+              <Trash2 className="size-3.5" aria-hidden />
+              消す
+            </Button>
+          )}
         </div>
-        {blocked !== undefined && !props.ui.recording && (
-          <p className="text-xs text-muted">{REJECTION_TEXT[blocked]}</p>
+
+        {/*
+          必要な手順を一度に見せる。1 段ずつ壁に当たって初めて次の条件を知る形に
+          すると、何をすればよいか読めない。
+        */}
+        {!props.ui.recording && (
+          <ol className="flex flex-col gap-0.5 text-xs text-muted">
+            <li>{props.paused ? "✓ " : "1. "}対象へ接続する</li>
+            <li>{props.ui.mode === "operate" ? "✓ " : "2. "}操作モードにする</li>
+            <li>3. 「記録を開始」を押す</li>
+          </ol>
         )}
+        {/* 状態の変化を目で追っていない利用者へも届ける。 */}
+        <p role="status" aria-atomic="true" className="sr-only">
+          {props.ui.recording
+            ? "記録中です"
+            : blocked === undefined
+              ? "記録を開始できます"
+              : REJECTION_TEXT[blocked]}
+        </p>
       </div>
 
       {props.steps.length === 0 ? (

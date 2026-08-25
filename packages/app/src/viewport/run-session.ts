@@ -6,6 +6,7 @@ import {
   type RecordedStep,
   type RecordingSession,
 } from "../recording.js";
+import { ConflictError } from "../errors.js";
 import { stateKeyOf } from "./state-key.js";
 import type { ElementId } from "@screen-contract/domain";
 import type { ExecutionEvent, StepRunner } from "@screen-contract/core-execution";
@@ -47,6 +48,64 @@ export interface ViewportSnapshot {
    * 要素定義は番号を持たない。並びを変えれば番号が変わる。
    */
   readonly badges: readonly ElementId[];
+  /**
+   * 利用者へ出す注意書き。
+   *
+   * 認証状態の一部が入らなかった場合などに入る。**黙って進まない** (ADR-0022)。
+   */
+  readonly warnings: readonly string[];
+}
+
+/**
+ * 操作の反映を待つ回数と間隔。
+ *
+ * 転送した直後の画面はまだ変わっていない。変わるまで見ないと、期待状態の候補が
+ * 常に空になり、冪等スキップが効かなくなる。**待ち切れなければ諦める** —
+ * 何も変わらないクリックは実在する。
+ */
+export interface SettleOptions {
+  readonly attempts: number;
+  readonly intervalMs: number;
+}
+
+const DEFAULT_SETTLE: SettleOptions = { attempts: 12, intervalMs: 150 };
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 観測が同じか。同じなら「まだ何も変わっていない」と読む。 */
+function same(a: RecordedObservation, b: RecordedObservation): boolean {
+  if (a.url !== b.url || a.title !== b.title || a.visibleRefs.length !== b.visibleRefs.length) {
+    return false;
+  }
+  const seen = new Set(a.visibleRefs);
+  return b.visibleRefs.every((ref) => seen.has(ref));
+}
+
+/**
+ * 記録の対象になる入力か。
+ *
+ * **記録するのは押下だけである。** 移動と離すまで記録すると、1 クリックが
+ * 3 手順になる。
+ */
+function pressPointOf(payload: string): { readonly x: number; readonly y: number } | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(payload);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const { type, eventType, x, y } = value as Record<string, unknown>;
+  return type === "input_mouse" &&
+    eventType === "mousePressed" &&
+    typeof x === "number" &&
+    typeof y === "number"
+    ? { x, y }
+    : undefined;
 }
 
 export interface RunSessionOptions {
@@ -62,6 +121,10 @@ export interface RunSessionOptions {
    */
   readonly observe?: (() => Promise<readonly ObservedElement[]>) | undefined;
   readonly currentUrl?: (() => Promise<string>) | undefined;
+  /** 利用者へ出す注意書きの取得元。 */
+  readonly warnings?: (() => readonly string[]) | undefined;
+  /** 操作の反映を待つ条件。テストでは 0 回にして実時間へ依存させない。 */
+  readonly settle?: SettleOptions | undefined;
 }
 
 export interface RunSession {
@@ -80,18 +143,32 @@ export interface RunSession {
    * セッションへ入力を中継し続け、画面も「一時停止中」を表示し続ける。
    */
   reset(): ViewportSnapshot;
+  /**
+   * 記録した手順をすべて捨てる。
+   *
+   * 記録は追記しかしないため、やり直す手段が無いと server を再起動するほか
+   * なくなる。要素の定義と構成番号は残す — 採番はやり直しの対象ではない。
+   */
+  clearSteps(): ViewportSnapshot;
   /** 選択した要素へ番号を付ける。既に付いていれば何もしない。 */
   addBadge(locator: SemanticLocator): ViewportSnapshot;
   removeBadge(id: ElementId): ViewportSnapshot;
   /** 並べ替える。番号は 1..N の連番を保ち、欠番を作らない (ADR-0005)。 */
   moveBadge(id: ElementId, to: number): ViewportSnapshot;
   /**
-   * 入力を記録する。**転送の直前に呼ぶ。**
+   * 対象ページへの入力を処理する。
    *
-   * 記録していなければ何もしない。座標は解決して `ref` にし、解決できなければ
-   * `clickPoint` と警告で残す — 記録の途中で止めない (ADR-0026)。
+   * **記録と転送の順序をここが持つ。** 解決 → 転送 → 検証の順であり、外に出すと
+   * 「操作後の状態で解決する」経路が呼び出し側の書き方次第で生まれる。そのとき
+   * は「解決できない」ではなく**間違った要素へ解決する**ため静かに壊れる
+   * (ADR-0026)。
+   *
+   * 記録しないときも転送はする。記録の有無で操作が効いたり効かなかったりしない。
+   *
+   * @param payload - 中継してよいと判定済みの入力
+   * @param forward - 対象ページへ届ける手段
    */
-  observeClick(point: { readonly x: number; readonly y: number }): Promise<void>;
+  handleInput(payload: string, forward: () => void): Promise<void>;
   /** run を起こす。1 ステップ実行して `paused` に入る。 */
   start(): Promise<ViewportSnapshot>;
   resume(): Promise<ViewportSnapshot>;
@@ -136,6 +213,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       steps,
       newElements,
       badges: badges(),
+      warnings: options.warnings?.() ?? [],
     };
   }
 
@@ -163,7 +241,9 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     const runner = options.runner();
     if (runner === undefined) {
       // viewport が開いていないと実行の相手がいない。黙って idle に留めない。
-      throw new Error("実行するセッションがありません");
+      // **入力の誤りではない。** 400 にすると「入力を直せば通る」と読めるが、
+      // 実際に要るのは接続である。
+      throw new ConflictError("実行するセッションがありません");
     }
     const outcome = await runSteps({
       steps: entrySteps(),
@@ -194,6 +274,15 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       confirmed = steps;
       session = undefined;
       events = [];
+      return snapshot();
+    },
+
+    clearSteps(): ViewportSnapshot {
+      steps = [];
+      confirmed = [];
+      // 記録中なら session も捨てる。残すと、次の 1 手で捨てたはずの手順が
+      // まとめて戻ってくる。
+      session = recording ? startRecording(RUN_ID, [...newElements]) : undefined;
       return snapshot();
     },
 
@@ -229,22 +318,32 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    async observeClick(point): Promise<void> {
-      // 記録していないときは何もしない。黙って記録しない (web-editor feature)。
-      if (!recording || session === undefined || options.observe === undefined) {
+    async handleInput(payload: string, forward: () => void): Promise<void> {
+      const point = pressPointOf(payload);
+      // 記録していないときも転送する。記録の有無で操作が効いたり効かなくなったり
+      // しない。押下以外 (移動・離す・ホイール) は 1 手順に数えない — 数えると
+      // 1 クリックが 3 手順になる。
+      if (
+        point === undefined ||
+        !recording ||
+        session === undefined ||
+        options.observe === undefined
+      ) {
+        forward();
         return;
       }
       const observe = options.observe;
       const currentUrl = options.currentUrl;
+      const settle = options.settle ?? DEFAULT_SETTLE;
 
       /**
-       * 操作の前後の観測。
+       * 観測を 1 回取る。
        *
        * **呼ぶたびに取り直す。** 同じ値を返すと `expectationCandidates` が
        * 「変化した項目」を 1 つも見つけられず、記録した手順が必ず期待状態を
        * 持たなくなる。期待状態が無いと冪等スキップが効かない。
        */
-      const snapshotObservation = async (): Promise<RecordedObservation> => {
+      const observeOnce = async (): Promise<RecordedObservation> => {
         const [url, elements] = await Promise.all([
           currentUrl?.() ?? Promise.resolve(options.entryUrl),
           observe(),
@@ -258,11 +357,36 @@ export function createRunSession(options: RunSessionOptions): RunSession {
         };
       };
 
+      let before: RecordedObservation | undefined;
+      /**
+       * 前後の観測。
+       *
+       * 転送した直後の画面はまだ変わっていない。**変わるまで見る。** 見ないと、
+       * 期待状態の候補が常に空になる。待ち切れなければ諦める — 何も変わらない
+       * クリックは実在する。
+       */
+      const observeStep = async (): Promise<RecordedObservation> => {
+        if (before === undefined) {
+          before = await observeOnce();
+          return before;
+        }
+        let after = await observeOnce();
+        for (let attempt = 0; attempt < settle.attempts && same(before, after); attempt += 1) {
+          await delay(settle.intervalMs);
+          after = await observeOnce();
+        }
+        return after;
+      };
+
       await session.click(
         { elements: await observe(), x: point.x, y: point.y, nextId },
-        // 転送そのものは Stream Proxy が行う。ここでは記録だけを担う。
-        () => Promise.resolve(),
-        snapshotObservation,
+        // **転送を session の内側で行う。** 外へ出すと、操作前の状態で「後」を
+        // 観測する経路が生まれ、期待状態が静かに空になる (ADR-0026)。
+        () => {
+          forward();
+          return Promise.resolve();
+        },
+        observeStep,
       );
       // 操作でページが移ることがある。移った先の画面状態へ番号の帳簿を切り替える。
       if (currentUrl !== undefined) {

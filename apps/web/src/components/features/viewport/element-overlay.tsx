@@ -33,46 +33,63 @@ export function ElementOverlay(props: ElementOverlayProps) {
   );
 
   return (
-    <svg
-      viewBox={`0 0 ${String(props.size.width)} ${String(props.size.height)}`}
-      className="pointer-events-none absolute inset-0 size-full"
-      aria-hidden
-    >
-      {props.elements.map((element) => {
-        const selected = props.picked?.role === element.role && props.picked.name === element.name;
-        const badge = numberOf.get(`${element.role}\u0000${element.name}`);
-        return (
-          <g key={`${element.role}\u0000${element.name}`}>
-            <rect
-              x={element.box.x}
-              y={element.box.y}
-              width={element.box.width}
-              height={element.box.height}
-              className={cn("fill-transparent", selected ? "stroke-accent" : "stroke-info/50")}
-              strokeWidth={selected ? 3 : 1.5}
-            />
-            {badge !== undefined && (
-              <>
-                <rect
-                  x={element.box.x}
-                  y={Math.max(0, element.box.y - BADGE_HEIGHT)}
-                  width={BADGE_WIDTH}
-                  height={BADGE_HEIGHT}
-                  className="fill-accent"
-                />
-                <text
-                  x={element.box.x + BADGE_WIDTH / 2}
-                  y={Math.max(0, element.box.y - BADGE_HEIGHT) + BADGE_HEIGHT - 5}
-                  textAnchor="middle"
-                  className="fill-bg text-[12px] font-bold"
-                >
-                  {badge}
-                </text>
-              </>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <>
+      <svg
+        viewBox={`0 0 ${String(props.size.width)} ${String(props.size.height)}`}
+        className="pointer-events-none absolute inset-0 size-full"
+        aria-hidden
+      >
+        {props.elements.map((element) => {
+          const selected =
+            props.picked?.role === element.role && props.picked.name === element.name;
+          const badge = numberOf.get(`${element.role}\u0000${element.name}`);
+          return (
+            <g key={`${element.role}\u0000${element.name}`}>
+              <rect
+                x={element.box.x}
+                y={element.box.y}
+                width={element.box.width}
+                height={element.box.height}
+                // 対象ページの色は制御できない。暗い縁取りを添えて、明暗どちらの
+                // 背景でも輪郭が残るようにする。
+                className={cn("fill-transparent", selected ? "stroke-accent" : "stroke-info")}
+                strokeWidth={selected ? 3 : 1.5}
+                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.9))" }}
+              />
+              {badge !== undefined && (
+                <>
+                  <rect
+                    x={element.box.x}
+                    y={Math.max(0, element.box.y - BADGE_HEIGHT)}
+                    width={BADGE_WIDTH}
+                    height={BADGE_HEIGHT}
+                    className="fill-accent"
+                  />
+                  <text
+                    x={element.box.x + BADGE_WIDTH / 2}
+                    y={Math.max(0, element.box.y - BADGE_HEIGHT) + BADGE_HEIGHT - 5}
+                    textAnchor="middle"
+                    className="fill-bg text-[12px] font-bold"
+                  >
+                    {badge}
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {/*
+      枠は装飾なので読み上げから外すが、番号の対応は残す。「構成番号」パネルは
+      タブを切り替えると DOM から消えるため、そこだけに置くと、他のタブを開いて
+      いる間はどこからも読めない。
+    */}
+      <ol className="sr-only">
+        {props.badges.map((id, index) => {
+          const definition = props.definitions.find((element) => element.id === id);
+          return <li key={id}>{`${String(index + 1)} 番 ${definition?.locator.name ?? id}`}</li>;
+        })}
+      </ol>
+    </>
   );
 }

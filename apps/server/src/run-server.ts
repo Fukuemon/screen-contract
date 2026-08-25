@@ -75,7 +75,12 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
     let activeProfile: string | undefined;
     const authProfiles = createAuthProfileStore({ stateDir, keystore: createKeystore() });
 
+    // **具象は 1 つだけ作る。** 2 つ作ると、home の解決元まで食い違い、
+    // テストが差し替えた側と実際に動く側がずれる (ADR-0023)。
+    const browser = createAgentBrowserPort({ home: env.home });
+
     const server = await listen({
+      browser,
       stateDir,
       webRoot: env.webRoot,
       allowedOrigins: createAllowedOrigins({
@@ -90,7 +95,7 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
       // 列挙が空なら起動時検査で中止しているため、ここには必ず 1 件ある。
       entryUrl: allowedOrigins[0] as string,
       viewport: createViewport({
-        browser: createAgentBrowserPort({ home: env.home }),
+        browser,
         entryUrl: allowedOrigins[0] as string,
         // 誰として実行しているかを Port へ渡す。匿名を名乗ったまま認証状態を
         // 注入すると、認証済みの結果が匿名の Baseline へ混ざる (ADR-0022)。

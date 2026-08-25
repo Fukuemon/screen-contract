@@ -6,6 +6,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { listen, type RunningServer } from "./listen.js";
 import { readRuntimeFile, runtimeFilePath } from "./runtime-file.js";
 import type { LifecycleEvent, LifecycleHost } from "./runtime-lifecycle.js";
+import type { BrowserPort } from "@screen-contract/core-execution";
+
+/**
+ * Browser Port の fake。
+ *
+ * **合成ルートが 1 つだけ作る契約を守る。** テストでも同じ形で渡すことで、
+ * 差し替え口が実際に効くことを確かめられる (context/testing.md)。
+ */
+const fakeBrowser: BrowserPort = {
+  connect: () => ({ send: () => undefined, close: () => undefined }),
+  createSession: () => Promise.reject(new Error("テストではセッションを開かない")),
+};
 
 let stateDir: string;
 let server: RunningServer | undefined;
@@ -37,7 +49,7 @@ afterEach(async () => {
 });
 
 async function start(): Promise<RunningServer> {
-  server = await listen({ stateDir, host: fakeHost() });
+  server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
   return server;
 }
 

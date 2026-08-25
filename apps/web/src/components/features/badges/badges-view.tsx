@@ -88,6 +88,8 @@ export function BadgesView(props: BadgesViewProps) {
                 >
                   <ChevronDown className="size-3.5" aria-hidden />
                 </Button>
+                {/* 「下へ」と隣接させない。押し間違えると採番が戻せない。 */}
+                <span className="w-2" aria-hidden />
                 <Button
                   tone="ghost"
                   size="icon"

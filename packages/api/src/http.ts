@@ -1,7 +1,13 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { ElementId, UseCases, ViewportControl } from "@screen-contract/app";
-import { isValidViewport, parseStartRunInput, parseStoreKey } from "@screen-contract/app";
+import {
+  isConflictError,
+  isValidationError,
+  isValidViewport,
+  parseStartRunInput,
+  parseStoreKey,
+} from "@screen-contract/app";
 import {
   isAllowedHost,
   isAllowedOrigin,
@@ -17,28 +23,6 @@ import {
  * 合成ルートである (ADR-0023 / ADR-0024)。認可は Hono のミドルウェアとして
  * interface 層に閉じる (ADR-0021)。
  */
-
-/** 拒否の理由を応答へそのまま出さない。攻撃者へどこで落ちたかを教える。 */
-/**
- * 検証由来と判断する失敗。
- *
- * 各層の検証エラーは `name` を自分のクラス名へ上書きするため、名前を列挙して
- * 判定する。列挙に無いものは想定外として 500 にする。
- */
-const VALIDATION_ERROR_NAMES = new Set([
-  "Error",
-  "SyntaxError",
-  "OriginError",
-  "AuthProfileError",
-  "SealError",
-  "StoreError",
-  "WorkflowError",
-  "ArtifactPathError",
-]);
-
-function isValidationError(error: Error): boolean {
-  return VALIDATION_ERROR_NAMES.has(error.name);
-}
 
 const STATUS: Readonly<Record<AuthRejection, 401 | 403>> = {
   "missing-token": 401,
@@ -270,6 +254,9 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       c.json(viewport.removeAuthProfile(c.req.param("name"))),
     );
 
+    // 記録は追記しかしない。捨てる口が無いと、やり直しに server の再起動が要る。
+    app.delete("/viewport/recording", (c) => c.json(viewport.clearSteps()));
+
     app.post("/viewport/recording", async (c) => {
       const { recording } = (await c.req.json()) as { recording?: unknown };
       if (typeof recording !== "boolean") {
@@ -323,20 +310,24 @@ export function createHttpApp(options: HttpAppOptions): Hono {
     return c.json(result, status);
   });
 
-  // 検証由来の失敗と想定外の失敗を分ける。すべて 400 にすると、client の
-  // 誤りと server の障害を呼び出し側が区別できない。
-  //
-  // **応答へ例外の中身を出さない。** 検証の失敗メッセージには規則が載るが、
-  // 想定外の失敗にはパスや secret が載りうる。詳細は server 側にだけ残す。
   /**
-   * 検証由来の失敗と想定外の失敗を分ける。
+   * 失敗を 3 つに分ける。
    *
-   * **名前ではなく型で判定する。** 文字列比較だと、`name` を上書きした
-   * エラークラスを足すたびに分類から漏れ、入力ミスが 500 になる。
+   * **応答へ例外の中身を出さない。** 検証の失敗メッセージには規則が載るが、
+   * 想定外の失敗にはパスや secret が載りうる。詳細は server 側にだけ残す。
+   *
+   * **名前ではなく構造で判定する** (`isValidationError` / `isConflictError`)。
+   * クラス名の列挙にすると、`name` を上書きしたクラスを足すたびに分類から漏れ、
+   * 逆に素の `Error` を入れると server の状態異常まで 400 として返る。
    */
   app.onError((error, c) => {
     if (isValidationError(error)) {
       return c.json({ error: "bad-request" }, 400);
+    }
+    if (isConflictError(error)) {
+      // 入力は正しいが、いまの状態では実行できない。400 と混ぜると
+      // 「入力を直せば通る」と読めてしまう。
+      return c.json({ error: "conflict" }, 409);
     }
     // 障害の一次観測点は標準出力である (context/infrastructure.md)。
     console.error("[api] 想定外の失敗", error.name);

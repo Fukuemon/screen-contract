@@ -11,6 +11,8 @@
 const MOUSE_EVENTS = new Set(["mousePressed", "mouseReleased", "mouseMoved", "mouseWheel"]);
 const KEY_EVENTS = new Set(["keyDown", "keyUp", "rawKeyDown", "char"]);
 const TOUCH_EVENTS = new Set(["touchStart", "touchEnd", "touchMove", "touchCancel"]);
+/** ボタン名も列挙で縛る。任意の文字列を通すと「組み直す」方針から外れる。 */
+const BUTTONS = new Set(["none", "left", "middle", "right", "back", "forward"]);
 
 /** 押しっぱなしの回数。桁外れを渡すと実行基盤側で意味を失う。 */
 const MAX_CLICK_COUNT = 3;
@@ -61,7 +63,7 @@ function mouse(raw: Record<string, unknown>): Record<string, unknown> | undefine
     eventType,
     x,
     y,
-    button: optionalString(raw["button"], 16),
+    button: BUTTONS.has(raw["button"] as string) ? (raw["button"] as string) : undefined,
     clickCount: optionalNumber(raw["clickCount"], MAX_CLICK_COUNT),
     modifiers: optionalNumber(raw["modifiers"], 15),
     deltaX: coordinate(raw["deltaX"]),

@@ -136,14 +136,7 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
     },
 
     forwardInput(claim: RelayClaim, payload: string): InputDiscarded | undefined {
-      // **語彙の検査を先に行う。** 中継条件を満たしていても、列挙に無い形は
-      // 送らない。組み直した payload だけを上流へ渡す。
-      const relayable = relayableInput(payload);
-      const reason =
-        relayable === undefined
-          ? "bad-input"
-          : discardReason(deps.runState.current(), claim, inputKindOf(payload));
-      if (reason !== undefined) {
+      function discard(reason: DiscardReason): InputDiscarded {
         const event: InputDiscarded = {
           kind: "input-discarded",
           reason,
@@ -156,7 +149,18 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
         }
         return event;
       }
-      deps.upstream.send(relayable as string);
+
+      // **語彙の検査を先に行う。** 中継条件を満たしていても、列挙に無い形は
+      // 送らない。組み直した payload だけを上流へ渡す。
+      const relayable = relayableInput(payload);
+      if (relayable === undefined) {
+        return discard("bad-input");
+      }
+      const reason = discardReason(deps.runState.current(), claim, inputKindOf(payload));
+      if (reason !== undefined) {
+        return discard(reason);
+      }
+      deps.upstream.send(relayable);
       return undefined;
     },
 

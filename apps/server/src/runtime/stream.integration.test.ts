@@ -5,6 +5,18 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { listen, type RunningServer } from "./listen.js";
 import type { LifecycleEvent, LifecycleHost } from "./runtime-lifecycle.js";
+import type { BrowserPort } from "@screen-contract/core-execution";
+
+/**
+ * Browser Port の fake。
+ *
+ * **合成ルートが 1 つだけ作る契約を守る。** テストでも同じ形で渡すことで、
+ * 差し替え口が実際に効くことを確かめられる (context/testing.md)。
+ */
+const fakeBrowser: BrowserPort = {
+  connect: () => ({ send: () => undefined, close: () => undefined }),
+  createSession: () => Promise.reject(new Error("テストではセッションを開かない")),
+};
 
 /**
  * Stream Proxy の接続を実プロセスで確かめる。
@@ -42,7 +54,7 @@ afterEach(async () => {
 });
 
 async function start() {
-  server = await listen({ stateDir, host: fakeHost() });
+  server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
   return server;
 }
 
@@ -152,6 +164,7 @@ describe("live viewport の映像", () => {
       resolveAt: () => Promise.resolve(undefined),
       observe: () => Promise.resolve([]),
       currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
+      authWarnings: () => [],
       consoleMessages: () => Promise.resolve([]),
     };
   }
@@ -186,6 +199,7 @@ describe("live viewport の映像", () => {
 
   it("認証を通したら映像が届く", async () => {
     server = await listen({
+      browser: fakeBrowser,
       stateDir,
       host: fakeHost(),
       viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
@@ -196,6 +210,7 @@ describe("live viewport の映像", () => {
   it("認証を通す前に映像を流さない", async () => {
     // 流すと、トークンを持たない接続へ対象アプリの画面が届く。
     server = await listen({
+      browser: fakeBrowser,
       stateDir,
       host: fakeHost(),
       viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
@@ -204,7 +219,7 @@ describe("live viewport の映像", () => {
   });
 
   it("viewport を渡さなければ映像は流れない", async () => {
-    server = await listen({ stateDir, host: fakeHost() });
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
     expect(await collectFrames(server, [], true)).toEqual([]);
   });
 });
@@ -215,7 +230,7 @@ describe("Web UI の配信", () => {
   it("配信する HTML へトークンを埋め込む", async () => {
     // ブラウザは runtime.json を読めず、URL の query には載せられない
     // (context/infrastructure.md)。
-    server = await listen({ stateDir, host: fakeHost(), webRoot: WEB_ROOT });
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
     const response = await fetch(`http://127.0.0.1:${server.port}/`);
     expect(response.status).toBe(200);
     const html = await response.text();
@@ -223,7 +238,7 @@ describe("Web UI の配信", () => {
   });
 
   it("配信ルートの外を読ませない", async () => {
-    server = await listen({ stateDir, host: fakeHost(), webRoot: WEB_ROOT });
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost(), webRoot: WEB_ROOT });
     const response = await fetch(
       `http://127.0.0.1:${server.port}/assets/..%2f..%2f..%2f..%2fpackage.json`,
     );
@@ -231,7 +246,7 @@ describe("Web UI の配信", () => {
   });
 
   it("配信を渡さなければ shell を返さない", async () => {
-    server = await listen({ stateDir, host: fakeHost() });
+    server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
     const response = await fetch(`http://127.0.0.1:${server.port}/`);
     // 認可ミドルウェアへ落ちる (トークンが無いため 401)。
     expect(response.status).not.toBe(200);

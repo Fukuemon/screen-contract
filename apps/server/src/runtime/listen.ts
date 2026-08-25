@@ -2,6 +2,7 @@ import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-se
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
 import type { AuthProfileStore } from "@screen-contract/app";
+import type { BrowserPort } from "@screen-contract/core-execution";
 import { createRunSession, createViewportControl } from "@screen-contract/app";
 import type { AllowedOrigins, Viewport, ViewportSubscription } from "@screen-contract/app";
 import type { AuthPolicy } from "@screen-contract/api";
@@ -52,6 +53,8 @@ export interface ListenOptions {
    * 中継条件は掛からない** (検査が要るのは逆方向の入力転送だけ)。
    */
   readonly viewport?: Viewport | undefined;
+  /** ブラウザ実行基盤。**合成ルートが 1 つだけ作って渡す** (ADR-0023)。 */
+  readonly browser: BrowserPort;
 }
 
 export interface RunningServer {
@@ -68,13 +71,6 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
   // 未定のまま固定されてしまう。
   let policy: AuthPolicy | undefined;
 
-  /**
-   * Stream Proxy の結線。
-   *
-   * **中継条件は server 側の run 状態で判定する** (ADR-0008)。skeleton では
-   * run を保持する層がまだ無いため、常に「run が無い」を返す。結果として
-   * 入力はすべて `no-run` として破棄され、**素通しにはならない**。
-   */
   // **中継条件は server が持つ run 状態で判定する** (ADR-0008)。client の自称は
   // 要求元の run しか渡せない。
   const viewportPort = options.viewport;
@@ -86,6 +82,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           runner: () => viewportPort.runner(),
           observe: () => viewportPort.observe(),
           currentUrl: () => viewportPort.currentUrl(),
+          warnings: () => viewportPort.authWarnings(),
         });
   const control =
     session === undefined ||
@@ -102,33 +99,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
         });
   const runState = { current: (): RunState | undefined => session?.relayState() };
 
-  /**
-   * 記録の対象になる入力かを見る。
-   *
-   * 記録するのは押下だけである。移動と離すまで記録すると、1 クリックが
-   * 3 手順になる。
-   */
-  function mousePressPoint(payload: string): { x: number; y: number } | undefined {
-    let value: unknown;
-    try {
-      value = JSON.parse(payload);
-    } catch {
-      return undefined;
-    }
-    if (typeof value !== "object" || value === null) {
-      return undefined;
-    }
-    const { type, eventType, x, y } = value as Record<string, unknown>;
-    return type === "input_mouse" &&
-      eventType === "mousePressed" &&
-      typeof x === "number" &&
-      typeof y === "number"
-      ? { x, y }
-      : undefined;
-  }
-
-  const stream = upgradeWebSocket((c) => {
-    void c;
+  const stream = upgradeWebSocket(() => {
     let connection: ReturnType<typeof createStreamConnection> | undefined;
     let subscription: ViewportSubscription | undefined;
     // **接続ごとに持つ。** 共有すると、1 本目が認証を通しただけで 2 本目にも
@@ -143,22 +114,23 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           /**
            * 上流 (ブラウザ) への転送。
            *
-           * **転送より前に記録する。** 操作後の状態で解決すると、ページが
-           * 自律的に変化していたときに「解決できない」ではなく間違った要素へ
-           * 解決する (ADR-0026)。順序をここで守る。
+           * **順序 (解決 → 転送 → 検証) は app が持つ** (ADR-0026)。ここは
+           * 転送の手段を渡すだけにする。合成ルートに置くと、記録の規則が
+           * 依存検査の効かない場所に入り、単体テストも当たらない (ADR-0023)。
            */
           upstream: {
             send: (payload) => {
-              const point = mousePressPoint(payload);
-              if (point === undefined || session === undefined) {
+              if (session === undefined) {
                 subscription?.send(payload);
                 return;
               }
-              // 解決を待ってから転送する。待たないと順序が保てない。
               void session
-                .observeClick(point)
-                .catch(() => undefined)
-                .finally(() => subscription?.send(payload));
+                .handleInput(payload, () => subscription?.send(payload))
+                .catch(() => {
+                  // **黙って捨てない。** 捨てると「操作は効いたのに手順が
+                  // 記録されていない」が無音で起きる。中身は出さない。
+                  console.error("[viewport] 操作の記録に失敗しました");
+                });
             },
           },
           downstream: { send: (payload) => ws.send(payload) },
@@ -198,6 +170,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
   });
 
   const app = compose({
+    browser: options.browser,
     stateDir: options.stateDir,
     policy: () => policy,
     stream,

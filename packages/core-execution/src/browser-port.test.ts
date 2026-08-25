@@ -28,7 +28,8 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
     consoleMessages: async () => [],
     setViewport: async () => undefined,
     captureStorageState: async () => ({ cookies: [], localStorage: {} }),
-    restoreStorageState: async () => undefined,
+    restoreStorageState: async () => ({ skippedKeys: [] }),
+    restoreReport: () => ({ skippedKeys: [] }),
     close: async () => undefined,
     ...overrides,
   };

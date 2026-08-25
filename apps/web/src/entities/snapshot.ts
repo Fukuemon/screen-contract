@@ -28,6 +28,10 @@ function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
+function strings(value: unknown): readonly string[] {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+}
+
 /** 構成番号の並び。server が採番した要素 ID をそのまま保つ。 */
 function elementIds(value: unknown): readonly ElementDef["id"][] {
   return Array.isArray(value)
@@ -125,5 +129,6 @@ export function parseSnapshot(value: unknown): ViewportSnapshot {
           .filter((element): element is ElementDefView => element !== undefined)
       : [],
     badges: elementIds(raw["badges"]),
+    warnings: strings(raw["warnings"]),
   };
 }

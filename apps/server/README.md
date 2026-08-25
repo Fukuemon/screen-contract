@@ -35,6 +35,13 @@ src/
 合成ルートは adapter を選んで注入するだけである
 ([adr/0023](../../adr/0023-composition-root.md))。
 
+## まだ結線していないもの
+
+`packages/agent` (エージェント向けの入口) は**どの transport にも繋いでいない**。
+`createAgentHandlers` を組み立てるだけでは使っていることにならないため、合成から
+外してある。JSON-RPC の入口を生やすときに、ここで組み立てる
+([adr/0021](../../adr/0021-agent-interface-authz.md))。
+
 ## 依存の向き
 
 `apps/server` だけが全層に依存してよい。`packages/api` は Hono のアプリを

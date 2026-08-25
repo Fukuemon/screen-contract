@@ -15,6 +15,12 @@ import { timingSafeEqual } from "node:crypto";
  * 1 バイトずつ総当たりで復元できる。
  */
 export function tokensMatch(expected: string, actual: string): boolean {
+  // **空同士を一致させない。** `timingSafeEqual` は長さ 0 で真を返すため、
+  // 期待値が未確定のまま空文字で組まれると、空を名乗る接続が通る。安全を
+  // ミドルウェアの登録順に依存させない。
+  if (expected.length === 0 || actual.length === 0) {
+    return false;
+  }
   const a = Buffer.from(expected, "utf8");
   const b = Buffer.from(actual, "utf8");
   // timingSafeEqual は長さが違うと投げる。長さの一致を先に定数時間の外で

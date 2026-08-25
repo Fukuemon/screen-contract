@@ -19,6 +19,9 @@ export type WorkflowErrorCode =
   | "expect/unimplemented";
 
 export class WorkflowError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
   constructor(
     readonly code: WorkflowErrorCode,
     message: string,

@@ -16,9 +16,21 @@
   --color-muted: #94a3b8;
   --color-accent: #22c55e;
   --color-on-accent: #0f172a;
+  /*
+   * danger は 3 つに分ける。1 つで済ませると、白文字を載せた面が 3.76:1 に
+   * なり WCAG の 4.5:1 へ届かない。最も読めてほしいラベルが最も読めなくなる。
+   *
+   * - `danger`   枠とアイコン (bg の上で 4.74:1)
+   * - `danger-solid` 白文字を載せる面 (6.47:1)
+   * - `danger-fg`    薄い面の上に置く文字 (5.27:1)
+   */
   --color-danger: #ef4444;
+  --color-danger-solid: #b91c1c;
+  --color-danger-fg: #f87171;
   --color-warn: #f59e0b;
   --color-info: #60a5fa;
+  /* elevated に重なる経路では #60a5fa が 4.04:1 まで落ちる。 */
+  --color-info-fg: #93c5fd;
 
   --font-sans:
     "IBM Plex Sans", system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;

@@ -7,6 +7,7 @@ import {
   type StoreKey,
   type StorePort,
 } from "./store.js";
+import { ValidationError } from "./errors.js";
 import {
   authContextKey,
   parseAuthProfileName,
@@ -38,14 +39,14 @@ export interface StartRunInput {
  */
 export function parseStartRunInput(raw: unknown): StartRunInput {
   if (typeof raw !== "object" || raw === null) {
-    throw new Error("run の開始入力がオブジェクトではありません");
+    throw new ValidationError("run の開始入力がオブジェクトではありません");
   }
   const { runId, authProfile } = raw as { runId?: unknown; authProfile?: unknown };
   if (typeof runId !== "string") {
-    throw new Error("run の開始入力に runId がありません");
+    throw new ValidationError("run の開始入力に runId がありません");
   }
   if (authProfile !== undefined && authProfile !== null && typeof authProfile !== "string") {
-    throw new Error("認証プロファイル名は文字列で指定します");
+    throw new ValidationError("認証プロファイル名は文字列で指定します");
   }
   const auth: AuthContext =
     authProfile === undefined || authProfile === null
@@ -106,6 +107,7 @@ export {
   type StorePort,
   type StoreSpace,
 } from "./store.js";
+export { ConflictError, isConflictError, isValidationError, ValidationError } from "./errors.js";
 export { contentRevision, type Revision } from "./revision.js";
 export {
   createApprovalQueue,
@@ -150,6 +152,7 @@ export {
   createRunSession,
   type RunSession,
   type RunSessionOptions,
+  type SettleOptions,
   type ViewportSnapshot,
 } from "./viewport/run-session.js";
 export type { RunState, StreamMode } from "./viewport/run-state.js";

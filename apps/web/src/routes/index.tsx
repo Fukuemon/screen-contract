@@ -10,6 +10,7 @@ import { RecordingView } from "../components/features/recording/recording-view.j
 import { TargetList } from "../components/features/targets/target-list.js";
 import { ViewportView } from "../components/features/viewport/viewport-view.js";
 import { SidebarItem, SidebarSection } from "../components/shared/sidebar/sidebar.js";
+import { panelId, tabId } from "../components/ui/tab-ids.js";
 import { Tabs } from "../components/ui/tabs.js";
 import { isValidViewport, VIEWPORT_PRESETS } from "../entities/target.js";
 
@@ -70,7 +71,7 @@ function EditorRoute() {
       <div className="flex min-w-0 flex-1 flex-col">
         <EditorHeader
           connected={connected}
-          paused={editor.paused}
+          busy={editor.busy}
           url={editor.url}
           needsAllow={needsAllow}
           onUrlChange={editor.setUrl}
@@ -89,7 +90,7 @@ function EditorRoute() {
             frame={editor.frame}
             forwards={editor.forwards}
             mode={editor.mode}
-            canOperate={editor.paused}
+            canOperate={editor.connected}
             elements={editor.elements}
             badges={snapshot?.badges ?? []}
             definitions={snapshot?.newElements ?? []}
@@ -127,7 +128,13 @@ function EditorRoute() {
                 { id: "logs", label: "ログ", count: editor.messages.length },
               ]}
             />
-            <div className="min-h-0 flex-1 overflow-auto border-t border-line/40">
+            <div
+              id={panelId(panel)}
+              role="tabpanel"
+              aria-labelledby={tabId(panel)}
+              tabIndex={0}
+              className="min-h-0 flex-1 overflow-auto border-t border-line/40"
+            >
               {panel === "badges" && (
                 <BadgesView
                   badges={snapshot?.badges ?? []}
@@ -142,9 +149,10 @@ function EditorRoute() {
               {panel === "record" && (
                 <RecordingView
                   ui={{ mode: editor.mode, recording: editor.recording }}
-                  paused={editor.paused}
+                  paused={editor.connected}
                   steps={snapshot?.steps ?? []}
                   onUi={editor.onUi}
+                  onClear={editor.clearSteps}
                 />
               )}
               {panel === "auth" && (
@@ -168,10 +176,22 @@ function EditorRoute() {
           </aside>
         </div>
 
+        {/* **黙って進まない。** 入ったつもりで未ログインの画面を撮ると、その
+            差分が仕様の変更として記録される (ADR-0022)。 */}
+        {(snapshot?.warnings ?? []).map((warning) => (
+          <p
+            key={warning}
+            role="status"
+            className="shrink-0 border-t border-warn/50 bg-warn/10 px-4 py-2 text-sm text-warn"
+          >
+            {warning}
+          </p>
+        ))}
+
         {editor.error !== undefined && (
           <p
             role="alert"
-            className="shrink-0 border-t border-line/40 bg-danger/10 px-4 py-2 text-sm text-danger"
+            className="shrink-0 border-t border-danger/50 bg-danger/10 px-4 py-2 text-sm text-danger-fg"
           >
             {editor.error}
           </p>

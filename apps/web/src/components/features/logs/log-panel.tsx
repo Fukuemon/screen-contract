@@ -74,7 +74,7 @@ export function LogPanel(props: LogPanelProps) {
               <span
                 className={cn(
                   "min-w-0 flex-1 break-all",
-                  message.level === "error" && "text-danger",
+                  message.level === "error" && "text-danger-fg",
                 )}
               >
                 {message.text}

@@ -192,3 +192,195 @@ describe("構成番号", () => {
     expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
   });
 });
+
+describe("入力の記録と転送", () => {
+  const press = (x: number, y: number): string =>
+    JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x, y });
+  const box = (x: number, y: number) => ({ x, y, width: 10, height: 10 });
+
+  /**
+   * 対象ページの fake。
+   *
+   * **転送を境に見える要素が変わる。** 実物と同じ形にしないと、期待状態が
+   * 空のままでもテストが緑になる。
+   */
+  function fakePage(after: readonly { role: string; name: string }[]) {
+    let url = "http://127.0.0.1:5174/";
+    let elements = [{ role: "button", name: "開く", box: box(0, 0) }];
+    return {
+      forwards: 0,
+      observe: () => Promise.resolve(elements),
+      currentUrl: () => Promise.resolve(url),
+      /** 転送されたら画面が変わる。実物のクリックと同じ順序になる。 */
+      react: (nextUrl?: string) => {
+        elements = after.map((element) => ({ ...element, box: box(0, 0) }));
+        if (nextUrl !== undefined) {
+          url = nextUrl;
+        }
+      },
+    };
+  }
+
+  function recording(page: ReturnType<typeof fakePage>) {
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      runner: () => fakeRunner(),
+      observe: page.observe,
+      currentUrl: page.currentUrl,
+      // 実時間へ依存させない。fake は転送と同時に変わる。
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    return s;
+  }
+
+  async function record(page: ReturnType<typeof fakePage>, nextUrl?: string) {
+    const s = recording(page);
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await s.handleInput(press(5, 5), () => {
+      page.forwards += 1;
+      page.react(nextUrl);
+    });
+    return s;
+  }
+
+  it("転送で現れた要素が期待状態に入る", async () => {
+    // **ここが中核である。** 転送を記録の外へ出すと、操作前の状態で「後」を
+    // 観測して候補が常に空になる。期待状態が無いと冪等スキップが効かない。
+    const page = fakePage([
+      { role: "button", name: "開く" },
+      { role: "heading", name: "設定" },
+    ]);
+    const s = await record(page);
+    expect(page.forwards).toBe(1);
+    expect(s.snapshot().steps[0]?.expect).toEqual([
+      { kind: "element", ref: "el-heading-設定", visible: true },
+    ]);
+  });
+
+  it("転送で消えた要素も期待状態に入る", async () => {
+    const page = fakePage([{ role: "heading", name: "設定" }]);
+    const s = await record(page);
+    expect(s.snapshot().steps[0]?.expect).toContainEqual({
+      kind: "element",
+      ref: "el-button-開く",
+      visible: false,
+    });
+  });
+
+  it("転送で移った先の URL が期待状態に入る", async () => {
+    const page = fakePage([{ role: "button", name: "開く" }]);
+    const s = await record(page, "http://127.0.0.1:5174/settings");
+    expect(s.snapshot().steps[0]?.expect).toContainEqual({ kind: "url", path: "/settings" });
+  });
+
+  it("移った先へ構成番号の帳簿を切り替える", async () => {
+    const page = fakePage([{ role: "button", name: "開く" }]);
+    const s = await record(page, "http://127.0.0.1:5174/settings");
+    expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
+  });
+
+  it("記録していなくても転送する", async () => {
+    // 記録の有無で操作が効いたり効かなくなったりしない。
+    const page = fakePage([]);
+    const s = recording(page);
+    await s.start();
+    await s.handleInput(press(5, 5), () => (page.forwards += 1));
+    expect(page.forwards).toBe(1);
+    expect(s.snapshot().steps).toEqual([]);
+  });
+
+  it("押下以外は 1 手順に数えない", async () => {
+    // 移動と離すまで記録すると、1 クリックが 3 手順になる。
+    const page = fakePage([{ role: "heading", name: "設定" }]);
+    const s = recording(page);
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    for (const eventType of ["mouseMoved", "mouseReleased", "mouseWheel"]) {
+      await s.handleInput(
+        JSON.stringify({ type: "input_mouse", eventType, x: 5, y: 5 }),
+        () => (page.forwards += 1),
+      );
+    }
+    expect(page.forwards).toBe(3);
+    expect(s.snapshot().steps).toEqual([]);
+  });
+
+  it("解釈できない payload も転送する", async () => {
+    const page = fakePage([]);
+    const s = recording(page);
+    await s.start();
+    await s.handleInput("{", () => (page.forwards += 1));
+    expect(page.forwards).toBe(1);
+  });
+
+  it("解決できない座標を clickPoint と警告で残す", async () => {
+    // 記録の途中で止めない (ADR-0026)。
+    const page = fakePage([{ role: "heading", name: "設定" }]);
+    const s = recording(page);
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await s.handleInput(press(900, 900), () => page.react());
+    const step = s.snapshot().steps[0];
+    expect(step?.action).toEqual({ kind: "clickPoint", x: 900, y: 900 });
+    expect(step?.warning).toBeDefined();
+  });
+
+  it("記録を止めて再開しても前の手順を消さない", async () => {
+    const page = fakePage([{ role: "heading", name: "設定" }]);
+    const s = await record(page);
+    s.setRecording(false);
+    s.setRecording(true);
+    await s.handleInput(press(5, 5), () => page.react());
+    const ids = s.snapshot().steps.map((step) => step.id);
+    expect(ids).toEqual(["step-0", "step-1"]);
+  });
+
+  it("同じ要素を 2 回押しても定義を重複させない", async () => {
+    const page = fakePage([{ role: "button", name: "開く" }]);
+    const s = await record(page);
+    await s.handleInput(press(5, 5), () => page.react());
+    expect(s.snapshot().newElements.map((element) => element.id)).toEqual(["el-button-開く"]);
+  });
+
+  it("反映を待つ", async () => {
+    // 転送の直後はまだ何も変わっていないことがある。1 回見て諦めると、期待状態が
+    // 空になる。
+    const page = fakePage([]);
+    let ticks = 0;
+    let elements = [{ role: "button", name: "開く", box: box(0, 0) }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      runner: () => fakeRunner(),
+      observe: () => {
+        ticks += 1;
+        // 転送から 3 回目の観測でようやく変わる。
+        if (ticks > 4) {
+          elements = [{ role: "heading", name: "設定", box: box(0, 0) }];
+        }
+        return Promise.resolve(elements);
+      },
+      currentUrl: page.currentUrl,
+      settle: { attempts: 5, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await s.handleInput(press(5, 5), () => undefined);
+    expect(s.snapshot().steps[0]?.expect).toContainEqual({
+      kind: "element",
+      ref: "el-heading-設定",
+      visible: true,
+    });
+  });
+
+  it("何も変わらなければ諦める", async () => {
+    // 何も変わらないクリックは実在する。待ち続けると操作が固まる。
+    const page = fakePage([{ role: "button", name: "開く" }]);
+    const s = await record(page);
+    expect(s.snapshot().steps[0]?.expect).toEqual([]);
+  });
+});
