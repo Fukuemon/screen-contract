@@ -37,15 +37,19 @@ FIXTURE_PORT=5174 node packages/fixture-app/dist/bin/serve.js
 
 別の端末で続ける。
 
-## 3. 実行してよい origin を列挙する
+## 3. 実行してよい origin を確かめる
+
+本リポジトリの `screen-contract.config.json` は、手順 2 の fixture (`http://127.0.0.1:5174`)
+を既に列挙している。**別のポートや別の対象を使うなら書き足す。**
 
 ```jsonc
 // screen-contract.config.json
 { "allowedOrigins": ["http://127.0.0.1:5174"] }
 ```
 
-**既定は空である。** 列挙しないと起動を中止する ([adr/0017](../../adr/0017-agent-draft-boundary.md))。
-`allowedOrigins` が空のまま起動すると次で止まる。
+列挙が空だと起動を中止する ([adr/0017](../../adr/0017-agent-draft-boundary.md))。
+これは安全装置であり、**列挙しない限り何も操作しない**ことを保証する。空のまま
+起動すると次で止まる。
 
 ```
 screen-contract-server: 実行してよい origin が 1 つも列挙されていません
@@ -55,6 +59,7 @@ screen-contract-server: 実行してよい origin が 1 つも列挙されてい
 ## 4. Workflow Server を起動する
 
 **プロジェクトルートから起動する。** プロダクト設定はカレントディレクトリから読む。
+`pnpm --filter` 経由だとパッケージのディレクトリが cwd になり、設定が見つからない。
 
 ```sh
 pnpm serve
