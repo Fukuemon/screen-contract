@@ -119,7 +119,7 @@ export function parseSnapshot(value: unknown): ViewportSnapshot {
     recording: raw["recording"] === true,
     events: eventsOf(raw["events"]),
     entryUrl: typeof raw["entryUrl"] === "string" ? raw["entryUrl"] : "",
-    stateUrl: typeof raw["stateUrl"] === "string" ? raw["stateUrl"] : "",
+    stateId: typeof raw["stateId"] === "string" ? raw["stateId"] : "",
     steps: Array.isArray(raw["steps"])
       ? raw["steps"].map(stepOf).filter((step): step is RecordedStepView => step !== undefined)
       : [],

@@ -54,7 +54,7 @@ function setup() {
   const run = {
     snapshot: () => ({
       status: "paused",
-      stateUrl: "http://127.0.0.1:5174/",
+      stateId: "http://127.0.0.1:5174/",
       badges: ["el-0001"],
       newElements: [
         {

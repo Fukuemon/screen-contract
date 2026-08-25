@@ -27,10 +27,10 @@ export interface SecretStore {
  * あり、日本語のラベルは落とすと消えて衝突する。要素 ID は既に不透明な連番で
  * あり、そのまま使える (ADR-0012)。
  */
-export function secretNameOf(stateUrl: string, elementId: string): string {
+export function secretNameOf(stateId: string, elementId: string): string {
   const host = (() => {
     try {
-      return new URL(stateUrl).host;
+      return new URL(stateId).host;
     } catch {
       return "target";
     }

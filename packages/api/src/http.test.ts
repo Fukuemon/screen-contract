@@ -24,7 +24,7 @@ const SNAPSHOT: ViewportSnapshot = {
   recording: false,
   events: [],
   entryUrl: "http://127.0.0.1:5174",
-  stateUrl: "http://127.0.0.1:5174/",
+  stateId: "http://127.0.0.1:5174/",
   steps: [],
   newElements: [],
   badges: [],

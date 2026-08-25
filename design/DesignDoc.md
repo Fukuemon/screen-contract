@@ -398,6 +398,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0026](../adr/0026-operation-recording.md)          | 操作の記録を DSL の draft を書く手段として提供する判断                            | web-editor / workflow-dsl    |
 | [adr/0027](../adr/0027-agent-browser-bundling.md)       | agent-browser を npm 依存として同梱しブラウザは起動時に検査する判断               | execution                    |
 | [adr/0028](../adr/0028-annotated-artifact-format.md)    | 注釈画像を SVG とし生スクリーンショットを別ファイルで参照する判断                 | artifact-generation          |
+| [adr/0029](../adr/0029-recording-state-key.md)          | 記録中の画面状態を URL の代理鍵で識別する判断                                     | web-editor                   |
 
 ## Open Questions / Future Work
 

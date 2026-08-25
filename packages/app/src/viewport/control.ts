@@ -195,7 +195,7 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     async submit(): Promise<SubmitResult> {
       const snapshot = options.run.snapshot();
       const draft = renderScreenDraft({
-        stateUrl: snapshot.stateUrl,
+        stateId: snapshot.stateId,
         badges: snapshot.badges,
         elements: snapshot.newElements,
         steps: snapshot.steps,

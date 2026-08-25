@@ -700,6 +700,18 @@ D1〜D28 を全行走査し、durable な反映先を持つものと spec で閉
 | D27  | ADR-0008 / feature doc: web-editor                                                                    |
 | D28  | **spec で閉じる** (既存語彙での run の終わらせ方)                                                     |
 
+### 実装で追加した判断 (ハンドオフ後)
+
+正本ハンドオフ後、実装と手動確認で見つかった不具合から追加で決めたもの。**反映先は
+ADR であり、本節は索引にすぎない。**
+
+| 判断                                                               | 反映先                                            |
+| ------------------------------------------------------------------ | ------------------------------------------------- |
+| 記録中の画面状態を URL の代理鍵で識別する (state 名がまだ無いため) | [adr/0029](../../adr/0029-recording-state-key.md) |
+| `GET /` の配布先を起動チケットで絞る                               | context: infrastructure.md                        |
+| 入力値を secret として暗号化し、記録には名前だけを残す             | context: infrastructure.md (既存契約の適用)       |
+| box の取得に `--annotate` を使わない (対象ページへ描き込むため)    | context: testing.md                               |
+
 ### PRD への影響
 
 統合モードのため PRD 単独の文書は無い (`context/project.yml` の `design.prd: integrated`)。**PRD 相当は Design Doc の Why/What 節**であり、下記の変更が要る。反映先は「Design Doc への影響」と同じ節である。

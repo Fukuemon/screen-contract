@@ -190,7 +190,7 @@ describe("構成番号", () => {
   it("いま採番している画面を写しに載せる", () => {
     const s = session(fakeRunner());
     s.enterState("http://127.0.0.1:5174/settings?a=1");
-    expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
+    expect(s.snapshot().stateId).toBe("http://127.0.0.1:5174/settings");
   });
 });
 
@@ -290,7 +290,7 @@ describe("入力の記録と転送", () => {
   it("移った先へ構成番号の帳簿を切り替える", async () => {
     const page = fakePage([{ role: "button", name: "開く" }]);
     const s = await record(page, "http://127.0.0.1:5174/settings");
-    expect(s.snapshot().stateUrl).toBe("http://127.0.0.1:5174/settings");
+    expect(s.snapshot().stateId).toBe("http://127.0.0.1:5174/settings");
   });
 
   it("記録していなくても転送する", async () => {

@@ -7,8 +7,13 @@ export interface BadgesViewProps {
   /** 構成番号順の要素 ID。リストの位置がそのまま番号になる (ADR-0005)。 */
   readonly badges: readonly ElementDefView["id"][];
   readonly elements: readonly ElementDefView[];
-  /** 番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。 */
-  readonly stateUrl: string;
+  /**
+   * 番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。
+   *
+   * 記録中は URL を代理鍵とする (ADR-0029)。同じ URL 上のモーダル開閉は区別
+   * できないため、**いま採番している画面を常時出す**。
+   */
+  readonly stateId: string;
   /** いま選択している要素。番号を付ける対象になる。 */
   readonly picked: { readonly role: string; readonly name: string } | undefined;
   readonly onAdd: (locator: { readonly role: string; readonly name: string }) => void;
@@ -33,9 +38,9 @@ export function BadgesView(props: BadgesViewProps) {
         </p>
         {/* どの画面の番号かを出す。出さないと、移動したのに前の画面の番号を
             見ていることに気付けない。 */}
-        {props.stateUrl !== "" && (
-          <p className="truncate font-mono text-[11px] text-muted" title={props.stateUrl}>
-            {props.stateUrl}
+        {props.stateId !== "" && (
+          <p className="truncate font-mono text-[11px] text-muted" title={props.stateId}>
+            {props.stateId}
           </p>
         )}
         <Button

@@ -139,7 +139,7 @@ function EditorRoute() {
                 <BadgesView
                   badges={snapshot?.badges ?? []}
                   elements={snapshot?.newElements ?? []}
-                  stateUrl={snapshot?.stateUrl ?? ""}
+                  stateId={snapshot?.stateId ?? ""}
                   picked={viewport.picked?.locator}
                   onAdd={(locator) => viewport.run((api) => api.addBadge(locator))}
                   onRemove={(id) => viewport.run((api) => api.removeBadge(id))}

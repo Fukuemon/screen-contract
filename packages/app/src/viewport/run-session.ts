@@ -45,8 +45,13 @@ export interface ViewportSnapshot {
   readonly recording: boolean;
   readonly events: readonly ExecutionEvent[];
   readonly entryUrl: string;
-  /** 構成番号が属する画面状態。**番号は画面ごとに別である。** */
-  readonly stateUrl: string;
+  /**
+   * 構成番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。
+   *
+   * 記録中は URL を代理鍵とする (ADR-0029)。DSL の state 名が決まった段では、
+   * 鍵の作り方だけを差し替える。
+   */
+  readonly stateId: string;
   /** 記録した手順。承認へ回す draft の中身になる。 */
   readonly steps: readonly (RecordedStep & { readonly id: string })[];
   readonly newElements: readonly ElementDef[];
@@ -267,7 +272,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       recording,
       events,
       entryUrl: options.entryUrl,
-      stateUrl: stateKey,
+      stateId: stateKey,
       steps,
       newElements,
       badges: badges(),

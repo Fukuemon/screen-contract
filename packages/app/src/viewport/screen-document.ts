@@ -20,7 +20,7 @@ export interface ScreenDraft {
 
 export interface ScreenDraftInput {
   /** 番号を振った画面。鍵の materialize に使う。 */
-  readonly stateUrl: string;
+  readonly stateId: string;
   readonly badges: readonly string[];
   readonly elements: readonly ElementDef[];
   readonly steps: readonly RecordedStep[];
@@ -32,10 +32,10 @@ export interface ScreenDraftInput {
  * **鍵の規則を満たす形へ落とす** (`parseStoreKey`)。落とせない入力は弾く —
  * 弾かないと、未検証の文字列が保存先のパス組み立てまで届く。
  */
-export function draftKeyOf(stateUrl: string): StoreKey {
+export function draftKeyOf(stateId: string): StoreKey {
   let parsed: URL;
   try {
-    parsed = new URL(stateUrl);
+    parsed = new URL(stateId);
   } catch {
     throw new ValidationError("画面状態の URL を解釈できません");
   }
@@ -85,7 +85,7 @@ export function renderScreenDraft(input: ScreenDraftInput): ScreenDraft {
   });
 
   const lines = [
-    `# ${input.stateUrl}`,
+    `# ${input.stateId}`,
     "",
     "## 構成要素",
     "",
@@ -99,5 +99,5 @@ export function renderScreenDraft(input: ScreenDraftInput): ScreenDraft {
     "",
   ];
 
-  return { key: draftKeyOf(input.stateUrl), content: lines.join("\n"), warnings: table.warnings };
+  return { key: draftKeyOf(input.stateId), content: lines.join("\n"), warnings: table.warnings };
 }
