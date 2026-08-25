@@ -72,6 +72,24 @@ export function useEditor() {
     }
   }, [connected, overlay, refreshElements]);
 
+  /**
+   * 記録中は写しを追いかける。
+   *
+   * **記録は Stream Proxy 経由で進む。** 画面は HTTP の応答からしか状態を知ら
+   * ないため、追いかけないと手順が積まれていることに気付けない。実際、server 側
+   * に手順があるのに画面は「まだありません」を出し続けていた。
+   *
+   * 間隔は反映を待つ上限 (server 側 12 回 x 150ms) より長く取る。短くすると、
+   * 確定する前の写しを何度も取り直すだけになる。
+   */
+  useEffect(() => {
+    if (!recording) {
+      return undefined;
+    }
+    const timer = setInterval(() => refreshSnapshot(), 2000);
+    return () => clearInterval(timer);
+  }, [recording, refreshSnapshot]);
+
   const clearSteps = useCallback(() => dispatch((api) => api.clearSteps()), [dispatch]);
 
   const clearLogs = useCallback(() => setMessages([]), []);

@@ -151,6 +151,7 @@ function EditorRoute() {
                   ui={{ mode: editor.mode, recording: editor.recording }}
                   paused={editor.connected}
                   steps={snapshot?.steps ?? []}
+                  elements={snapshot?.newElements ?? []}
                   onUi={editor.onUi}
                   onClear={editor.clearSteps}
                 />

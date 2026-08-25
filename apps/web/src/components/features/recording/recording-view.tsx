@@ -1,5 +1,5 @@
 import { Circle, Square, TriangleAlert, Trash2 } from "lucide-react";
-import type { RecordedStepView } from "../../../gateways/workflow-server.js";
+import type { ElementDefView, RecordedStepView } from "../../../gateways/workflow-server.js";
 import { Badge } from "../../ui/badge.js";
 import { Button } from "../../ui/button.js";
 import { EmptyState } from "../../ui/panel.js";
@@ -21,6 +21,8 @@ export interface RecordingViewProps {
   readonly ui: UiState;
   readonly paused: boolean;
   readonly steps: readonly RecordedStepView[];
+  /** 手順の `ref` を読める名前へ引くための定義。 */
+  readonly elements: readonly ElementDefView[];
   readonly onUi: (action: UiAction) => void;
   /** 記録した手順をすべて捨てる。**追記しかしないため、やり直す手段が要る。** */
   readonly onClear: () => void;
@@ -29,6 +31,8 @@ export interface RecordingViewProps {
 /** 記録の操作と、記録した手順の一覧。 */
 export function RecordingView(props: RecordingViewProps) {
   const context = { paused: props.paused };
+  // 手順に出すのは要素 ID ではなく名前。ID は人が読む前提の値ではない。
+  const nameOf = new Map(props.elements.map((element) => [element.id, element.name]));
   const blocked = rejectUiAction(props.ui, { kind: "start-recording" }, context);
 
   return (
@@ -99,7 +103,7 @@ export function RecordingView(props: RecordingViewProps) {
                 <span className="font-mono text-xs text-muted tabular-nums">{index + 1}</span>
                 <code className="min-w-0 flex-1 truncate text-xs">
                   {step.action.kind === "click"
-                    ? step.action.ref
+                    ? (nameOf.get(step.action.ref) ?? step.action.ref)
                     : `座標 ${String(step.action.x)}, ${String(step.action.y)}`}
                 </code>
                 {step.action.kind === "clickPoint" && (
