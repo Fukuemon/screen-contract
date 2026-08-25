@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import type { AuthProfileStore } from "@screen-contract/app";
 import type { Keystore } from "./keystore.js";
 import { open, parseEnvelope, seal } from "./sealed.js";
 
@@ -69,15 +70,6 @@ export class AuthProfileError extends Error {
   }
 }
 
-export interface AuthProfileStore {
-  /** 規則に合う名前か。合わなければ投げる。 */
-  assertName(name: string): void;
-  list(): readonly string[];
-  save(name: string, state: unknown): void;
-  load(name: string): unknown;
-  remove(name: string): void;
-}
-
 export interface AuthProfileStoreOptions {
   /** `$XDG_STATE_HOME/screen-contract`。起動時検査を通した値を渡す。 */
   readonly stateDir: string;
@@ -120,14 +112,33 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
       );
     },
 
-    save(name: string, state: unknown): void {
+    generation(name: string): number {
+      // 復号せずに読む。世代は封筒の平文にあり、AAD が改ざんを検知する。
+      try {
+        return parseEnvelope(readFileSync(pathOf(name), "utf8")).generation;
+      } catch {
+        return 0;
+      }
+    },
+
+    save(name: string, state: unknown): number {
       const target = pathOf(name);
       mkdirSync(directory, { recursive: true, mode: 0o700 });
+      // **取り込みのたびに世代を進める** (ADR-0022)。進めないと、同じ名前へ
+      // 別のアカウントを入れた瞬間から権限の違う結果が同じ Baseline へ混ざる。
+      let previous = 0;
+      try {
+        previous = parseEnvelope(readFileSync(target, "utf8")).generation;
+      } catch {
+        previous = 0;
+      }
+      const generation = previous + 1;
       const envelope = seal(
         JSON.stringify(state),
         options.keystore.loadOrCreate(),
         KEY_VERSION,
         name,
+        generation,
       );
       // 一時ファイルへ書いてから置き換える。途中で落ちても壊れた状態を残さない。
       const temporary = `${target}.${String(process.pid)}.tmp`;
@@ -140,6 +151,7 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
       }
       // rename は元ファイルの権限を引き継ぐ。作り直したときのために揃える。
       chmodSync(target, 0o600);
+      return generation;
     },
 
     load(name: string): unknown {

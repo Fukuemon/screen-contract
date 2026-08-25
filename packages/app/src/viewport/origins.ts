@@ -1,5 +1,3 @@
-import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-
 /**
  * 実行してよい origin の列挙。
  *
@@ -45,8 +43,20 @@ export function parseOrigin(raw: string): string {
   return url.origin;
 }
 
+/**
+ * 列挙の置き場。
+ *
+ * **app はファイルを読まない。** 追加を記録に残す先はプロダクト設定であり、
+ * その読み書きは adapter が担う (context/architecture.md)。
+ */
+export interface OriginsConfigPort {
+  /** 設定の中身。**丸ごと読む** — 他の項目を消さずに書き戻すために要る。 */
+  read(): Record<string, unknown>;
+  write(config: Record<string, unknown>): void;
+}
+
 export interface AllowedOriginsOptions {
-  readonly configPath: string;
+  readonly config: OriginsConfigPort;
   readonly initial: readonly string[];
 }
 
@@ -63,23 +73,8 @@ export function createAllowedOrigins(options: AllowedOriginsOptions): AllowedOri
         return [...origins];
       }
       const next = [...origins, parsed];
-      // 設定ファイルの他の項目を消さない。読み直してから足す。
-      let config: Record<string, unknown>;
-      try {
-        config = JSON.parse(readFileSync(options.configPath, "utf8")) as Record<string, unknown>;
-      } catch {
-        config = {};
-      }
-      config["allowedOrigins"] = next;
-      // 一時ファイルへ書いてから置き換える。途中で落ちても壊れた設定を残さない。
-      const temporary = `${options.configPath}.${String(process.pid)}.tmp`;
-      writeFileSync(temporary, `${JSON.stringify(config, null, 2)}\n`, "utf8");
-      try {
-        renameSync(temporary, options.configPath);
-      } catch (error) {
-        rmSync(temporary, { force: true });
-        throw error;
-      }
+      // 設定の他の項目を消さない。読み直してから足す。
+      options.config.write({ ...options.config.read(), allowedOrigins: next });
       origins = next;
       return [...origins];
     },

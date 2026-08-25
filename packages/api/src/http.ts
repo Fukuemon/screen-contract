@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import type { UseCases } from "@screen-contract/app";
-import { parseStartRunInput, parseStoreKey } from "@screen-contract/app";
+import type { ElementId, UseCases, ViewportControl } from "@screen-contract/app";
+import { isValidViewport, parseStartRunInput, parseStoreKey } from "@screen-contract/app";
 import {
   isAllowedHost,
   isAllowedOrigin,
@@ -73,49 +73,6 @@ export interface HttpAppOptions {
    * 渡さないと `/viewport` 系の endpoint を生やさない。
    */
   readonly viewport?: ViewportControl | undefined;
-}
-
-/** Web UI からの run 操作。判定は合成ルートが持つ実装に閉じる。 */
-export interface ViewportControl {
-  /** run を起こす。開く先を渡せる。**列挙外の origin は実装側が弾く** (ADR-0017)。 */
-  start(url?: string): Promise<unknown>;
-  resume(): Promise<unknown>;
-  /**
-   * run を未開始へ戻す。
-   *
-   * **終端から戻る経路である。** run を走らせきると `completed` になり、
-   * `paused` を要求する操作モードと記録がどちらも使えなくなる (ADR-0002)。
-   */
-  stop(): unknown;
-  setMode(mode: "view" | "operate"): unknown;
-  setRecording(recording: boolean): unknown;
-  snapshot(): unknown;
-  /** 対象を開き直す。**列挙外の origin は実装側が弾く** (ADR-0017)。 */
-  navigate(url: string): Promise<unknown>;
-  setViewport(size: { readonly width: number; readonly height: number }): Promise<unknown>;
-  /** 座標を要素へ解決する。記録に残すのは Locator であり座標ではない。 */
-  resolveAt(point: { readonly x: number; readonly y: number }): Promise<unknown>;
-  /** 観測できる要素の一覧。枠と番号の描画に使う。 */
-  observeElements(): Promise<readonly unknown[]>;
-  /** 対象ページのコンソール出力。 */
-  consoleMessages(): Promise<readonly unknown[]>;
-  /** 構成番号を付ける。リストの位置がそのまま番号になる (ADR-0005)。 */
-  addBadge(locator: { readonly role: string; readonly name: string }): unknown;
-  removeBadge(id: string): unknown;
-  moveBadge(id: string, to: number): unknown;
-  /** 実行してよい origin。UI はここから選ぶ。 */
-  allowedOrigins(): readonly string[];
-  /**
-   * 実行してよい origin を足す。
-   *
-   * **列挙は残す。** UI から任意の URL を開けるようにしても、追加は明示的な
-   * 操作として設定ファイルへ書き戻す (ADR-0017)。
-   */
-  addAllowedOrigin(origin: string): readonly string[];
-  listAuthProfiles(): readonly string[];
-  saveAuthProfile(name: string): Promise<unknown>;
-  useAuthProfile(name: string | undefined): Promise<unknown>;
-  removeAuthProfile(name: string): unknown;
 }
 
 export interface WebAssets {
@@ -229,7 +186,12 @@ export function createHttpApp(options: HttpAppOptions): Hono {
 
     app.post("/viewport/size", async (c) => {
       const { width, height } = (await c.req.json()) as { width?: unknown; height?: unknown };
+      // 型だけでは足りない。0 や桁外れをそのまま実行基盤へ渡すと、原因の
+      // 分からない失敗になる。**client 側の検証を規則にしない。**
       if (typeof width !== "number" || typeof height !== "number") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      if (!isValidViewport({ width, height })) {
         return c.json({ error: "bad-request" }, 400);
       }
       return c.json(await viewport.setViewport({ width, height }));
@@ -260,14 +222,18 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       return c.json(viewport.addBadge({ role, name }));
     });
 
-    app.delete("/viewport/badges/:id", (c) => c.json(viewport.removeBadge(c.req.param("id"))));
+    // 要素 ID は server が採番したものを返してもらうだけである。番号を外す
+    // 相手が居なければ何も起きないため、鍵として組み立てには使わない。
+    app.delete("/viewport/badges/:id", (c) =>
+      c.json(viewport.removeBadge(c.req.param("id") as ElementId)),
+    );
 
     app.post("/viewport/badges/:id/move", async (c) => {
       const { to } = (await c.req.json()) as { to?: unknown };
       if (typeof to !== "number" || !Number.isInteger(to)) {
         return c.json({ error: "bad-request" }, 400);
       }
-      return c.json(viewport.moveBadge(c.req.param("id"), to));
+      return c.json(viewport.moveBadge(c.req.param("id") as ElementId, to));
     });
 
     app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));

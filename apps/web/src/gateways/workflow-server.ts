@@ -1,5 +1,5 @@
 import type { ApprovalRequest, ApprovalResult } from "@screen-contract/api";
-import { parseSnapshot, type ViewportSnapshot } from "../entities/snapshot.js";
+import { parseSnapshot, type ElementDefView, type ViewportSnapshot } from "../entities/snapshot.js";
 import { httpBase, type ServerTarget } from "../lib/connection.js";
 
 /**
@@ -60,8 +60,8 @@ export interface WorkflowServerClient {
     readonly { readonly id: string; readonly level: string; readonly text: string }[]
   >;
   addBadge(locator: { readonly role: string; readonly name: string }): Promise<ViewportSnapshot>;
-  removeBadge(id: string): Promise<ViewportSnapshot>;
-  moveBadge(id: string, to: number): Promise<ViewportSnapshot>;
+  removeBadge(id: ElementDefView["id"]): Promise<ViewportSnapshot>;
+  moveBadge(id: ElementDefView["id"], to: number): Promise<ViewportSnapshot>;
   allowedOrigins(): Promise<readonly string[]>;
   addAllowedOrigin(origin: string): Promise<readonly string[]>;
   listAuthProfiles(): Promise<readonly string[]>;

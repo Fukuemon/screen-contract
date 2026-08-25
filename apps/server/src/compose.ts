@@ -2,15 +2,9 @@ import { homedir } from "node:os";
 import { createAgentBrowserPort } from "@screen-contract/adapter-browser";
 import { createFsStore } from "@screen-contract/adapter-store";
 import { createAgentHandlers } from "@screen-contract/agent";
-import {
-  createApiApp,
-  createHttpApp,
-  type AuthPolicy,
-  type ViewportControl,
-  type WebAssets,
-} from "@screen-contract/api";
+import { createApiApp, createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
-import type { StorePort } from "@screen-contract/app";
+import type { StorePort, ViewportControl } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
 import type { MiddlewareHandler } from "hono";
 

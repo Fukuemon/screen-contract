@@ -5,15 +5,15 @@ import { EmptyState } from "../../ui/panel.js";
 
 export interface BadgesViewProps {
   /** 構成番号順の要素 ID。リストの位置がそのまま番号になる (ADR-0005)。 */
-  readonly badges: readonly string[];
+  readonly badges: readonly ElementDefView["id"][];
   readonly elements: readonly ElementDefView[];
   /** 番号が属する画面状態。**番号は画面ごとに別である** (ADR-0005)。 */
   readonly stateUrl: string;
   /** いま選択している要素。番号を付ける対象になる。 */
   readonly picked: { readonly role: string; readonly name: string } | undefined;
   readonly onAdd: (locator: { readonly role: string; readonly name: string }) => void;
-  readonly onRemove: (id: string) => void;
-  readonly onMove: (id: string, to: number) => void;
+  readonly onRemove: (id: ElementDefView["id"]) => void;
+  readonly onMove: (id: ElementDefView["id"], to: number) => void;
 }
 
 /**

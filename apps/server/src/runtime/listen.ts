@@ -1,11 +1,9 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
-import type { AuthProfileStore } from "@screen-contract/adapter-store";
-import type { AllowedOrigins } from "../viewport/allowed-origins.js";
-import { createRunSession } from "../viewport/run-session.js";
-import { createViewportControl } from "../viewport/viewport-control.js";
-import type { Viewport, ViewportSubscription } from "../viewport/viewport.js";
+import type { AuthProfileStore } from "@screen-contract/app";
+import { createRunSession, createViewportControl } from "@screen-contract/app";
+import type { AllowedOrigins, Viewport, ViewportSubscription } from "@screen-contract/app";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
 import { createFsWebAssets } from "../serving/web-assets.js";

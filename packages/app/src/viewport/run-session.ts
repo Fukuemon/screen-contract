@@ -1,11 +1,12 @@
-import type { RunState, StreamMode } from "@screen-contract/api";
+import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
+import type { RunState, StreamMode } from "./run-state.js";
 import {
   startRecording,
   type RecordedObservation,
   type RecordedStep,
   type RecordingSession,
-} from "@screen-contract/app";
-import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
+} from "../recording.js";
+import { stateKeyOf } from "./state-key.js";
 import type { ElementId } from "@screen-contract/domain";
 import type { ExecutionEvent, StepRunner } from "@screen-contract/core-execution";
 import { runSteps } from "@screen-contract/core-execution";
@@ -25,10 +26,10 @@ import type { ExecutionStep } from "@screen-contract/core-workflow";
 /**
  * run の写し。**HTTP の応答そのものである。**
  *
- * `ViewportControl` (api 側) は `unknown` を返す契約にしている。interface 層が
- * run の形を知ると、core の語彙が interface へ漏れるためである。
+ * **形を app が定める。** interface 層 (api / web) がそれぞれ手で写すと、ずれても
+ * 型検査が鳴らない。実際に、項目が 1 つ欠けただけで画面が落ちた。
  */
-interface RunSnapshot {
+export interface ViewportSnapshot {
   readonly runId: string;
   readonly status: "idle" | "paused" | "completed" | "failed";
   readonly mode: StreamMode;
@@ -45,7 +46,7 @@ interface RunSnapshot {
    *
    * 要素定義は番号を持たない。並びを変えれば番号が変わる。
    */
-  readonly badges: readonly string[];
+  readonly badges: readonly ElementId[];
 }
 
 export interface RunSessionOptions {
@@ -78,12 +79,12 @@ export interface RunSession {
    * セッションを捨てたのに `paused` のままにすると、Stream Proxy が存在しない
    * セッションへ入力を中継し続け、画面も「一時停止中」を表示し続ける。
    */
-  reset(): RunSnapshot;
+  reset(): ViewportSnapshot;
   /** 選択した要素へ番号を付ける。既に付いていれば何もしない。 */
-  addBadge(locator: SemanticLocator): RunSnapshot;
-  removeBadge(id: string): RunSnapshot;
+  addBadge(locator: SemanticLocator): ViewportSnapshot;
+  removeBadge(id: ElementId): ViewportSnapshot;
   /** 並べ替える。番号は 1..N の連番を保ち、欠番を作らない (ADR-0005)。 */
-  moveBadge(id: string, to: number): RunSnapshot;
+  moveBadge(id: ElementId, to: number): ViewportSnapshot;
   /**
    * 入力を記録する。**転送の直前に呼ぶ。**
    *
@@ -92,11 +93,11 @@ export interface RunSession {
    */
   observeClick(point: { readonly x: number; readonly y: number }): Promise<void>;
   /** run を起こす。1 ステップ実行して `paused` に入る。 */
-  start(): Promise<RunSnapshot>;
-  resume(): Promise<RunSnapshot>;
-  setMode(mode: StreamMode): RunSnapshot;
-  setRecording(recording: boolean): RunSnapshot;
-  snapshot(): RunSnapshot;
+  start(): Promise<ViewportSnapshot>;
+  resume(): Promise<ViewportSnapshot>;
+  setMode(mode: StreamMode): ViewportSnapshot;
+  setRecording(recording: boolean): ViewportSnapshot;
+  snapshot(): ViewportSnapshot;
   /** Stream Proxy の中継条件に使う。**client から渡させない。** */
   relayState(): RunState | undefined;
 }
@@ -104,24 +105,8 @@ export interface RunSession {
 /** run の識別子。skeleton は 1 本しか動かさないため固定する。 */
 const RUN_ID = "current";
 
-/**
- * 画面状態の鍵。
- *
- * query と fragment を落とす。同じ画面を指す URL が別の状態として増えると、
- * 番号を振り直す先が分からなくなる。解釈できない URL はそのまま鍵にする —
- * 落とすと、番号が黙ってどこかの画面へ紛れ込む。
- */
-function stateKeyOf(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.origin}${parsed.pathname}`;
-  } catch {
-    return url;
-  }
-}
-
 export function createRunSession(options: RunSessionOptions): RunSession {
-  let status: RunSnapshot["status"] = "idle";
+  let status: ViewportSnapshot["status"] = "idle";
   let mode: StreamMode = "view";
   let recording = false;
   let events: readonly ExecutionEvent[] = [];
@@ -130,16 +115,16 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   let steps: readonly (RecordedStep & { id: string })[] = [];
   let newElements: readonly ElementDef[] = [];
   /** 画面状態ごとの構成番号。鍵は origin + pathname。 */
-  const badgesByState = new Map<string, readonly string[]>();
+  const badgesByState = new Map<string, readonly ElementId[]>();
   let stateKey = stateKeyOf(options.entryUrl);
   /** 記録を止めた時点までの手順。再開しても消さない。 */
   let confirmed: readonly (RecordedStep & { id: string })[] = [];
 
-  function badges(): readonly string[] {
+  function badges(): readonly ElementId[] {
     return badgesByState.get(stateKey) ?? [];
   }
 
-  function snapshot(): RunSnapshot {
+  function snapshot(): ViewportSnapshot {
     return {
       runId: RUN_ID,
       status,
@@ -174,7 +159,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     ];
   }
 
-  async function run(pause: boolean): Promise<RunSnapshot> {
+  async function run(pause: boolean): Promise<ViewportSnapshot> {
     const runner = options.runner();
     if (runner === undefined) {
       // viewport が開いていないと実行の相手がいない。黙って idle に留めない。
@@ -202,7 +187,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       stateKey = stateKeyOf(url);
     },
 
-    reset(): RunSnapshot {
+    reset(): ViewportSnapshot {
       status = "idle";
       mode = "view";
       recording = false;
@@ -212,7 +197,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    addBadge(locator: SemanticLocator): RunSnapshot {
+    addBadge(locator: SemanticLocator): ViewportSnapshot {
       const id = nextId(locator);
       if (!newElements.some((element) => element.id === id)) {
         newElements = [...newElements, { id, name: locator.name, type: locator.role, locator }];
@@ -223,7 +208,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    removeBadge(id: string): RunSnapshot {
+    removeBadge(id: ElementId): ViewportSnapshot {
       badgesByState.set(
         stateKey,
         badges().filter((badge) => badge !== id),
@@ -231,7 +216,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    moveBadge(id: string, to: number): RunSnapshot {
+    moveBadge(id: ElementId, to: number): ViewportSnapshot {
       const current = badges();
       const from = current.indexOf(id);
       if (from < 0 || to < 0 || to >= current.length) {
@@ -304,7 +289,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     start: () => run(true),
     resume: () => run(false),
 
-    setMode(next: StreamMode): RunSnapshot {
+    setMode(next: StreamMode): ViewportSnapshot {
       // 判定の正本は core にある。ここは保持だけを行う。
       mode = status === "paused" ? next : "view";
       if (mode !== "operate") {
@@ -313,7 +298,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    setRecording(next: RunSnapshot["recording"]): RunSnapshot {
+    setRecording(next: ViewportSnapshot["recording"]): ViewportSnapshot {
       recording = status === "paused" && mode === "operate" ? next : false;
       if (recording && session === undefined) {
         // 記録した steps の遷移元は run の到達状態から決まる (ADR-0026)。

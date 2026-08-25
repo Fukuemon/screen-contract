@@ -5,7 +5,10 @@ import {
   type BrowserAction,
   type BrowserPort,
   type BrowserSession,
+  type CreateSessionInput,
+  type StorageState,
 } from "./index.js";
+import { parseAuthProfileName } from "./index.js";
 
 /**
  * Port の相手は fake 実装を使う (context/testing.md)。ここで確かめるのは
@@ -31,19 +34,45 @@ function createFakeSession(overrides: Partial<BrowserSession> = {}): BrowserSess
   };
 }
 
+function fakePort(seen: (AuthContext | CreateSessionInput)[]): BrowserPort {
+  return {
+    connect: () => ({ send: () => undefined, close: () => undefined }),
+    createSession: async (input) => {
+      seen.push(input);
+      return createFakeSession();
+    },
+  };
+}
+
 describe("BrowserPort の契約", () => {
   it("認証コンテキストを受け取ってセッションを開く", async () => {
     // 省略できると「認証なし」が既定になり、意図しないプロファイルでの実行と
     // Baseline の汚染を招く (ADR-0022)。匿名も明示して渡す。
-    const seen: AuthContext[] = [];
-    const port: BrowserPort = {
-      createSession: async (auth) => {
-        seen.push(auth);
-        return createFakeSession();
-      },
-    };
-    await port.createSession({ kind: "anonymous" });
+    const seen: (AuthContext | CreateSessionInput)[] = [];
+    await fakePort(seen).createSession({ kind: "anonymous" });
     expect(seen).toEqual([{ kind: "anonymous" }]);
+  });
+
+  it("誰として実行しているかと、その中身を分けて受け取る", async () => {
+    // `auth` は保存の鍵と Baseline の識別に使い、`storageState` はその中身で
+    // ある (ADR-0022)。混ぜると、認証済みの実行を匿名として記録してしまう。
+    const seen: (AuthContext | CreateSessionInput)[] = [];
+    const storageState: StorageState = { cookies: [{ name: "s" }], localStorage: {} };
+    const auth: AuthContext = { kind: "profile", name: parseAuthProfileName("admin") };
+    await fakePort(seen).createSession({ auth, storageState });
+    expect(seen).toEqual([{ auth, storageState }]);
+  });
+
+  it("配信へ繋ぐ経路を Port が持つ", () => {
+    // endpoint の形と protocol は adapter に閉じる (ADR-0008)。app が
+    // WebSocket を直接開くと、実行基盤のポートが app 層へ漏れる。
+    const frames: string[] = [];
+    const relay = fakePort([]).connect({ endpoint: "ws://127.0.0.1:1/" }, (frame) =>
+      frames.push(frame),
+    );
+    relay.send("{}");
+    relay.close();
+    expect(frames).toEqual([]);
   });
 
   it("型付きの action を受け取る", async () => {

@@ -1,20 +1,13 @@
 import type { BrowserPort, BrowserSession } from "@screen-contract/core-execution";
-import { describe, expect, it, vi } from "vitest";
-import { createViewport } from "./viewport.js";
-
-vi.mock("@screen-contract/adapter-browser", () => ({
-  connectStream: vi.fn((options: { onFrame: (uri: string) => void }) => {
-    sent.length = 0;
-    emit = options.onFrame;
-    return { send: (payload: string) => void sent.push(payload), close: () => void (closed += 1) };
-  }),
-}));
+import { describe, expect, it } from "vitest";
+import { createViewport } from "./session.js";
 
 let emit: ((uri: string) => void) | undefined;
 const sent: string[] = [];
 let closed = 0;
 const sizes: { width: number; height: number }[] = [];
-const restored: unknown[] = [];
+/** セッションを開く要求。認証の中身が「開く前」に渡ったかをここで見る。 */
+const requests: unknown[] = [];
 
 /** Port の相手は fake を使う (context/testing.md)。 */
 function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number } {
@@ -22,8 +15,18 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
   const port = {
     opened,
     sessions: 0,
-    createSession: () => {
+    // 配信への接続も Port が持つ。app が WebSocket を直接開かない (ADR-0008)。
+    connect: (_handle: unknown, onFrame: (uri: string) => void) => {
+      sent.length = 0;
+      emit = onFrame;
+      return {
+        send: (payload: string) => void sent.push(payload),
+        close: () => void (closed += 1),
+      };
+    },
+    createSession: (input: unknown) => {
       port.sessions += 1;
+      requests.push(input);
       const session = {
         perform: (action: { kind: string; url?: string }) => {
           if (action.url !== undefined) {
@@ -37,10 +40,6 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
           return Promise.resolve();
         },
         captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
-        restoreStorageState: (state: unknown) => {
-          restored.push(state);
-          return Promise.resolve();
-        },
         close: () => Promise.resolve(),
       } as unknown as BrowserSession;
       return Promise.resolve(session);
@@ -137,30 +136,47 @@ describe("対象と寸法の切り替え", () => {
 });
 
 describe("認証状態", () => {
-  it("対象を開く前に注入する", async () => {
-    // 開いた後では、既に描画された画面が未ログインのままになる (ADR-0022)。
-    restored.length = 0;
+  it("セッションを開く要求へ認証の中身を載せる", async () => {
+    // **注入は Port の中で行う** (ADR-0022)。開いた後に入れても、既に描画された
+    // 画面は未ログインのままである。app が後から注入する形にすると、順序が
+    // app 側の実装の約束になり、Port の契約から読めない。
+    requests.length = 0;
     const browser = fakePort();
-    const state = { cookies: [{ name: "session" }], localStorage: {} };
+    const storageState = { cookies: [{ name: "session" }], localStorage: {} };
     const viewport = createViewport({
       browser,
       entryUrl: "http://127.0.0.1:5174",
-      storageState: () => Promise.resolve(state),
+      storageState: () => Promise.resolve(storageState),
     });
     await viewport.subscribe(() => undefined);
-    expect(restored).toEqual([state]);
+    expect(requests).toEqual([{ auth: { kind: "anonymous" }, storageState }]);
     expect(browser.opened).toEqual(["http://127.0.0.1:5174"]);
   });
 
+  it("誰として実行しているかを Port へ渡す", async () => {
+    // 匿名を名乗ったまま認証状態を注入すると、認証済みの結果が匿名の Baseline
+    // へ混ざる (ADR-0022)。
+    requests.length = 0;
+    const auth = { kind: "profile", name: "admin" } as never;
+    const viewport = createViewport({
+      browser: fakePort(),
+      entryUrl: "http://127.0.0.1:5174",
+      auth: () => auth,
+      storageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
+    });
+    await viewport.subscribe(() => undefined);
+    expect((requests[0] as { auth: unknown }).auth).toBe(auth);
+  });
+
   it("無ければ注入しない", async () => {
-    restored.length = 0;
+    requests.length = 0;
     const viewport = createViewport({
       browser: fakePort(),
       entryUrl: "http://127.0.0.1:5174",
       storageState: () => Promise.resolve(undefined),
     });
     await viewport.subscribe(() => undefined);
-    expect(restored).toEqual([]);
+    expect(requests).toEqual([{ auth: { kind: "anonymous" }, storageState: undefined }]);
   });
 
   it("いまの認証状態を取り出せる", async () => {

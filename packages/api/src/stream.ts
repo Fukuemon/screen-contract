@@ -6,19 +6,9 @@
  * 入力転送 (逆方向) を同じ経路で行う (ADR-0008)。
  */
 
-export type StreamMode = "view" | "operate";
-
-/**
- * server が保持している run の状態。
- *
- * **client から渡させない。** 渡させると、client が `paused: true` を自称する
- * だけで中継条件が全通し、ADR-0008 が塞いだはずの迂回がそのまま再現する。
- */
-export interface RunState {
-  readonly runId: string;
-  readonly paused: boolean;
-  readonly mode: StreamMode;
-}
+// 語彙の正本は app にある。run を保持している側が定め、Stream Proxy は読むだけ。
+export type { RunState, StreamMode } from "@screen-contract/app";
+import type { RunState } from "@screen-contract/app";
 
 /** client が名乗った主張。信用しない値はここにだけ入る。 */
 export interface RelayClaim {

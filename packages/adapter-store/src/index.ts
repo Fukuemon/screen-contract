@@ -1,8 +1,8 @@
+export { createOriginsConfig } from "./origins-config.js";
 export { generateKey, SealError, type SealedEnvelope } from "./sealed.js";
 export {
   createAuthProfileStore,
   AuthProfileError,
-  type AuthProfileStore,
   type AuthProfileStoreOptions,
 } from "./auth-profiles.js";
 export { createKeystore, KeystoreError, type Keystore } from "./keystore.js";

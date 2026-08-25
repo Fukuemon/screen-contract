@@ -133,6 +133,36 @@ export {
   type StopRecordingOutcome,
 } from "./recording.js";
 
+export {
+  createViewportControl,
+  type AuthProfilesView,
+  type ViewportControl,
+} from "./viewport/control.js";
+export { type AuthProfileStore } from "./viewport/auth-profiles.js";
+export {
+  createAllowedOrigins,
+  parseOrigin,
+  OriginError,
+  type AllowedOrigins,
+  type OriginsConfigPort,
+} from "./viewport/origins.js";
+export {
+  createRunSession,
+  type RunSession,
+  type RunSessionOptions,
+  type ViewportSnapshot,
+} from "./viewport/run-session.js";
+export type { RunState, StreamMode } from "./viewport/run-state.js";
+export {
+  createViewport,
+  isValidViewport,
+  type PickedElement,
+  type Viewport,
+  type ViewportOptions,
+  type ViewportSubscription,
+} from "./viewport/session.js";
+export { stateKeyOf } from "./viewport/state-key.js";
+
 /**
  * interface 層 (api / web) へ型を中継する。
  *
@@ -140,8 +170,15 @@ export {
  * 表示や応答に要る型は app が窓口になる。**値は中継しない。**
  */
 export type {
+  BoundingBox,
+  ConsoleMessage,
   EvaluationPhase,
   ExecutionEvent,
+  ObservedElement,
+  SemanticLocator,
   StepResult,
   TerminalRunStatus,
+  ViewportSize,
 } from "@screen-contract/core-execution";
+export type { ElementDef } from "@screen-contract/core-element";
+export type { ElementId } from "@screen-contract/domain";

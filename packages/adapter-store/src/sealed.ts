@@ -22,6 +22,13 @@ const KEY_BYTES = 32;
 export interface SealedEnvelope {
   readonly format: number;
   readonly keyVersion: number;
+  /**
+   * 取り込みの世代。Baseline の識別に入る (ADR-0022)。
+   *
+   * **平文で持ち、AAD で守る。** 平文なので復号せずに読める (一覧のたびに
+   * キーストアを開かずに済む)。AAD に含むため、書き換えると復号が失敗する。
+   */
+  readonly generation: number;
   /** base64。暗号化のたびに作り直す。**同じ鍵で再利用しない。** */
   readonly nonce: string;
   readonly tag: string;
@@ -42,11 +49,15 @@ export function generateKey(): Buffer {
 /**
  * 追加認証データ。
  *
- * 形式の版・鍵の版・`authProfile` を含める。含めないと、別プロファイルの
- * ファイルを置き換えても復号が通り、取り違えを検知できない。
+ * 形式の版・鍵の版・`authProfile`・世代を含める。含めないと、別プロファイルの
+ * ファイルを置き換えても復号が通り、取り違えを検知できない。世代を含めるのは、
+ * 平文のまま巻き戻して古い Baseline へ結果を混ぜられるのを防ぐためである。
  */
-function additionalData(keyVersion: number, profile: string): Buffer {
-  return Buffer.from(`${String(FORMAT_VERSION)}:${String(keyVersion)}:${profile}`, "utf8");
+function additionalData(keyVersion: number, profile: string, generation: number): Buffer {
+  return Buffer.from(
+    `${String(FORMAT_VERSION)}:${String(keyVersion)}:${profile}:${String(generation)}`,
+    "utf8",
+  );
 }
 
 export function seal(
@@ -54,17 +65,19 @@ export function seal(
   key: Buffer,
   keyVersion: number,
   profile: string,
+  generation: number,
 ): SealedEnvelope {
   if (key.length !== KEY_BYTES) {
     throw new SealError("鍵の長さが規則に合いません");
   }
   const nonce = randomBytes(NONCE_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
-  cipher.setAAD(additionalData(keyVersion, profile));
+  cipher.setAAD(additionalData(keyVersion, profile, generation));
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return {
     format: FORMAT_VERSION,
     keyVersion,
+    generation,
     nonce: nonce.toString("base64"),
     tag: cipher.getAuthTag().toString("base64"),
     ciphertext: ciphertext.toString("base64"),
@@ -91,7 +104,7 @@ export function open(envelope: SealedEnvelope, key: Buffer, profile: string): st
   }
   try {
     const decipher = createDecipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
-    decipher.setAAD(additionalData(envelope.keyVersion, profile));
+    decipher.setAAD(additionalData(envelope.keyVersion, profile, envelope.generation));
     decipher.setAuthTag(tag);
     return Buffer.concat([
       decipher.update(Buffer.from(envelope.ciphertext, "base64")),
@@ -114,15 +127,19 @@ export function parseEnvelope(raw: string): SealedEnvelope {
   if (typeof value !== "object" || value === null) {
     throw new SealError("認証状態のファイルが壊れています");
   }
-  const { format, keyVersion, nonce, tag, ciphertext } = value as Record<string, unknown>;
+  const { format, keyVersion, generation, nonce, tag, ciphertext } = value as Record<
+    string,
+    unknown
+  >;
   if (
     typeof format !== "number" ||
     typeof keyVersion !== "number" ||
+    !Number.isInteger(generation) ||
     typeof nonce !== "string" ||
     typeof tag !== "string" ||
     typeof ciphertext !== "string"
   ) {
     throw new SealError("認証状態のファイルが壊れています");
   }
-  return { format, keyVersion, nonce, tag, ciphertext };
+  return { format, keyVersion, generation: generation as number, nonce, tag, ciphertext };
 }

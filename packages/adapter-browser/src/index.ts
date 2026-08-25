@@ -1,7 +1,14 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AuthContext, BrowserPort, BrowserSession } from "@screen-contract/core-execution";
+import type {
+  AuthContext,
+  BrowserPort,
+  BrowserSession,
+  CreateSessionInput,
+  StreamHandle,
+  StreamRelay,
+} from "@screen-contract/core-execution";
 import { resolveCliPath } from "./cli.js";
 import { resolveChromeInstall } from "./chrome.js";
 import { createSession } from "./session.js";
@@ -17,6 +24,7 @@ export {
 export { readObservedElements } from "./session.js";
 export { AgentBrowserError } from "./error.js";
 export { connectStream, type ConnectStreamOptions, type StreamClient } from "./stream.js";
+import { connectStream } from "./stream.js";
 
 /**
  * agent-browser を子プロセスとして駆動する。CLI の呼び出しは本 adapter に閉じる。
@@ -40,11 +48,17 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
   const chrome = resolveChromeInstall(options.home);
 
   return {
-    async createSession(auth: AuthContext): Promise<BrowserSession> {
-      if (auth.kind !== "anonymous") {
-        // 匿名以外は Storage State の復号が要る。復号を伴わないまま
-        // 「認証済みのつもり」で実行させない。
-        throw new Error("認証プロファイルを使う実行はまだ実装していません");
+    connect(handle: StreamHandle, onFrame: (dataUri: string) => void): StreamRelay {
+      return connectStream({ endpoint: handle.endpoint, onFrame });
+    },
+
+    async createSession(input: AuthContext | CreateSessionInput): Promise<BrowserSession> {
+      const { auth, storageState } =
+        "kind" in input ? { auth: input, storageState: undefined } : input;
+      if (auth.kind !== "anonymous" && storageState === undefined) {
+        // 匿名以外は Storage State が要る。中身を伴わないまま「認証済みのつもり」
+        // で実行させない (ADR-0022)。
+        throw new Error("認証プロファイルの Storage State が渡されていません");
       }
       // セッションごとに使い捨ての置き場を作る。要素一覧の取得は注釈
       // スクリーンショットを伴うが、その画像は保存せず捨てる。成果物の
@@ -65,6 +79,11 @@ export function createAgentBrowserPort(options: AgentBrowserOptions): BrowserPor
         },
         join(discardDir, "discard.png"),
       );
+      if (storageState !== undefined) {
+        // **対象を開く前に注入する** (ADR-0022)。開いた後に入れても、既に描画
+        // された画面は未ログインのままである。
+        await session.restoreStorageState(storageState);
+      }
       return {
         ...session,
         async close(): Promise<void> {

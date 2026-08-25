@@ -1,6 +1,7 @@
 import type { Observation, StepRunner } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
 import { describe, expect, it } from "vitest";
+import type { ElementId } from "@screen-contract/domain";
 import { createRunSession } from "./run-session.js";
 
 const ENTRY = "http://127.0.0.1:5174/";
@@ -138,7 +139,10 @@ describe("構成番号", () => {
     s.addBadge(button);
     const after = s.addBadge(link);
     expect(after.badges).toEqual(["el-button-保存", "el-link-戻る"]);
-    expect(s.moveBadge("el-link-戻る", 0).badges).toEqual(["el-link-戻る", "el-button-保存"]);
+    expect(s.moveBadge("el-link-戻る" as ElementId, 0).badges).toEqual([
+      "el-link-戻る",
+      "el-button-保存",
+    ]);
   });
 
   it("同じ要素へ二重に番号を付けない", () => {

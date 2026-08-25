@@ -192,13 +192,50 @@ export interface StreamHandle {
   readonly endpoint: string;
 }
 
+/**
+ * 配信への接続。
+ *
+ * **endpoint の形と protocol は adapter に閉じる。** 実行基盤のポートを外部へ
+ * 公開せず、Stream Proxy が中継する (ADR-0008)。
+ */
+export interface StreamRelay {
+  send(payload: string): void;
+  close(): void;
+}
+
+/**
+ * 対象ページのコンソール出力 1 件。
+ *
+ * **実行基盤の生の形をそのまま流さない。** 流すと CDP の語彙が interface 層まで
+ * 漏れ、基盤を差し替えられなくなる (ADR-0013)。
+ */
+export interface ConsoleMessage {
+  /** `log` / `warn` / `error` など。実行基盤の値をそのまま使う。 */
+  readonly level: string;
+  readonly text: string;
+}
+
+/**
+ * セッションを開く要求。
+ *
+ * `auth` は**誰として実行しているか**であり、保存の鍵と Baseline の識別に使う
+ * (ADR-0022)。`storageState` は**その中身**である。復号は保管側が担い、
+ * 対象を開く前の注入を adapter が担う。
+ */
+export interface CreateSessionInput {
+  readonly auth: AuthContext;
+  readonly storageState?: StorageState | undefined;
+}
+
 /** ブラウザ実行基盤を差し替え可能にする Port。実装は adapter/browser (ADR-0013)。 */
 export interface BrowserPort {
   /**
    * 認証コンテキストは必須とする。省略できると「認証なし」が既定になるため
-   * (ADR-0022)。Storage State の復号と注入は adapter/browser の責務。
+   * (ADR-0022)。注入は adapter/browser の責務であり、**対象を開く前に行う**。
    */
-  createSession(auth: AuthContext): Promise<BrowserSession>;
+  createSession(input: AuthContext | CreateSessionInput): Promise<BrowserSession>;
+  /** 配信へ繋ぐ。1 フレームぶんの data URI を渡す。 */
+  connect(handle: StreamHandle, onFrame: (dataUri: string) => void): StreamRelay;
 }
 
 /**
@@ -216,12 +253,8 @@ export interface BrowserSession {
   stream(): Promise<StreamHandle>;
   /** 一時停止中もセッションを生かし続ける。 */
   keepalive(): Promise<void>;
-  /**
-   * 対象ページのコンソール出力。
-   *
-   * 形は実行基盤の都合であり、core は不透明な値として扱う (ADR-0013)。
-   */
-  consoleMessages(): Promise<readonly unknown[]>;
+  /** 対象ページのコンソール出力。 */
+  consoleMessages(): Promise<readonly ConsoleMessage[]>;
   /**
    * viewport の寸法を変える。
    *

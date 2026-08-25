@@ -1,4 +1,3 @@
-import { connectStream, type StreamClient } from "@screen-contract/adapter-browser";
 import {
   elementAt,
   resolve,
@@ -7,16 +6,19 @@ import {
   type SemanticLocator,
 } from "@screen-contract/core-element";
 import type {
+  AuthContext,
   BrowserPort,
   BrowserSession,
+  ConsoleMessage,
   Observation,
   StepRunner,
   StorageState,
+  StreamRelay,
 } from "@screen-contract/core-execution";
 import type { ExecutionStep } from "@screen-contract/core-workflow";
 
 /** 選択モードで指した要素。 */
-interface PickedElement {
+export interface PickedElement {
   readonly locator: SemanticLocator;
   readonly box: BoundingBox;
   /** 一意に解決できるか。できなければ記録に使えない。 */
@@ -55,7 +57,7 @@ export interface Viewport {
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<PickedElement | undefined>;
   observe(): Promise<readonly ObservedElement[]>;
   /** 対象ページのコンソール出力。 */
-  consoleMessages(): Promise<readonly unknown[]>;
+  consoleMessages(): Promise<readonly ConsoleMessage[]>;
   currentUrl(): Promise<string>;
   /** 実行の相手。セッションが無ければ undefined。 */
   runner(): StepRunner | undefined;
@@ -65,6 +67,13 @@ export interface ViewportOptions {
   readonly browser: BrowserPort;
   /** 最初に開く URL。列挙した origin の先頭を渡す (ADR-0017)。 */
   readonly entryUrl: string;
+  /**
+   * いま誰として実行しているか。
+   *
+   * **保存の鍵と Baseline の識別に入る** (ADR-0022)。匿名を名乗ったまま
+   * 認証状態を注入すると、認証済みの結果が匿名の Baseline へ混ざる。
+   */
+  readonly auth?: (() => AuthContext) | undefined;
   /** セッションを開く直前に注入する認証状態 (ADR-0022)。 */
   readonly storageState?: (() => Promise<StorageState | undefined>) | undefined;
 }
@@ -77,33 +86,29 @@ export interface ViewportOptions {
  */
 export function createViewport(options: ViewportOptions): Viewport {
   let session: BrowserSession | undefined;
-  let client: StreamClient | undefined;
+  let relay: StreamRelay | undefined;
   let starting: Promise<void> | undefined;
   const listeners = new Set<(dataUri: string) => void>();
 
   async function start(): Promise<void> {
-    const opened = await options.browser.createSession({ kind: "anonymous" });
+    // 注入は Port の中で行う。開いた後に入れても、既に描画された画面は
+    // 未ログインのままである (ADR-0022)。
+    const opened = await options.browser.createSession({
+      auth: options.auth?.() ?? { kind: "anonymous" },
+      storageState: await options.storageState?.(),
+    });
     session = opened;
-    const state = await options.storageState?.();
-    if (state !== undefined) {
-      // 開いた後に入れても、既に描画された画面は未ログインのままである。
-      await opened.restoreStorageState(state);
-    }
     await opened.perform({ kind: "open", url: options.entryUrl });
-    const handle = await opened.stream();
-    client = connectStream({
-      endpoint: handle.endpoint,
-      onFrame: (dataUri) => {
-        for (const listener of listeners) {
-          listener(dataUri);
-        }
-      },
+    relay = options.browser.connect(await opened.stream(), (dataUri) => {
+      for (const listener of listeners) {
+        listener(dataUri);
+      }
     });
   }
 
   async function stop(): Promise<void> {
-    client?.close();
-    client = undefined;
+    relay?.close();
+    relay = undefined;
     starting = undefined;
     const opened = session;
     session = undefined;
@@ -184,7 +189,7 @@ export function createViewport(options: ViewportOptions): Viewport {
         throw error;
       }
       return {
-        send: (payload) => client?.send(payload),
+        send: (payload) => relay?.send(payload),
         close: async () => {
           listeners.delete(onFrame);
           if (listeners.size === 0) {
@@ -194,4 +199,18 @@ export function createViewport(options: ViewportOptions): Viewport {
       };
     },
   };
+}
+
+/**
+ * 実行してよい寸法か。
+ *
+ * **0 以下や桁外れを対象へ渡さない。** 渡すと実行基盤側で失敗し、原因が
+ * 読めない。下限は responsive の最小分岐より小さい値、上限は現実的な画面幅。
+ */
+export function isValidViewport(size: {
+  readonly width: number;
+  readonly height: number;
+}): boolean {
+  const ok = (value: number): boolean => Number.isInteger(value) && value >= 200 && value <= 4096;
+  return ok(size.width) && ok(size.height);
 }

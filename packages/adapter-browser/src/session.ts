@@ -1,4 +1,5 @@
 import type {
+  ConsoleMessage,
   StorageState,
   BoundingBox,
   BrowserAction,
@@ -202,9 +203,25 @@ export function createSession(options: CliOptions, discardPath: string): Browser
       }
     },
 
-    async consoleMessages(): Promise<readonly unknown[]> {
+    async consoleMessages(): Promise<readonly ConsoleMessage[]> {
       const data = readRecord(await call(["console"], "コンソールの取得"), "コンソールの取得");
-      return Array.isArray(data["messages"]) ? data["messages"] : [];
+      if (!Array.isArray(data["messages"])) {
+        return [];
+      }
+      // 実行基盤の生の形をここで畳む。畳まないと CDP の語彙が interface 層まで
+      // 漏れる (ADR-0013)。
+      return data["messages"].map((raw): ConsoleMessage => {
+        const message = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+          string,
+          unknown
+        >;
+        const level = message["level"] ?? message["type"];
+        const text = message["text"] ?? message["message"];
+        return {
+          level: typeof level === "string" ? level : "log",
+          text: typeof text === "string" ? text : JSON.stringify(raw),
+        };
+      });
     },
 
     async stream(): Promise<StreamHandle> {

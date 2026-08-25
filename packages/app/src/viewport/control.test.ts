@@ -1,8 +1,8 @@
-import type { AuthProfileStore } from "@screen-contract/adapter-store";
 import { describe, expect, it } from "vitest";
-import { createViewportControl } from "./viewport-control.js";
+import type { AuthProfileStore } from "./auth-profiles.js";
+import { createViewportControl } from "./control.js";
 import type { RunSession } from "./run-session.js";
-import type { Viewport } from "./viewport.js";
+import type { Viewport } from "./session.js";
 
 const ALLOWED = ["http://127.0.0.1:5174", "https://example.test"];
 
@@ -29,6 +29,7 @@ function setup() {
     },
   } as unknown as Viewport;
 
+  const generations = new Map<string, number>();
   const authProfiles = {
     assertName: (name: string) => {
       if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name === "anonymous") {
@@ -36,7 +37,13 @@ function setup() {
       }
     },
     list: () => [...saved.keys()].sort(),
-    save: (name: string, state: unknown) => void saved.set(name, state),
+    save: (name: string, state: unknown) => {
+      saved.set(name, state);
+      const next = (generations.get(name) ?? 0) + 1;
+      generations.set(name, next);
+      return next;
+    },
+    generation: (name: string) => generations.get(name) ?? 0,
     load: (name: string) => saved.get(name),
     remove: (name: string) => void saved.delete(name),
   } as AuthProfileStore;
@@ -182,8 +189,8 @@ describe("認証プロファイル", () => {
 
   it("保存すると一覧に出る", async () => {
     const s = setup();
-    expect(await s.control.saveAuthProfile("admin")).toEqual({ profiles: ["admin"] });
-    expect(s.control.listAuthProfiles()).toEqual(["admin"]);
+    expect(await s.control.saveAuthProfile("admin")).toMatchObject({ profiles: ["admin"] });
+    expect(s.control.listAuthProfiles().profiles).toEqual(["admin"]);
   });
 
   it("切り替えるとセッションを作り直す", async () => {
@@ -220,6 +227,6 @@ describe("認証プロファイル", () => {
   it("削除できる", async () => {
     const s = setup();
     await s.control.saveAuthProfile("admin");
-    expect(s.control.removeAuthProfile("admin")).toEqual({ profiles: [] });
+    expect(s.control.removeAuthProfile("admin")).toMatchObject({ profiles: [] });
   });
 });

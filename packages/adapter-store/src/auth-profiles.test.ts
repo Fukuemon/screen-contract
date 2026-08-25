@@ -124,3 +124,34 @@ describe("認証プロファイル", () => {
     expect(store().list()).toEqual([]);
   });
 });
+
+describe("取り込みの世代", () => {
+  it("取り込むたびに 1 つ進む", () => {
+    // 進めないと、同じ名前へ別のアカウントを入れた瞬間から権限の違う結果が
+    // 同じ Baseline へ混ざる (ADR-0022)。
+    const profiles = store();
+    expect(profiles.save("admin", { cookies: [], localStorage: {} })).toBe(1);
+    expect(profiles.save("admin", { cookies: [], localStorage: {} })).toBe(2);
+    expect(profiles.generation("admin")).toBe(2);
+  });
+
+  it("プロファイルごとに数える", () => {
+    const profiles = store();
+    profiles.save("admin", { cookies: [], localStorage: {} });
+    profiles.save("admin", { cookies: [], localStorage: {} });
+    profiles.save("guest", { cookies: [], localStorage: {} });
+    expect(profiles.generation("admin")).toBe(2);
+    expect(profiles.generation("guest")).toBe(1);
+  });
+
+  it("まだ無ければ 0", () => {
+    expect(store().generation("admin")).toBe(0);
+  });
+
+  it("世代を進めても中身は読める", () => {
+    const profiles = store();
+    profiles.save("admin", { cookies: [{ name: "a" }], localStorage: {} });
+    profiles.save("admin", { cookies: [{ name: "b" }], localStorage: {} });
+    expect(profiles.load("admin")).toEqual({ cookies: [{ name: "b" }], localStorage: {} });
+  });
+});

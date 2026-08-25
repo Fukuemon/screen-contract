@@ -4,14 +4,18 @@ import {
   isChromeAvailable,
   resolveChromeInstall,
 } from "@screen-contract/adapter-browser";
-import { createAllowedOrigins } from "./viewport/allowed-origins.js";
+import { createAllowedOrigins, createViewport } from "@screen-contract/app";
 import { StartupAbort } from "./startup/abort.js";
 import { runStartupChecks } from "./startup/checks.js";
 import { loadProductConfig } from "./startup/config.js";
 import { listen, type RunningServer } from "./runtime/listen.js";
-import { createAuthProfileStore, createKeystore } from "@screen-contract/adapter-store";
+import {
+  createAuthProfileStore,
+  createKeystore,
+  createOriginsConfig,
+} from "@screen-contract/adapter-store";
+import { parseAuthProfileName } from "@screen-contract/core-execution";
 import { resolveStateDir } from "./startup/state-dir.js";
-import { createViewport } from "./viewport/viewport.js";
 
 /**
  * 起動の本体。終了コードと出力を戻り値にして、プロセスを起こさずに検証できる形にする。
@@ -75,7 +79,7 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
       stateDir,
       webRoot: env.webRoot,
       allowedOrigins: createAllowedOrigins({
-        configPath: join(env.cwd, PRODUCT_CONFIG_NAME),
+        config: createOriginsConfig(join(env.cwd, PRODUCT_CONFIG_NAME)),
         initial: allowedOrigins,
       }),
       authProfiles,
@@ -88,6 +92,12 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
       viewport: createViewport({
         browser: createAgentBrowserPort({ home: env.home }),
         entryUrl: allowedOrigins[0] as string,
+        // 誰として実行しているかを Port へ渡す。匿名を名乗ったまま認証状態を
+        // 注入すると、認証済みの結果が匿名の Baseline へ混ざる (ADR-0022)。
+        auth: () =>
+          activeProfile === undefined
+            ? { kind: "anonymous" }
+            : { kind: "profile", name: parseAuthProfileName(activeProfile) },
         storageState: () =>
           Promise.resolve(
             activeProfile === undefined ? undefined : (authProfiles.load(activeProfile) as never),

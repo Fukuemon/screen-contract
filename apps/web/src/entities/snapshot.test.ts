@@ -6,6 +6,7 @@ const FULL = {
   status: "paused",
   mode: "operate",
   recording: true,
+  events: [{ kind: "paused", atIndex: 0 }],
   entryUrl: "http://127.0.0.1:5174",
   stateUrl: "http://127.0.0.1:5174/",
   steps: [{ id: "step-0", action: { kind: "click", ref: "el-a" }, expect: [{ kind: "url" }] }],
@@ -24,13 +25,14 @@ describe("parseSnapshot", () => {
   });
 
   it("項目が欠けても落ちない", () => {
-    // 応答の型は server 側で定義され、ここは手で写している。ずれても型検査は
-    // 鳴らないため境界で補う。補わないと画面全体が落ちる。
+    // 型は server 側 (app) が定めるが、**古い server プロセスが動いたまま
+    // 新しい画面を読む**ことがある。そのときの応答は現在の型と一致しない。
     expect(parseSnapshot({})).toEqual({
       runId: "current",
       status: "idle",
       mode: "view",
       recording: false,
+      events: [],
       entryUrl: "",
       stateUrl: "",
       steps: [],
