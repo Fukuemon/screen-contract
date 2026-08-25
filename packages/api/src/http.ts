@@ -68,6 +68,13 @@ export interface ViewportControl {
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<unknown>;
   /** 実行してよい origin。UI はここから選ぶ。 */
   allowedOrigins(): readonly string[];
+  /**
+   * 実行してよい origin を足す。
+   *
+   * **列挙は残す。** UI から任意の URL を開けるようにしても、追加は明示的な
+   * 操作として設定ファイルへ書き戻す (ADR-0017)。
+   */
+  addAllowedOrigin(origin: string): readonly string[];
   listAuthProfiles(): readonly string[];
   saveAuthProfile(name: string): Promise<unknown>;
   useAuthProfile(name: string | undefined): Promise<unknown>;
@@ -193,6 +200,14 @@ export function createHttpApp(options: HttpAppOptions): Hono {
     });
 
     app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));
+
+    app.post("/viewport/origins", async (c) => {
+      const { origin } = (await c.req.json()) as { origin?: unknown };
+      if (typeof origin !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json({ origins: viewport.addAllowedOrigin(origin) });
+    });
 
     app.get("/auth/profiles", (c) => c.json({ profiles: viewport.listAuthProfiles() }));
 

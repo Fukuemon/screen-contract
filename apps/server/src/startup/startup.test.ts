@@ -21,7 +21,7 @@ import {
   removeRuntimeFile,
   runtimeFilePath,
   writeRuntimeFile,
-} from "./runtime-file.js";
+} from "../runtime/runtime-file.js";
 import { ensureStateDir, resolveStateDir } from "./state-dir.js";
 import { generateLocalToken } from "./token.js";
 

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { ApprovalRequest } from "@screen-contract/api";
+import { ApprovalView } from "../features/approval/approval-view.js";
 import {
   forgetMissing,
   INITIAL_APPROVAL_UI,
@@ -9,36 +10,17 @@ import {
   showDiff,
   type ApprovalUiState,
 } from "../features/approval/approval.js";
-import { ApprovalView } from "../features/approval/approval-view.js";
-import { createApiClient, type ApiClient } from "../shared/api/client.js";
-import { readEmbeddedToken, serverTargetOf } from "../shared/api/connection.js";
+import type { ApiClient } from "../shared/api/client.js";
+import { useApiClient } from "../shared/api/use-api-client.js";
 
 export const Route = createFileRoute("/approvals")({ component: ApprovalsRoute });
 
-/**
- * 承認画面 (container)。
- *
- * **client state は正本を持たない。** 承認待ちは server から取り直す
- * (context/architecture.md)。
- */
+/** 承認画面。承認待ちの正本は server が持ち、ここは写しを表示する。 */
 function ApprovalsRoute() {
-  const [client, setClient] = useState<ApiClient | undefined>(undefined);
+  const { client, error: clientError } = useApiClient();
   const [pending, setPending] = useState<readonly ApprovalRequest[]>([]);
   const [state, setState] = useState<ApprovalUiState>(INITIAL_APPROVAL_UI);
   const [error, setError] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    try {
-      setClient(
-        createApiClient({
-          target: serverTargetOf(globalThis.location.origin),
-          token: readEmbeddedToken(globalThis.document),
-        }),
-      );
-    } catch (cause) {
-      setError((cause as Error).message);
-    }
-  }, []);
 
   const refresh = useCallback((api: ApiClient) => {
     void api
@@ -58,15 +40,17 @@ function ApprovalsRoute() {
     }
   }, [client, refresh]);
 
+  const showing = error ?? clientError;
+
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line/40 px-4">
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-line/40 px-4">
         <Link
           to="/"
-          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-line/60 bg-elevated px-3 text-sm transition-colors duration-150 hover:bg-line/40"
+          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm text-muted transition-colors duration-150 hover:bg-elevated hover:text-ink"
         >
           <ArrowLeft className="size-4" aria-hidden />
-          エディタへ
+          エディタ
         </Link>
         <span className="text-sm font-semibold">承認</span>
         <span className="text-xs text-muted">確定すると画面仕様書の正本になります</span>
@@ -94,7 +78,7 @@ function ApprovalsRoute() {
             .catch((cause: Error) => setError(cause.message));
         }}
         onApprove={(requestId) => {
-          // **判定の正本はここ。** disabled は表示上の補助にすぎない。
+          // 判定の正本はここ。disabled は表示上の補助にすぎない。
           if (client === undefined || rejectApprove(state, pending, requestId) !== undefined) {
             return;
           }
@@ -105,12 +89,12 @@ function ApprovalsRoute() {
         }}
       />
 
-      {error !== undefined && (
+      {showing !== undefined && (
         <p
           role="alert"
           className="shrink-0 border-t border-line/40 bg-danger/10 px-4 py-2 text-sm text-danger"
         >
-          {error}
+          {showing}
         </p>
       )}
     </div>

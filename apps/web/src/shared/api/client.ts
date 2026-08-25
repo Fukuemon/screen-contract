@@ -9,6 +9,7 @@ import { httpBase, type ServerTarget } from "./connection.js";
  */
 
 export interface RecordedStepView {
+  readonly id: string;
   readonly action:
     | { readonly kind: "click"; readonly ref: string }
     | { readonly kind: "clickPoint"; readonly x: number; readonly y: number };
@@ -60,6 +61,7 @@ export interface ApiClient {
     readonly y: number;
   }): Promise<PickedElementView | undefined>;
   allowedOrigins(): Promise<readonly string[]>;
+  addAllowedOrigin(origin: string): Promise<readonly string[]>;
   listAuthProfiles(): Promise<readonly string[]>;
   saveAuthProfile(name: string): Promise<readonly string[]>;
   useAuthProfile(name: string | undefined): Promise<void>;
@@ -128,6 +130,10 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
 
     async allowedOrigins(): Promise<readonly string[]> {
       return (await json<{ origins: readonly string[] }>("/viewport/origins")).origins;
+    },
+
+    async addAllowedOrigin(origin): Promise<readonly string[]> {
+      return (await post<{ origins: readonly string[] }>("/viewport/origins", { origin })).origins;
     },
 
     async listAuthProfiles(): Promise<readonly string[]> {

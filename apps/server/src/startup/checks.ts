@@ -1,5 +1,5 @@
 import { StartupAbort } from "./abort.js";
-import { isProcessAlive, readRuntimeFile } from "./runtime-file.js";
+import { isProcessAlive, readRuntimeFile } from "../runtime/runtime-file.js";
 import { ensureStateDir } from "./state-dir.js";
 
 /**

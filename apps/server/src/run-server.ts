@@ -4,13 +4,14 @@ import {
   isChromeAvailable,
   resolveChromeInstall,
 } from "@screen-contract/adapter-browser";
-import { StartupAbort } from "./abort.js";
-import { runStartupChecks } from "./checks.js";
-import { loadProductConfig } from "./config.js";
-import { listen, type RunningServer } from "./listen.js";
+import { createAllowedOrigins } from "./viewport/allowed-origins.js";
+import { StartupAbort } from "./startup/abort.js";
+import { runStartupChecks } from "./startup/checks.js";
+import { loadProductConfig } from "./startup/config.js";
+import { listen, type RunningServer } from "./runtime/listen.js";
 import { createAuthProfileStore, createKeystore } from "@screen-contract/adapter-store";
-import { resolveStateDir } from "./state-dir.js";
-import { createViewport } from "./viewport.js";
+import { resolveStateDir } from "./startup/state-dir.js";
+import { createViewport } from "./viewport/viewport.js";
 
 /**
  * 起動の本体。終了コードと出力を戻り値にして、プロセスを起こさずに検証できる形にする。
@@ -73,7 +74,10 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
     const server = await listen({
       stateDir,
       webRoot: env.webRoot,
-      allowedOrigins,
+      allowedOrigins: createAllowedOrigins({
+        configPath: join(env.cwd, PRODUCT_CONFIG_NAME),
+        initial: allowedOrigins,
+      }),
       authProfiles,
       setActiveProfile: (name) => {
         activeProfile = name;

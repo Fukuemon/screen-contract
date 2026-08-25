@@ -2,13 +2,14 @@ import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-se
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
 import type { AuthProfileStore } from "@screen-contract/adapter-store";
-import { createRunSession } from "./run-session.js";
-import { createViewportControl } from "./viewport-control.js";
-import type { Viewport, ViewportSubscription } from "./viewport.js";
+import type { AllowedOrigins } from "../viewport/allowed-origins.js";
+import { createRunSession } from "../viewport/run-session.js";
+import { createViewportControl } from "../viewport/viewport-control.js";
+import type { Viewport, ViewportSubscription } from "../viewport/viewport.js";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
-import { createFsWebAssets } from "./web-assets.js";
-import { generateLocalToken } from "./token.js";
+import { createFsWebAssets } from "../serving/web-assets.js";
+import { generateLocalToken } from "../startup/token.js";
 import {
   processLifecycleHost,
   startRuntimeFile,
@@ -41,7 +42,7 @@ export interface ListenOptions {
   /** run が最初に開く URL。プロダクト設定で列挙した origin の先頭を渡す。 */
   readonly entryUrl?: string | undefined;
   /** 実行してよい origin の列挙。UI はここから選ぶ (ADR-0017)。 */
-  readonly allowedOrigins?: readonly string[] | undefined;
+  readonly allowedOrigins?: AllowedOrigins | undefined;
   /** 認証プロファイルの保管。渡さないと認証まわりの endpoint を生やさない。 */
   readonly authProfiles?: AuthProfileStore | undefined;
   /** いま使う認証プロファイルを合成ルートへ伝える。 */
@@ -89,12 +90,15 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           currentUrl: () => viewportPort.currentUrl(),
         });
   const control =
-    session === undefined || viewportPort === undefined || options.authProfiles === undefined
+    session === undefined ||
+    viewportPort === undefined ||
+    options.authProfiles === undefined ||
+    options.allowedOrigins === undefined
       ? undefined
       : createViewportControl({
           run: session,
           viewport: viewportPort,
-          allowedOrigins: options.allowedOrigins ?? [],
+          allowedOrigins: options.allowedOrigins,
           authProfiles: options.authProfiles,
           setActiveProfile: options.setActiveProfile ?? (() => undefined),
         });

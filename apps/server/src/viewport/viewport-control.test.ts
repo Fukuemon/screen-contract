@@ -38,10 +38,22 @@ function setup() {
 
   const run = { snapshot: () => ({ status: "paused" }) } as unknown as RunSession;
 
+  const added: string[] = [];
+  const origins = [...ALLOWED];
+  const allowedOrigins = {
+    list: () => [...origins],
+    has: (origin: string) => origins.includes(origin),
+    add: (origin: string) => {
+      added.push(origin);
+      origins.push(origin);
+      return [...origins];
+    },
+  };
+
   const control = createViewportControl({
     run,
     viewport,
-    allowedOrigins: ALLOWED,
+    allowedOrigins,
     authProfiles,
     setActiveProfile: (name) => {
       active = name;
@@ -50,6 +62,7 @@ function setup() {
 
   return {
     control,
+    added,
     navigated,
     sizes,
     saved,
@@ -79,6 +92,17 @@ describe("対象の切り替え", () => {
 
   it("列挙をそのまま返す", () => {
     expect(setup().control.allowedOrigins()).toEqual(ALLOWED);
+  });
+
+  it("列挙へ足すと開けるようになる", async () => {
+    // **列挙は残す。** 任意の URL を開けるようにしても、追加は明示的な操作
+    // として記録する (ADR-0017)。
+    const s = setup();
+    await expect(s.control.navigate("https://added.test/x")).rejects.toThrow();
+    s.control.addAllowedOrigin("https://added.test");
+    expect(s.added).toEqual(["https://added.test"]);
+    await s.control.navigate("https://added.test/x");
+    expect(s.navigated).toEqual(["https://added.test/x"]);
   });
 
   it("viewport の寸法を変える", async () => {

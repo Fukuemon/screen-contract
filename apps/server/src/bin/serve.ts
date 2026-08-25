@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { runServer } from "../startup/run-server.js";
+import { runServer } from "../run-server.js";
 
 /** Workflow Server のプロセス入口。判断は runServer にあり、ここは環境を渡すだけ。 */
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));

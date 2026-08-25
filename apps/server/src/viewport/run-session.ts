@@ -31,7 +31,7 @@ interface RunSnapshot {
   readonly events: readonly ExecutionEvent[];
   readonly entryUrl: string;
   /** 記録した手順。承認へ回す draft の中身になる。 */
-  readonly steps: readonly RecordedStep[];
+  readonly steps: readonly (RecordedStep & { readonly id: string })[];
   readonly newElements: readonly ElementDef[];
 }
 
@@ -77,7 +77,8 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   let recording = false;
   let events: readonly ExecutionEvent[] = [];
   let session: RecordingSession | undefined;
-  let steps: readonly RecordedStep[] = [];
+  /** 手順は追記のみで並べ替えない。連番をそのまま識別子にする。 */
+  let steps: readonly (RecordedStep & { id: string })[] = [];
   let newElements: readonly ElementDef[] = [];
 
   function snapshot(): RunSnapshot {
@@ -151,7 +152,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
         () => Promise.resolve(observation),
       );
       const draft = session.finish();
-      steps = draft.steps;
+      steps = draft.steps.map((step, index) => ({ ...step, id: `step-${String(index)}` }));
       newElements = draft.newElements;
     },
 

@@ -11,7 +11,7 @@ import { cn } from "./cn.js";
 const button = cva(
   [
     "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border",
-    "text-sm font-medium transition-colors duration-150",
+    "text-sm font-medium whitespace-nowrap transition-colors duration-150",
     "disabled:cursor-not-allowed disabled:opacity-40",
   ],
   {

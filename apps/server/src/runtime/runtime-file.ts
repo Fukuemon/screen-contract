@@ -9,7 +9,7 @@ import {
   writeSync,
 } from "node:fs";
 import { join } from "node:path";
-import { StartupAbort } from "./abort.js";
+import { StartupAbort } from "../startup/abort.js";
 
 /**
  * 待受アドレス・ポート・トークン・プロセス ID を 1 つのファイルへ原子的に置く。

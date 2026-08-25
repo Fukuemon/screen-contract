@@ -1,5 +1,6 @@
 import type { ViewportControl } from "@screen-contract/api";
 import type { AuthProfileStore } from "@screen-contract/adapter-store";
+import type { AllowedOrigins } from "./allowed-origins.js";
 import type { RunSession } from "./run-session.js";
 import type { Viewport } from "./viewport.js";
 
@@ -14,7 +15,7 @@ import type { Viewport } from "./viewport.js";
 export interface ViewportControlOptions {
   readonly run: RunSession;
   readonly viewport: Viewport;
-  readonly allowedOrigins: readonly string[];
+  readonly allowedOrigins: AllowedOrigins;
   readonly authProfiles: AuthProfileStore;
   /** いま使う認証プロファイル。viewport がセッションを開くときに読む。 */
   readonly setActiveProfile: (name: string | undefined) => void;
@@ -28,7 +29,7 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     } catch {
       throw new Error("開く URL を解釈できません");
     }
-    if (!options.allowedOrigins.includes(origin)) {
+    if (!options.allowedOrigins.has(origin)) {
       // 列挙という安全装置を UI から迂回させない。
       throw new Error("実行してよい origin として列挙されていません");
     }
@@ -41,7 +42,8 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     setRecording: (recording) => options.run.setRecording(recording),
     snapshot: () => options.run.snapshot(),
     resolveAt: (point) => options.viewport.resolveAt(point),
-    allowedOrigins: () => options.allowedOrigins,
+    allowedOrigins: () => options.allowedOrigins.list(),
+    addAllowedOrigin: (origin) => options.allowedOrigins.add(origin),
 
     async navigate(url: string): Promise<unknown> {
       assertAllowed(url);

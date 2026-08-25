@@ -391,7 +391,7 @@ describe("操作モードの入力転送", () => {
   it("一時停止した run の操作モードでだけ入力が対象ページへ届く", async () => {
     // 中継条件は server 側の run 状態で判定する (ADR-0008)。client の自称では
     // 満たせない。
-    const { createRunSession } = await import("./startup/run-session.js");
+    const { createRunSession } = await import("./viewport/run-session.js");
     const runner = {
       observe: async () => ({
         url: new URL(await session.currentUrl()).pathname,
