@@ -1,4 +1,42 @@
-import type { ElementId } from "@screen-contract/domain";
+import type {
+  BoundingBox,
+  ElementId,
+  ObservedElement,
+  SemanticLocator,
+} from "@screen-contract/domain";
+
+// **同じ型を core ごとに持たない。** 片方へ項目を足した瞬間に、構造的型付けの
+// おかげで通ってしまう無音の不一致が生まれる (context/architecture.md)。
+export type { BoundingBox, ObservedElement, SemanticLocator } from "@screen-contract/domain";
+
+/**
+ * 要素 ID の規則。
+ *
+ * **外部入力を型アサーションで持ち上げない。** branded type は実行時の保証を
+ * 持たないため、通すと未検証の文字列が保存先のパス組み立てまで届く
+ * (`parseStoreKey` と同じ理由)。
+ *
+ * `el-` を必須にするのは、生成規則と読み手の規則を揃えるためである。
+ */
+const ELEMENT_ID = /^el-[\p{Letter}\p{Number}][\p{Letter}\p{Number}._-]{0,127}$/u;
+
+export class ElementIdError extends Error {
+  /** 検証由来であることの印。interface 層が構造で分類する。 */
+  readonly failure = "validation";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "ElementIdError";
+  }
+}
+
+export function parseElementId(raw: string): ElementId {
+  if (!ELEMENT_ID.test(raw)) {
+    // 拒否した値をメッセージへ入れない。ログや応答へ外部入力が反射する。
+    throw new ElementIdError("要素 ID の規則に合いません (el- で始まる 130 文字以内)");
+  }
+  return raw as ElementId;
+}
 
 /**
  * 画面上の実要素と、仕様書上の要素定義を対応づける。
@@ -7,33 +45,6 @@ import type { ElementId } from "@screen-contract/domain";
  * 座標・box は入力値として受け取る (element-mapping feature)。**bounding box が
  * Accessibility Snapshot の応答に含まれるとは限らない**ため、取得手段は問わない。
  */
-
-/** 画面上の位置。撮影時の viewport ピクセル座標。 */
-export interface BoundingBox {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
-
-/** 観測した要素 1 件。取得手段は adapter に閉じる。 */
-export interface ObservedElement {
-  readonly role: string;
-  readonly name: string;
-  readonly box: BoundingBox;
-}
-
-/**
- * Semantic Locator。
- *
- * skeleton は role+name までとする。祖先方向の候補列と label / testid の
- * 優先順位は要素選択 (Web UI で「ボタンではなくカード全体を選ぶ」) の機能で
- * あり、記録では第一候補だけで足りる。
- */
-export interface SemanticLocator {
-  readonly role: string;
-  readonly name: string;
-}
 
 export interface ElementDef {
   readonly id: ElementId;

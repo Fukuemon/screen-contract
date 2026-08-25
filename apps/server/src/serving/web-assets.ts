@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type { WebAssets } from "@screen-contract/api";
+import { ConflictError } from "@screen-contract/app";
 import { TOKEN_META } from "./web-token.js";
 
 /**
@@ -26,7 +27,8 @@ export function embedToken(html: string, token: string): string {
   const head = html.indexOf("</head>");
   if (head < 0) {
     // 埋め込めないまま配信しない。配信すると、原因の分からない 401 になる。
-    throw new Error("配信する HTML に head がありません");
+    // **入力の誤りではない。** ビルド成果物の異常であり、client には直せない。
+    throw new ConflictError("配信する HTML に head がありません");
   }
   return html.slice(0, head) + meta + html.slice(head);
 }
@@ -47,14 +49,23 @@ export interface FsWebAssetsOptions {
 }
 
 export function createFsWebAssets(options: FsWebAssetsOptions): WebAssets {
-  const realRoot = resolve(options.root);
+  // **symlink を辿ってから固定する。** `resolve` は字句解決で symlink を辿ら
+  // ないため、配信ルート配下に外を指す symlink があると前置き一致が通る。
+  const realRoot = realpathSync(resolve(options.root));
   return {
     shell: () => embedToken(readFileSync(join(realRoot, "_shell.html"), "utf8"), options.token),
 
     asset(path: string) {
       // 要求されたパスが配信ルートの配下に収まることを解決後に検査する。
       // 文字列検査だけでは `..` を含む要求を通しうる。
-      const target = resolve(realRoot, `.${path}`);
+      const resolved = resolve(realRoot, `.${path}`);
+      // 実体を辿ってから配下判定する。辿れなければ配信しない。
+      let target: string;
+      try {
+        target = realpathSync(resolved);
+      } catch {
+        return undefined;
+      }
       if (target !== realRoot && !target.startsWith(realRoot + sep)) {
         return undefined;
       }

@@ -88,13 +88,33 @@ export function createWorkflowServerClient(
   const base = httpBase(options.target);
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
 
-  async function call(path: string, init?: RequestInit): Promise<Response> {
+  /**
+   * 保存の鍵を path へ載せる。
+   *
+   * **セグメントごとに符号化する。** 丸ごと通すと `?` や `#` で path が壊れ、
+   * `../` は server の検証へ届く前に URL 正規化で消える。`/` は鍵の区切りなので
+   * 残す。
+   */
+  function keyPath(prefix: string, key: string): string {
+    return `${prefix}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  }
+
+  /**
+   * @param allow - 失敗として扱わない status。**呼び出しごとに指定する。**
+   *   全体で除外すると、写しを取る経路が 404 を受けても既定値の画面になり、
+   *   原因が読めない。
+   */
+  async function call(
+    path: string,
+    init?: RequestInit,
+    allow: readonly number[] = [],
+  ): Promise<Response> {
     // `headers` は配列や Headers も取りうる。spread すると添字の羅列になる。
     const headers = new Headers(init?.headers);
     // トークンはヘッダで渡す。URL の query に載せない。
     headers.set("authorization", `Bearer ${options.token}`);
     const response = await doFetch(`${base}${path}`, { ...init, headers });
-    if (!response.ok && response.status !== 409 && response.status !== 404) {
+    if (!response.ok && !allow.includes(response.status)) {
       // server が返す理由は列挙で、外部入力を反射しない。
       const detail = ((await response.json().catch(() => ({}))) as { error?: string }).error;
       throw new Error(
@@ -185,10 +205,18 @@ export function createWorkflowServerClient(
       json<AuthProfilesView>(`/auth/profiles/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
     listApprovals: () => json<readonly ApprovalRequest[]>("/approvals"),
-    approve: (requestId) =>
-      post<ApprovalResult>(`/approvals/${encodeURIComponent(requestId)}/approve`),
-    loadDraft: async (key) => (await call(`/drafts/${key}`)).text(),
-    loadAuthoritative: async (key) => (await call(`/authoritative/${key}`)).text(),
+    // 404 (依頼が消えた) と 409 (差分が変わった) は結果として返る。
+    approve: async (requestId) =>
+      (await (
+        await call(
+          `/approvals/${encodeURIComponent(requestId)}/approve`,
+          { method: "POST" },
+          [404, 409],
+        )
+      ).json()) as ApprovalResult,
+    // draft がまだ無いのは失敗ではない。「空からの差分」として扱う。
+    loadDraft: async (key) => (await call(keyPath("/drafts", key), undefined, [404])).text(),
+    loadAuthoritative: async (key) => (await call(keyPath("/authoritative", key))).text(),
   };
 }
 

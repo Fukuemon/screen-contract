@@ -21,7 +21,13 @@ export type RecordedAction =
 /** 操作の前後で観測した、Expectation の候補になりうる項目。 */
 export interface RecordedObservation {
   readonly url: string;
-  readonly title: string;
+  /**
+   * 画面のタイトル。取得できない実行基盤では省く。
+   *
+   * **空文字で埋めない。** 埋めると「常に同じ」になり、title の比較が
+   * 一度も発火しないまま実装済みに見える。
+   */
+  readonly title?: string | undefined;
   /** 可視な要素の `ref`。 */
   readonly visibleRefs: readonly ElementId[];
 }
@@ -104,7 +110,8 @@ export function expectationCandidates(
   if (before.url !== after.url) {
     candidates.push({ kind: "url", path: after.url });
   }
-  if (before.title !== after.title) {
+  // 片方でも取れていなければ比べない。取れていないことを「変わった」と読まない。
+  if (before.title !== undefined && after.title !== undefined && before.title !== after.title) {
     candidates.push({ kind: "title", value: after.title });
   }
   // Set 化してから回す。重複した ref があると同じ候補が 2 度出る。

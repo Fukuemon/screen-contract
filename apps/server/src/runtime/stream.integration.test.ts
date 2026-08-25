@@ -58,7 +58,12 @@ async function start() {
   return server;
 }
 
-/** 接続して 1 往復させ、閉じられたかを返す。 */
+/**
+ * 接続して 1 往復させる。
+ *
+ * **閉じられたかだけでは足りない。** 中継してはいけない入力が上流へ届いても、
+ * 接続が開いたままなら気付けない。上流の fake が受けたものも返す。
+ */
 function connect(
   running: RunningServer,
   frames: readonly string[],
@@ -70,16 +75,26 @@ function connect(
     } as never);
     let closed = false;
     ws.addEventListener("open", () => {
-      for (const frame of frames) {
-        ws.send(frame);
-      }
+      // **フレームを間を空けて送る。** 続けて送ると、認証の後に張られる購読が
+      // 間に合わず、入力が中継の手前で落ちる。中継条件を外しても落ちない
+      // テストになってしまう。
+      frames.forEach((frame, index) => {
+        setTimeout(() => {
+          if (!closed) {
+            ws.send(frame);
+          }
+        }, index * 150);
+      });
       // 閉じられなければ通ったとみなす。
-      setTimeout(() => {
-        if (!closed) {
-          ws.close();
-          resolve({ closed: false, code: undefined });
-        }
-      }, 300);
+      setTimeout(
+        () => {
+          if (!closed) {
+            ws.close();
+            resolve({ closed: false, code: undefined });
+          }
+        },
+        300 + frames.length * 150,
+      );
     });
     ws.addEventListener("close", (event) => {
       closed = true;
@@ -87,6 +102,30 @@ function connect(
     });
     ws.addEventListener("error", reject);
   });
+}
+
+/** フレームを 1 枚だけ流す fake。実ブラウザを起こさない。 */
+function fakeViewport(frames: readonly string[]) {
+  return {
+    subscribe: (onFrame: (uri: string) => void) => {
+      for (const frame of frames) {
+        setTimeout(() => onFrame(frame), 10);
+      }
+      return Promise.resolve({ send: () => undefined, close: () => Promise.resolve() });
+    },
+    // run を起こさないため、実行の相手は無い。
+    runner: () => undefined,
+    navigate: () => Promise.resolve(),
+    setSize: () => Promise.resolve(),
+    captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
+    reset: () => Promise.resolve(),
+    resolveAt: () => Promise.resolve(undefined),
+    observe: () => Promise.resolve([]),
+    currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
+    entryUrl: () => "http://127.0.0.1:5174/",
+    authWarnings: () => [],
+    consoleMessages: () => Promise.resolve([]),
+  };
 }
 
 describe("Stream Proxy の接続", () => {
@@ -113,9 +152,12 @@ describe("Stream Proxy の接続", () => {
     expect(result.closed).toBe(true);
   });
 
-  it("トークンを URL の query に載せずに通る", async () => {
-    // URL は履歴・Referer・アクセスログに残る。
+  it("接続先の URL にトークンを載せない", async () => {
+    // URL は履歴・Referer・アクセスログに残る (context/infrastructure.md)。
+    // 「閉じられなかった」では、query に載せた場合との区別が付かない。
     const running = await start();
+    const url = `ws://127.0.0.1:${String(running.port)}/stream`;
+    expect(url).not.toContain(running.token);
     const result = await connect(running, [
       JSON.stringify({ kind: "auth", token: running.token, runId: "run-1" }),
     ]);
@@ -123,14 +165,33 @@ describe("Stream Proxy の接続", () => {
   });
 
   it("run が無ければ認証を通っても入力を中継しない", async () => {
-    // 中継条件は server 側の run 状態で判定する (ADR-0008)。
-    const running = await start();
-    const result = await connect(running, [
-      JSON.stringify({ kind: "auth", token: running.token, runId: "run-1" }),
-      JSON.stringify({ kind: "input", payload: "input_mouse" }),
+    // 中継条件は server 側の run 状態で判定する (ADR-0008)。**上流へ届いて
+    // いないことを見る。** 接続が閉じないことだけを見ると、中継が素通しに
+    // なっても緑のままになる。
+    const relayed: string[] = [];
+    server = await listen({
+      browser: fakeBrowser,
+      stateDir,
+      host: fakeHost(),
+      viewport: {
+        ...fakeViewport([]),
+        subscribe: () =>
+          Promise.resolve({
+            send: (payload: string) => void relayed.push(payload),
+            close: () => Promise.resolve(),
+          }),
+      } as never,
+    });
+    const result = await connect(server, [
+      JSON.stringify({ kind: "auth", token: server.token, runId: "run-1" }),
+      JSON.stringify({
+        kind: "input",
+        payload: JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2 }),
+      }),
     ]);
     // 破棄しても接続は保つ (UI の不具合と迂回の試みを区別するため記録に残す)。
     expect(result.closed).toBe(false);
+    expect(relayed).toEqual([]);
   });
 
   it("別 origin からの upgrade を拒否する", async () => {
@@ -146,32 +207,8 @@ describe("Stream Proxy の接続", () => {
 });
 
 describe("live viewport の映像", () => {
-  /** フレームを 1 枚だけ流す fake。実ブラウザを起こさない。 */
-  function fakeViewport(frames: readonly string[]) {
-    return {
-      subscribe: (onFrame: (uri: string) => void) => {
-        for (const frame of frames) {
-          setTimeout(() => onFrame(frame), 10);
-        }
-        return Promise.resolve({ send: () => undefined, close: () => Promise.resolve() });
-      },
-      // run を起こさないため、実行の相手は無い。
-      runner: () => undefined,
-      navigate: () => Promise.resolve(),
-      setSize: () => Promise.resolve(),
-      captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),
-      reset: () => Promise.resolve(),
-      resolveAt: () => Promise.resolve(undefined),
-      observe: () => Promise.resolve([]),
-      currentUrl: () => Promise.resolve("http://127.0.0.1:5174/"),
-      authWarnings: () => [],
-      consoleMessages: () => Promise.resolve([]),
-    };
-  }
-
   function collectFrames(
     running: RunningServer,
-    frames: readonly string[],
     authenticate: boolean,
   ): Promise<readonly string[]> {
     return new Promise((resolve, reject) => {
@@ -193,7 +230,6 @@ describe("live viewport の映像", () => {
         }
       });
       ws.addEventListener("error", reject);
-      void frames;
     });
   }
 
@@ -204,7 +240,7 @@ describe("live viewport の映像", () => {
       host: fakeHost(),
       viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
     });
-    expect(await collectFrames(server, [], true)).toEqual(["data:image/jpeg;base64,AAA"]);
+    expect(await collectFrames(server, true)).toEqual(["data:image/jpeg;base64,AAA"]);
   });
 
   it("認証を通す前に映像を流さない", async () => {
@@ -215,12 +251,12 @@ describe("live viewport の映像", () => {
       host: fakeHost(),
       viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
     });
-    expect(await collectFrames(server, [], false)).toEqual([]);
+    expect(await collectFrames(server, false)).toEqual([]);
   });
 
   it("viewport を渡さなければ映像は流れない", async () => {
     server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
-    expect(await collectFrames(server, [], true)).toEqual([]);
+    expect(await collectFrames(server, true)).toEqual([]);
   });
 });
 
@@ -248,7 +284,7 @@ describe("Web UI の配信", () => {
   it("配信を渡さなければ shell を返さない", async () => {
     server = await listen({ browser: fakeBrowser, stateDir, host: fakeHost() });
     const response = await fetch(`http://127.0.0.1:${server.port}/`);
-    // 認可ミドルウェアへ落ちる (トークンが無いため 401)。
-    expect(response.status).not.toBe(200);
+    // 認可ミドルウェアへ落ちる。**500 でも通る形にしない。**
+    expect(response.status).toBe(401);
   });
 });

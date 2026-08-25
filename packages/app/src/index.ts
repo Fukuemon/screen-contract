@@ -184,4 +184,5 @@ export type {
   ViewportSize,
 } from "@screen-contract/core-execution";
 export type { ElementDef } from "@screen-contract/core-element";
+export { ElementIdError, parseElementId } from "@screen-contract/core-element";
 export type { ElementId } from "@screen-contract/domain";

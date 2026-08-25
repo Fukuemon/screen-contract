@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import type { ElementId, UseCases, ViewportControl } from "@screen-contract/app";
+import type { UseCases, ViewportControl } from "@screen-contract/app";
 import {
   isConflictError,
   isValidationError,
   isValidViewport,
+  parseElementId,
   parseStartRunInput,
   parseStoreKey,
 } from "@screen-contract/app";
@@ -206,10 +207,10 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       return c.json(viewport.addBadge({ role, name }));
     });
 
-    // 要素 ID は server が採番したものを返してもらうだけである。番号を外す
-    // 相手が居なければ何も起きないため、鍵として組み立てには使わない。
+    // 外部入力は必ず parse を通す。いまは組み立てに使わなくても、要素 ID は
+    // badges と ref を通じて正本と成果物のファイル名側へ流れる識別子である。
     app.delete("/viewport/badges/:id", (c) =>
-      c.json(viewport.removeBadge(c.req.param("id") as ElementId)),
+      c.json(viewport.removeBadge(parseElementId(c.req.param("id")))),
     );
 
     app.post("/viewport/badges/:id/move", async (c) => {
@@ -217,7 +218,7 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       if (typeof to !== "number" || !Number.isInteger(to)) {
         return c.json({ error: "bad-request" }, 400);
       }
-      return c.json(viewport.moveBadge(c.req.param("id") as ElementId, to));
+      return c.json(viewport.moveBadge(parseElementId(c.req.param("id")), to));
     });
 
     app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));

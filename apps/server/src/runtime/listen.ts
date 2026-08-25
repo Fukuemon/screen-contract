@@ -39,6 +39,7 @@ export interface ListenOptions {
   readonly port?: number | undefined;
   readonly host?: LifecycleHost | undefined;
   /** run が最初に開く URL。プロダクト設定で列挙した origin の先頭を渡す。 */
+  /** 最初に開く URL。列挙の先頭を渡す (ADR-0017)。 */
   readonly entryUrl?: string | undefined;
   /** 実行してよい origin の列挙。UI はここから選ぶ (ADR-0017)。 */
   readonly allowedOrigins?: AllowedOrigins | undefined;
@@ -78,7 +79,9 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     viewportPort === undefined
       ? undefined
       : createRunSession({
-          entryUrl: options.entryUrl ?? "",
+          // 空文字を渡さない。`new URL("")` が TypeError になり、原因の分から
+          // ない 500 として返る。列挙が空なら起動時検査で中止している。
+          entryUrl: options.entryUrl ?? viewportPort.entryUrl(),
           runner: () => viewportPort.runner(),
           observe: () => viewportPort.observe(),
           currentUrl: () => viewportPort.currentUrl(),

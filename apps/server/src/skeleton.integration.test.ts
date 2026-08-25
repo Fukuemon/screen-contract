@@ -155,8 +155,10 @@ describe("記録", () => {
         locator: { role: button!.role, name: button!.name },
       },
     ]);
-    // 操作の前後で変化した項目だけが候補になる。
-    expect(step.expect.every((e) => e.kind !== "url")).toBe(true);
+    // 操作の前後で変化した項目だけが候補になる。**空でないことを先に見る。**
+    // 空だと `every` が無条件に真になり、候補が 1 件も出ない不具合を見逃す。
+    expect(step.expect.length).toBeGreaterThan(0);
+    expect(step.expect.filter((e) => e.kind === "url")).toEqual([]);
   }, 60_000);
 
   it("記録を停止すると、記録に使った run を resume して completed で終える", async () => {
@@ -311,9 +313,11 @@ describe("再現と冪等スキップ", () => {
       "run-completed",
       "run-failed",
     ]);
-    for (const event of [...first.events, ...again.events]) {
-      expect(allowed.has(event.kind)).toBe(true);
-    }
+    // **列挙に無い種類が 0 件であることを見る。** ループで回すと、イベントが
+    // 空のときに assertion が 1 度も走らない。
+    const events = [...first.events, ...again.events];
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.map((event) => event.kind).filter((kind) => !allowed.has(kind))).toEqual([]);
   }, 120_000);
 });
 

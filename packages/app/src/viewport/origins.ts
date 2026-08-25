@@ -61,6 +61,14 @@ export interface OriginsConfigPort {
 export interface AllowedOriginsOptions {
   readonly config: OriginsConfigPort;
   readonly initial: readonly string[];
+  /**
+   * 追加を記録する先。
+   *
+   * **黙って広げない。** ADR-0017 は「拒否した実行は理由付きで記録する」と定める
+   * が、対象の範囲を広げたこと自体も同じだけ重い。利用者が気付く契機が設定
+   * ファイルの差分しか無い状態にしない。
+   */
+  readonly onAdded?: ((origin: string) => void) | undefined;
 }
 
 export function createAllowedOrigins(options: AllowedOriginsOptions): AllowedOrigins {
@@ -79,6 +87,7 @@ export function createAllowedOrigins(options: AllowedOriginsOptions): AllowedOri
       // 設定の他の項目を消さない。読み直してから足す。
       options.config.write({ ...options.config.read(), allowedOrigins: next });
       origins = next;
+      options.onAdded?.(parsed);
       return [...origins];
     },
   };

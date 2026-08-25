@@ -38,12 +38,6 @@ describe("run の入口", () => {
     expect(runner.performed.map((step) => step.action)).toEqual([{ kind: "open", url: ENTRY }]);
   });
 
-  it("列挙した origin を開く", async () => {
-    const runner = fakeRunner();
-    await session(runner).start();
-    expect(runner.performed[0]?.action).toEqual({ kind: "open", url: ENTRY });
-  });
-
   it("既に到達していれば冪等スキップで開き直さない", async () => {
     const runner = fakeRunner("/");
     const snapshot = await session(runner).start();

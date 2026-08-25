@@ -1,13 +1,27 @@
 import type { BrowserPort, BrowserSession } from "@screen-contract/core-execution";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createViewport } from "./session.js";
 
+/**
+ * fake が観測した副作用。
+ *
+ * **テストごとに戻す。** 手で 1 箇所ずつ戻すと、書き忘れた瞬間に実行順で
+ * 緑にも赤にもなる。
+ */
 let emit: ((uri: string) => void) | undefined;
 const sent: string[] = [];
 let closed = 0;
 const sizes: { width: number; height: number }[] = [];
 /** セッションを開く要求。認証の中身が「開く前」に渡ったかをここで見る。 */
 const requests: unknown[] = [];
+
+beforeEach(() => {
+  emit = undefined;
+  closed = 0;
+  sent.length = 0;
+  sizes.length = 0;
+  requests.length = 0;
+});
 
 /** Port の相手は fake を使う (context/testing.md)。 */
 function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number } {
@@ -17,7 +31,6 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
     sessions: 0,
     // 配信への接続も Port が持つ。app が WebSocket を直接開かない (ADR-0008)。
     connect: (_handle: unknown, onFrame: (uri: string) => void) => {
-      sent.length = 0;
       emit = onFrame;
       return {
         send: (payload: string) => void sent.push(payload),
@@ -49,8 +62,9 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
 }
 
 describe("createViewport", () => {
-  it("列挙した origin を開く", async () => {
-    // 列挙外へ open しない (ADR-0017)。
+  it("渡された entry を開く", async () => {
+    // **列挙の判定はここではない** (`createViewportControl` が持つ)。ここが
+    // 見るのは「渡された URL をそのまま開く」ことだけである。
     const browser = fakePort();
     const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
     await viewport.subscribe(() => undefined);
@@ -75,7 +89,6 @@ describe("createViewport", () => {
 
   it("全員が離れるまでセッションを閉じない", async () => {
     const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
-    closed = 0;
     const first = await viewport.subscribe(() => undefined);
     const second = await viewport.subscribe(() => undefined);
     await first.close();
@@ -101,13 +114,21 @@ describe("createViewport", () => {
     expect(sent).toEqual(["input_mouse"]);
   });
 
-  it("開けなければ握り潰さず投げ、後始末する", async () => {
-    // 必須データの欠落を隠さない。
+  it("開けなければ握り潰さず投げ、次で開き直せる", async () => {
+    // **投げるだけでは足りない。** 開きかけの Promise を残したままにすると、
+    // 2 度目の購読が同じ失敗を永久に掴み、二度と開けなくなる。
+    let attempts = 0;
     const browser = {
-      createSession: () => Promise.reject(new Error("開けません")),
+      connect: () => ({ send: () => undefined, close: () => undefined }),
+      createSession: () => {
+        attempts += 1;
+        return Promise.reject(new Error("開けません"));
+      },
     } as unknown as BrowserPort;
     const viewport = createViewport({ browser, entryUrl: "http://127.0.0.1:5174" });
     await expect(viewport.subscribe(() => undefined)).rejects.toThrow("開けません");
+    await expect(viewport.subscribe(() => undefined)).rejects.toThrow("開けません");
+    expect(attempts).toBe(2);
   });
 });
 
@@ -121,7 +142,6 @@ describe("対象と寸法の切り替え", () => {
   });
 
   it("viewport の寸法を変える", async () => {
-    sizes.length = 0;
     const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
     await viewport.subscribe(() => undefined);
     await viewport.setSize({ width: 375, height: 667 });
@@ -140,7 +160,6 @@ describe("認証状態", () => {
     // **注入は Port の中で行う** (ADR-0022)。開いた後に入れても、既に描画された
     // 画面は未ログインのままである。app が後から注入する形にすると、順序が
     // app 側の実装の約束になり、Port の契約から読めない。
-    requests.length = 0;
     const browser = fakePort();
     const storageState = { cookies: [{ name: "session" }], localStorage: {} };
     const viewport = createViewport({
@@ -156,7 +175,6 @@ describe("認証状態", () => {
   it("誰として実行しているかを Port へ渡す", async () => {
     // 匿名を名乗ったまま認証状態を注入すると、認証済みの結果が匿名の Baseline
     // へ混ざる (ADR-0022)。
-    requests.length = 0;
     const auth = { kind: "profile", name: "admin" } as never;
     const viewport = createViewport({
       browser: fakePort(),
@@ -169,7 +187,6 @@ describe("認証状態", () => {
   });
 
   it("無ければ注入しない", async () => {
-    requests.length = 0;
     const viewport = createViewport({
       browser: fakePort(),
       entryUrl: "http://127.0.0.1:5174",

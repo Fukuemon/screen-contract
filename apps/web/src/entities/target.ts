@@ -34,7 +34,14 @@ export const VIEWPORT_PRESETS: readonly ViewportPreset[] = [
   { id: "desktop", label: "デスクトップ", width: 1440, height: 900 },
 ];
 
-/** 実行してよい寸法か。0 以下や桁外れを対象へ渡さない。 */
+/**
+ * 実行してよい寸法か。
+ *
+ * **`packages/app` の `isValidViewport` と同じ規則を持つ。** `apps/web` は
+ * `packages/app` を参照できない (context/architecture.md の Runtime Boundary)
+ * ため、値を共有できない。**片方だけ変えない。** 判定の正本は server 側であり、
+ * ここは押す前に弾くための写しである。
+ */
 export function isValidViewport(size: {
   readonly width: number;
   readonly height: number;

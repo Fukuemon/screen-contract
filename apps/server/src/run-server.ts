@@ -86,6 +86,10 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
       allowedOrigins: createAllowedOrigins({
         config: createOriginsConfig(join(env.cwd, PRODUCT_CONFIG_NAME)),
         initial: allowedOrigins,
+        // 障害と重要な変更の一次観測点は標準出力である
+        // (context/infrastructure.md)。
+        onAdded: (origin) =>
+          console.error(`screen-contract-server: 実行してよい対象へ ${origin} を足しました`),
       }),
       authProfiles,
       setActiveProfile: (name) => {

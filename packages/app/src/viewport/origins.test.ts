@@ -90,3 +90,44 @@ describe("列挙の追加", () => {
     expect(s.saved()["allowedOrigins"]).toBeUndefined();
   });
 });
+
+describe("追加の記録", () => {
+  it("足したことを記録へ残す", () => {
+    // 対象の範囲が広がったことに、利用者が気付く契機を設定ファイルの差分だけに
+    // しない (ADR-0017)。
+    const config = fakeConfig();
+    const added: string[] = [];
+    const origins = createAllowedOrigins({
+      config: config.port,
+      initial: [],
+      onAdded: (origin) => added.push(origin),
+    });
+    origins.add("https://example.test/");
+    // 記録するのは正規化した後の値。入力そのままだと照合と食い違う。
+    expect(added).toEqual(["https://example.test"]);
+  });
+
+  it("既にあるものは記録しない", () => {
+    const config = fakeConfig();
+    const added: string[] = [];
+    const origins = createAllowedOrigins({
+      config: config.port,
+      initial: ["https://example.test"],
+      onAdded: (origin) => added.push(origin),
+    });
+    origins.add("https://example.test");
+    expect(added).toEqual([]);
+  });
+
+  it("弾いた入力は記録しない", () => {
+    const config = fakeConfig();
+    const added: string[] = [];
+    const origins = createAllowedOrigins({
+      config: config.port,
+      initial: [],
+      onAdded: (origin) => added.push(origin),
+    });
+    expect(() => origins.add("https://example.test/path")).toThrow();
+    expect(added).toEqual([]);
+  });
+});

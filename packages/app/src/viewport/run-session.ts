@@ -349,8 +349,9 @@ export function createRunSession(options: RunSessionOptions): RunSession {
           observe(),
         ]);
         return {
+          // title は取得経路が無い。空文字で埋めると比較が一度も発火しない
+          // まま実装済みに見えるため、持たせない。
           url: new URL(url).pathname,
-          title: "",
           visibleRefs: elements.map((element) =>
             nextId({ role: element.role, name: element.name }),
           ),

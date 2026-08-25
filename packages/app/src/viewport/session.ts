@@ -57,6 +57,8 @@ export interface Viewport {
    */
   resolveAt(point: { readonly x: number; readonly y: number }): Promise<PickedElement | undefined>;
   observe(): Promise<readonly ObservedElement[]>;
+  /** 最初に開く URL。run の 1 ステップはここへの `open` になる。 */
+  entryUrl(): string;
   /** 対象ページのコンソール出力。 */
   consoleMessages(): Promise<readonly ConsoleMessage[]>;
   /**
@@ -133,6 +135,7 @@ export function createViewport(options: ViewportOptions): Viewport {
   }
 
   return {
+    entryUrl: () => options.entryUrl,
     navigate: async (url) => required().perform({ kind: "open", url }),
 
     authWarnings(): readonly string[] {
@@ -218,10 +221,13 @@ export function createViewport(options: ViewportOptions): Viewport {
 }
 
 /**
- * 実行してよい寸法か。
+ * 実行してよい寸法か。**判定の正本はここである。**
  *
  * **0 以下や桁外れを対象へ渡さない。** 渡すと実行基盤側で失敗し、原因が
  * 読めない。下限は responsive の最小分岐より小さい値、上限は現実的な画面幅。
+ *
+ * `apps/web/src/entities/target.ts` に同じ規則の写しがある (web は app を
+ * 参照できない)。**片方だけ変えない。**
  */
 export function isValidViewport(size: {
   readonly width: number;
