@@ -1,24 +1,17 @@
 #!/usr/bin/env node
-import { compose } from "../compose.js";
+import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { runServer } from "../startup/run-server.js";
 
-/**
- * Workflow Server のプロセス入口。
- *
- * **まだ listen しない。** framework は Hono に確定しているが (ADR-0024)、
- * まだ組み込んでいない。**未確定だから保留しているのではない。**
- * 127.0.0.1 への bind、ローカルトークンの要求、Origin 検査、起動時の検査は、
- * listen の実装と同時に入れる (ADR-0021 / context/infrastructure.md)。
- *
- * 未実装のまま成功終了しない。0 を返すと、起動したつもりの利用者と
- * 起動を待つ検査の両方が気付けない。
- */
-function main(): void {
-  const app = compose();
-  const surfaces = Object.keys(app).join(" / ");
-  process.stderr.write(
-    `screen-contract-server: ${surfaces} を組み立てました。listen は未実装です。\n`,
-  );
-  process.exitCode = 1;
-}
+/** Workflow Server のプロセス入口。判断は runServer にあり、ここは環境を渡すだけ。 */
+const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
-main();
+const result = runServer({
+  home: homedir(),
+  xdgStateHome: process.env["XDG_STATE_HOME"],
+  cwd: process.cwd(),
+  forbiddenRoots: [repoRoot],
+});
+
+process.stderr.write(result.stderr);
+process.exitCode = result.exitCode;

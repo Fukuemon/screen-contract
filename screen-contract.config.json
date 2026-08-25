@@ -1,0 +1,4 @@
+{
+  "$comment": "プロダクト設定。secret ではないためレビューできる場所に置く (context/infrastructure.md)。",
+  "allowedOrigins": []
+}

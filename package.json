@@ -18,8 +18,9 @@
     "test:integration": "turbo run test:integration",
     "e2e": "turbo run e2e",
     "check": "pnpm lint && pnpm format && pnpm test && pnpm build",
-    "boundaries": "turbo run build && depcruise apps/*/src packages/*/src packages/config/vitest e2e/src",
-    "knip": "knip"
+    "boundaries": "turbo run build && depcruise apps/*/src packages/*/src packages/*/scripts packages/config/vitest e2e/src",
+    "knip": "knip",
+    "browser:install": "pnpm --filter @screen-contract/adapter-browser run browser:install"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@^7.0.2",

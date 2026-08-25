@@ -1,3 +1,5 @@
+export { isChromeAvailable, resolveChromeInstall, type ChromeInstall } from "./chrome.js";
+
 import type { AuthContext, BrowserPort, BrowserSession } from "@screen-contract/core-execution";
 
 /**
