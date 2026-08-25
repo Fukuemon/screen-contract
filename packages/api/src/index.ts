@@ -14,6 +14,7 @@ export type {
   ElementId,
   ExecutionEvent,
   ObservedElement,
+  PageInput,
   PickedElement,
   RecordedStep,
   SemanticLocator,
@@ -40,7 +41,6 @@ export {
   type AuthRejection,
   type OriginPolicy,
 } from "./auth.js";
-export { relayableInput } from "./relayable-input.js";
 export {
   createStreamProxy,
   discardReason,
@@ -54,7 +54,8 @@ export {
   type StreamMode,
   type StreamProxy,
   type StreamProxyDeps,
-  type StreamSink,
+  type FrameSink,
+  type InputSink,
 } from "./stream.js";
 
 import { parseStartRunInput, type UseCases } from "@screen-contract/app";

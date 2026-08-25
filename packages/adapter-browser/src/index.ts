@@ -23,7 +23,12 @@ export {
 } from "./cli.js";
 export { readObservedElements } from "./session.js";
 export { AgentBrowserError } from "./error.js";
-export { connectStream, type ConnectStreamOptions, type StreamClient } from "./stream.js";
+export {
+  connectStream,
+  toAgentBrowserInput,
+  type ConnectStreamOptions,
+  type StreamClient,
+} from "./stream.js";
 import { connectStream } from "./stream.js";
 
 /**

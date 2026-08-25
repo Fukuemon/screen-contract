@@ -122,13 +122,13 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
            * 依存検査の効かない場所に入り、単体テストも当たらない (ADR-0023)。
            */
           upstream: {
-            send: (payload) => {
+            send: (input) => {
               if (session === undefined) {
-                subscription?.send(payload);
+                subscription?.send(input);
                 return;
               }
               void session
-                .handleInput(payload, () => subscription?.send(payload))
+                .handleInput(input, () => subscription?.send(input))
                 .catch(() => {
                   // **黙って捨てない。** 捨てると「操作は効いたのに手順が
                   // 記録されていない」が無音で起きる。中身は出さない。

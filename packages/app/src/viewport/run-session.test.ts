@@ -188,8 +188,9 @@ describe("構成番号", () => {
 });
 
 describe("入力の記録と転送", () => {
-  const press = (x: number, y: number): string =>
-    JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x, y });
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const press = (x: number, y: number) =>
+    ({ kind: "pointer", phase: "down", x, y, button: "left", modifiers: NONE }) as const;
   const box = (x: number, y: number) => ({ x, y, width: 10, height: 10 });
 
   /**
@@ -292,22 +293,16 @@ describe("入力の記録と転送", () => {
     await s.start();
     s.setMode("operate");
     s.setRecording(true);
-    for (const eventType of ["mouseMoved", "mouseReleased", "mouseWheel"]) {
-      await s.handleInput(
-        JSON.stringify({ type: "input_mouse", eventType, x: 5, y: 5 }),
-        () => (page.forwards += 1),
-      );
+    const others = [
+      { kind: "pointer", phase: "move", x: 5, y: 5, button: "none", modifiers: NONE },
+      { kind: "pointer", phase: "up", x: 5, y: 5, button: "left", modifiers: NONE },
+      { kind: "scroll", x: 5, y: 5, dx: 0, dy: 10, modifiers: NONE },
+    ] as const;
+    for (const input of others) {
+      await s.handleInput(input, () => (page.forwards += 1));
     }
     expect(page.forwards).toBe(3);
     expect(s.snapshot().steps).toEqual([]);
-  });
-
-  it("解釈できない payload も転送する", async () => {
-    const page = fakePage([]);
-    const s = recording(page);
-    await s.start();
-    await s.handleInput("{", () => (page.forwards += 1));
-    expect(page.forwards).toBe(1);
   });
 
   it("解決できない座標を clickPoint と警告で残す", async () => {

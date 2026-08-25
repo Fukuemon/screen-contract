@@ -116,6 +116,19 @@ flowchart TD
 
 Store Port を app に置くのは保存が機能横断のためであり、**例外はこの 1 つに限る**。adapter/ai を MVP で実装しない判断は [adr/0019](../adr/0019-agent-led-ai-suggestions.md)。
 
+### 対象ページへ届ける入力の語彙
+
+Stream Proxy が中継する入力は **Browser Port の語彙 (`PageInput`) で表す**。実行基盤の生の形 (CDP の `input_mouse` / `mousePressed` / 修飾キーのビットフラグ) を interface 層 (api / web) へ持ち込まない。持ち込むと、基盤を差し替えたときに adapter だけでなく api と web を直すことになり、[adr/0013](../adr/0013-browser-port.md) の差し替え可能性が失われる。
+
+| 層              | 担うこと                                                      |
+| --------------- | ------------------------------------------------------------- |
+| core/execution  | 語彙の定義と、外部入力からの `parsePageInput`                 |
+| api             | 中継条件の判定 (ADR-0008)。**組み直したものだけを上流へ渡す** |
+| adapter/browser | 実行基盤の語彙への写像。**この写像は adapter の外に出さない** |
+| web             | 中立の語彙で組み立てる                                        |
+
+`parsePageInput` は列挙に無い形を落とす。素通しにすると、認証を通した client が実行基盤の配信ソケットへ任意の命令を送れる — 中継の口は「操作モードのマウスとキー入力」のためにある。
+
 ### 合成ルートの責務
 
 `apps/server` は次だけを担い、ドメインロジックと use case を持たない。

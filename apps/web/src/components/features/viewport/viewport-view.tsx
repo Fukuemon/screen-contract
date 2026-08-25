@@ -12,13 +12,13 @@ import type {
   PickedElementView,
 } from "../../../gateways/workflow-server.js";
 import {
-  mouseInput,
+  pointerInput,
+  scrollInput,
   toViewportPoint,
-  wheelInput,
-  type MouseEventType,
-  type MouseInput,
   type Point,
+  type PointerPhase,
 } from "../../../entities/input.js";
+import type { PageInput } from "@screen-contract/api";
 import { Badge } from "../../ui/badge.js";
 import { Button } from "../../ui/button.js";
 import { cn } from "../../../lib/cn.js";
@@ -36,7 +36,7 @@ export interface ViewportViewProps {
   readonly picked: PickedElementView | undefined;
   readonly pickFailed: boolean;
   readonly onModeChange: (mode: "view" | "operate") => void;
-  readonly onPageInput: (input: MouseInput) => void;
+  readonly onPageInput: (input: PageInput) => void;
   readonly onPick: (point: Point) => void;
   readonly onSize: (size: { width: number; height: number }) => void;
   readonly overlay: boolean;
@@ -77,18 +77,18 @@ export function ViewportView(props: ViewportViewProps) {
   const { forwards, onPick, onPageInput } = props;
 
   const send = useCallback(
-    (event: ReactMouseEvent, eventType: MouseEventType) => {
+    (event: ReactMouseEvent, phase: PointerPhase) => {
       const point = pointOf(event);
       if (point === undefined) {
         return;
       }
       if (!forwards) {
-        if (eventType === "mousePressed") {
+        if (phase === "down") {
           onPick(point);
         }
         return;
       }
-      onPageInput(mouseInput(eventType, point, event.button, event));
+      onPageInput(pointerInput(phase, point, event.button, event));
     },
     [forwards, onPageInput, onPick, pointOf],
   );
@@ -105,7 +105,7 @@ export function ViewportView(props: ViewportViewProps) {
         return;
       }
       event.preventDefault();
-      onPageInput(wheelInput(point, { deltaX: event.deltaX, deltaY: event.deltaY }, event));
+      onPageInput(scrollInput(point, { deltaX: event.deltaX, deltaY: event.deltaY }, event));
     };
     frame.addEventListener("wheel", onWheel, { passive: false });
     return () => frame.removeEventListener("wheel", onWheel);
@@ -202,11 +202,11 @@ export function ViewportView(props: ViewportViewProps) {
                 "block rounded border border-line/60 shadow-2xl",
                 forwards ? "cursor-crosshair" : "cursor-pointer",
               )}
-              onMouseDown={(event) => send(event, "mousePressed")}
-              onMouseUp={(event) => send(event, "mouseReleased")}
+              onMouseDown={(event) => send(event, "down")}
+              onMouseUp={(event) => send(event, "up")}
               onMouseMove={(event) => {
                 if (forwards) {
-                  send(event, "mouseMoved");
+                  send(event, "move");
                 }
               }}
               onContextMenu={(event) => event.preventDefault()}

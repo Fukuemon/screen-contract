@@ -4,21 +4,27 @@ import {
   createStreamProxy,
   type RunState,
   type StreamProxy,
-  type StreamSink,
+  type FrameSink,
+  type InputSink,
 } from "./index.js";
 
 const TOKEN = "a".repeat(64);
 
-function sink(): StreamSink & { readonly sent: string[] } {
+function inputSink(): InputSink & { readonly sent: string[] } {
   const sent: string[] = [];
-  return { sent, send: (payload) => void sent.push(payload) };
+  return { sent, send: (input) => void sent.push(JSON.stringify(input)) };
+}
+
+function frameSink(): FrameSink & { readonly sent: string[] } {
+  const sent: string[] = [];
+  return { sent, send: (frame) => void sent.push(frame) };
 }
 
 function setup(state: RunState | undefined = { runId: "run-1", paused: true, mode: "operate" }) {
-  const upstream = sink();
+  const upstream = inputSink();
   const proxy: StreamProxy = createStreamProxy({
     upstream,
-    downstream: sink(),
+    downstream: frameSink(),
     runState: { current: () => state },
   });
   return { upstream, proxy, connection: createStreamConnection({ token: TOKEN, proxy }) };
@@ -26,7 +32,15 @@ function setup(state: RunState | undefined = { runId: "run-1", paused: true, mod
 
 const AUTH = JSON.stringify({ kind: "auth", token: TOKEN, runId: "run-1" });
 /** 中継してよい語彙の入力。列挙外の形は Stream Proxy 側が拒む。 */
-const CLICK = JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2 });
+const CLICK = JSON.stringify({ kind: "pointer", phase: "down", x: 1, y: 2, button: "left" });
+const RELAYED = JSON.stringify({
+  kind: "pointer",
+  phase: "down",
+  x: 1,
+  y: 2,
+  button: "left",
+  modifiers: { alt: false, ctrl: false, meta: false, shift: false },
+});
 const INPUT = JSON.stringify({ kind: "input", payload: CLICK });
 
 describe("接続後の最初のフレームで認証する", () => {
@@ -60,7 +74,7 @@ describe("接続後の最初のフレームで認証する", () => {
       "already-authenticated",
     );
     connection.receive(INPUT);
-    expect(upstream.sent).toEqual([CLICK]);
+    expect(upstream.sent).toEqual([RELAYED]);
   });
 
   it.each([
@@ -82,7 +96,7 @@ describe("認証後の中継", () => {
     const { connection, upstream } = setup();
     connection.receive(AUTH);
     expect(connection.receive(INPUT)).toBeUndefined();
-    expect(upstream.sent).toEqual([CLICK]);
+    expect(upstream.sent).toEqual([RELAYED]);
   });
 
   it("再生中の入力は認証を通っていても転送しない", () => {

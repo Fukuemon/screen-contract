@@ -1,4 +1,5 @@
 import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
+import type { PageInput } from "@screen-contract/core-execution";
 import type { RunState, StreamMode } from "./run-state.js";
 import {
   startRecording,
@@ -87,24 +88,11 @@ function same(a: RecordedObservation, b: RecordedObservation): boolean {
  * 記録の対象になる入力か。
  *
  * **記録するのは押下だけである。** 移動と離すまで記録すると、1 クリックが
- * 3 手順になる。
+ * 3 手順になる。スクロールとキー入力も 1 手順に数えない。
  */
-function pressPointOf(payload: string): { readonly x: number; readonly y: number } | undefined {
-  let value: unknown;
-  try {
-    value = JSON.parse(payload);
-  } catch {
-    return undefined;
-  }
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-  const { type, eventType, x, y } = value as Record<string, unknown>;
-  return type === "input_mouse" &&
-    eventType === "mousePressed" &&
-    typeof x === "number" &&
-    typeof y === "number"
-    ? { x, y }
+function pressPointOf(input: PageInput): { readonly x: number; readonly y: number } | undefined {
+  return input.kind === "pointer" && input.phase === "down"
+    ? { x: input.x, y: input.y }
     : undefined;
 }
 
@@ -165,10 +153,10 @@ export interface RunSession {
    *
    * 記録しないときも転送はする。記録の有無で操作が効いたり効かなかったりしない。
    *
-   * @param payload - 中継してよいと判定済みの入力
+   * @param input - 中継してよいと判定済みの入力
    * @param forward - 対象ページへ届ける手段
    */
-  handleInput(payload: string, forward: () => void): Promise<void>;
+  handleInput(input: PageInput, forward: () => void): Promise<void>;
   /** run を起こす。1 ステップ実行して `paused` に入る。 */
   start(): Promise<ViewportSnapshot>;
   resume(): Promise<ViewportSnapshot>;
@@ -318,8 +306,8 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       return snapshot();
     },
 
-    async handleInput(payload: string, forward: () => void): Promise<void> {
-      const point = pressPointOf(payload);
+    async handleInput(input: PageInput, forward: () => void): Promise<void> {
+      const point = pressPointOf(input);
       // 記録していないときも転送する。記録の有無で操作が効いたり効かなくなったり
       // しない。押下以外 (移動・離す・ホイール) は 1 手順に数えない — 数えると
       // 1 クリックが 3 手順になる。

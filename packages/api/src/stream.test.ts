@@ -1,19 +1,30 @@
 import { describe, expect, it } from "vitest";
-import { createStreamProxy, discardReason, type RunState, type StreamSink } from "./index.js";
+import {
+  createStreamProxy,
+  discardReason,
+  type RunState,
+  type FrameSink,
+  type InputSink,
+} from "./index.js";
 
 function state(overrides: Partial<RunState> = {}): RunState {
   return { runId: "run-1", paused: true, mode: "operate", ...overrides };
 }
 
-function sink(): StreamSink & { readonly sent: string[] } {
+function inputSink(): InputSink & { readonly sent: string[] } {
   const sent: string[] = [];
-  return { sent, send: (payload) => void sent.push(payload) };
+  return { sent, send: (input) => void sent.push(JSON.stringify(input)) };
+}
+
+function frameSink(): FrameSink & { readonly sent: string[] } {
+  const sent: string[] = [];
+  return { sent, send: (frame) => void sent.push(frame) };
 }
 
 /** `current` を必須にする。既定値にすると、undefined を明示しても既定が効く。 */
 function proxy(current: RunState | undefined) {
-  const upstream = sink();
-  const downstream = sink();
+  const upstream = inputSink();
+  const downstream = frameSink();
   return {
     upstream,
     downstream,
@@ -23,14 +34,25 @@ function proxy(current: RunState | undefined) {
 
 const MINE = { requesterRunId: "run-1" };
 
+const NONE = { alt: false, ctrl: false, meta: false, shift: false };
 /** 中継してよい語彙の入力。列挙外の形は中継そのものが拒む。 */
-const CLICK = JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2 });
-const WHEEL = JSON.stringify({
-  type: "input_mouse",
-  eventType: "mouseWheel",
+const CLICK = JSON.stringify({ kind: "pointer", phase: "down", x: 1, y: 2, button: "left" });
+const RELAYED_CLICK = JSON.stringify({
+  kind: "pointer",
+  phase: "down",
   x: 1,
   y: 2,
-  deltaY: -120,
+  button: "left",
+  modifiers: NONE,
+});
+const WHEEL = JSON.stringify({ kind: "scroll", x: 1, y: 2, dx: 0, dy: -120 });
+const RELAYED_WHEEL = JSON.stringify({
+  kind: "scroll",
+  x: 1,
+  y: 2,
+  dx: 0,
+  dy: -120,
+  modifiers: NONE,
 });
 
 describe("中継してよい語彙", () => {
@@ -38,7 +60,7 @@ describe("中継してよい語彙", () => {
     // 認証を通した client が実行基盤の配信ソケットへ任意の命令を送れると、
     // 中継の口が実行基盤の全機能を開ける口になる (ADR-0008)。
     const { upstream, proxy: p } = proxy(state());
-    expect(p.forwardInput(MINE, JSON.stringify({ type: "eval", expression: "1" }))).toEqual({
+    expect(p.forwardInput(MINE, JSON.stringify({ kind: "eval", expression: "1" }))).toEqual({
       kind: "input-discarded",
       reason: "bad-input",
       requesterRunId: "run-1",
@@ -50,16 +72,16 @@ describe("中継してよい語彙", () => {
     // スクロールは要素選択の前提であり、画面の外にある要素へ届くために要る。
     const { upstream, proxy: p } = proxy(state({ mode: "view" }));
     expect(p.forwardInput(MINE, WHEEL)).toBeUndefined();
-    expect(upstream.sent).toEqual([WHEEL]);
+    expect(upstream.sent).toEqual([RELAYED_WHEEL]);
   });
 
   it("列挙に無い項目を混ぜても、そのままは送らない", () => {
     const { upstream, proxy: p } = proxy(state());
     p.forwardInput(
       MINE,
-      JSON.stringify({ type: "input_mouse", eventType: "mousePressed", x: 1, y: 2, script: "x" }),
+      JSON.stringify({ kind: "pointer", phase: "down", x: 1, y: 2, button: "left", script: "x" }),
     );
-    expect(upstream.sent).toEqual([CLICK]);
+    expect(upstream.sent).toEqual([RELAYED_CLICK]);
   });
 });
 
@@ -67,7 +89,7 @@ describe("中継条件", () => {
   it("条件を満たす入力を転送する", () => {
     const { upstream, proxy: p } = proxy(state());
     expect(p.forwardInput(MINE, CLICK)).toBeUndefined();
-    expect(upstream.sent).toEqual([CLICK]);
+    expect(upstream.sent).toEqual([RELAYED_CLICK]);
   });
 
   it.each([

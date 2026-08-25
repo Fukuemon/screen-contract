@@ -12,6 +12,7 @@ import type {
   ConsoleMessage,
   Observation,
   StepRunner,
+  PageInput,
   StorageState,
   StreamRelay,
 } from "@screen-contract/core-execution";
@@ -28,7 +29,8 @@ export interface PickedElement {
 }
 
 export interface ViewportSubscription {
-  send(payload: string): void;
+  /** 対象ページへ入力を届ける。実行基盤の語彙への写像は adapter が担う。 */
+  send(input: PageInput): void;
   close(): Promise<void>;
 }
 

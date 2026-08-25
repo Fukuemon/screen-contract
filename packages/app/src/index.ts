@@ -172,9 +172,11 @@ export { stateKeyOf } from "./viewport/state-key.js";
  * interface は core / domain へ直接依存できない (context/architecture.md)。
  * 表示や応答に要る型は app が窓口になる。**値は中継しない。**
  */
+export { parsePageInput } from "@screen-contract/core-execution";
 export type {
   BoundingBox,
   ConsoleMessage,
+  PageInput,
   EvaluationPhase,
   ExecutionEvent,
   ObservedElement,

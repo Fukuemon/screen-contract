@@ -9,7 +9,7 @@
 // 語彙の正本は app にある。run を保持している側が定め、Stream Proxy は読むだけ。
 export type { RunState, StreamMode } from "@screen-contract/app";
 import type { RunState } from "@screen-contract/app";
-import { relayableInput } from "./relayable-input.js";
+import { parsePageInput, type PageInput } from "@screen-contract/app";
 
 /** client が名乗った主張。信用しない値はここにだけ入る。 */
 export interface RelayClaim {
@@ -58,17 +58,8 @@ export interface InputDiscarded {
  */
 export type InputKind = "scroll" | "operation";
 
-export function inputKindOf(payload: string): InputKind {
-  try {
-    const value: unknown = JSON.parse(payload);
-    return typeof value === "object" &&
-      value !== null &&
-      (value as Record<string, unknown>)["eventType"] === "mouseWheel"
-      ? "scroll"
-      : "operation";
-  } catch {
-    return "operation";
-  }
+export function inputKindOf(input: PageInput): InputKind {
+  return input.kind === "scroll" ? "scroll" : "operation";
 }
 
 export function discardReason(
@@ -93,9 +84,19 @@ export function discardReason(
   return undefined;
 }
 
-/** 中継先。agent-browser の WebSocket を adapter が包んだもの。 */
-export interface StreamSink {
-  send(payload: string): void;
+/**
+ * 上流 (対象ブラウザ) への入力。実行基盤の配信を adapter が包んだもの。
+ *
+ * **映像と型を分ける。** 1 つの `send` にすると、方向の違う 2 つの値が同じ口を
+ * 通り、片方の語彙をもう片方へ渡しても型検査が鳴らない。
+ */
+export interface InputSink {
+  send(input: PageInput): void;
+}
+
+/** 下流 (Web UI) への映像。1 フレームぶんの data URI。 */
+export interface FrameSink {
+  send(frame: string): void;
 }
 
 export interface StreamProxy {
@@ -111,9 +112,9 @@ export interface StreamProxy {
 
 export interface StreamProxyDeps {
   /** ブラウザ側への入力転送。 */
-  readonly upstream: StreamSink;
+  readonly upstream: InputSink;
   /** Web UI 側への映像配信。 */
-  readonly downstream: StreamSink;
+  readonly downstream: FrameSink;
   /** 中継条件の判定に使う、server 側の run 状態。 */
   readonly runState: RunStateSource;
 }
@@ -151,16 +152,16 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
       }
 
       // **語彙の検査を先に行う。** 中継条件を満たしていても、列挙に無い形は
-      // 送らない。組み直した payload だけを上流へ渡す。
-      const relayable = relayableInput(payload);
-      if (relayable === undefined) {
+      // 送らない。組み直したものだけを上流へ渡す。
+      const input = parsePageInput(payload);
+      if (input === undefined) {
         return discard("bad-input");
       }
-      const reason = discardReason(deps.runState.current(), claim, inputKindOf(payload));
+      const reason = discardReason(deps.runState.current(), claim, inputKindOf(input));
       if (reason !== undefined) {
         return discard(reason);
       }
-      deps.upstream.send(relayable);
+      deps.upstream.send(input);
       return undefined;
     },
 

@@ -33,7 +33,7 @@ function fakePort(): BrowserPort & { readonly opened: string[]; sessions: number
     connect: (_handle: unknown, onFrame: (uri: string) => void) => {
       emit = onFrame;
       return {
-        send: (payload: string) => void sent.push(payload),
+        send: (input: { kind: string }) => void sent.push(JSON.stringify(input)),
         close: () => void (closed += 1),
       };
     },
@@ -110,8 +110,16 @@ describe("createViewport", () => {
   it("入力を対象セッションへ転送する", async () => {
     const viewport = createViewport({ browser: fakePort(), entryUrl: "http://127.0.0.1:5174" });
     const subscription = await viewport.subscribe(() => undefined);
-    subscription.send("input_mouse");
-    expect(sent).toEqual(["input_mouse"]);
+    const input = {
+      kind: "pointer",
+      phase: "down",
+      x: 1,
+      y: 2,
+      button: "left",
+      modifiers: { alt: false, ctrl: false, meta: false, shift: false },
+    } as const;
+    subscription.send(input);
+    expect(sent).toEqual([JSON.stringify(input)]);
   });
 
   it("開けなければ握り潰さず投げ、次で開き直せる", async () => {

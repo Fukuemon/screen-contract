@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cdpButton, cdpModifiers, mouseInput, toViewportPoint, wheelInput } from "./input.js";
+import { buttonOf, modifiersOf, pointerInput, scrollInput, toViewportPoint } from "./input.js";
 
 const RECT = { left: 100, top: 50, width: 640, height: 360 };
 const VIEWPORT = { width: 1280, height: 720 };
@@ -24,64 +24,66 @@ describe("toViewportPoint", () => {
   });
 });
 
-describe("CDP への写像", () => {
+describe("入力の組み立て", () => {
+  const NONE = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
+
   it("ボタンを名前へ写す", () => {
-    expect(cdpButton(0)).toBe("left");
-    expect(cdpButton(1)).toBe("middle");
-    expect(cdpButton(2)).toBe("right");
-    expect(cdpButton(9)).toBe("none");
+    expect(buttonOf(0)).toBe("left");
+    expect(buttonOf(1)).toBe("middle");
+    expect(buttonOf(2)).toBe("right");
+    expect(buttonOf(9)).toBe("none");
   });
 
-  it("修飾キーをビットフラグへ写す", () => {
-    const none = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
-    expect(cdpModifiers(none)).toBe(0);
-    expect(cdpModifiers({ ...none, altKey: true })).toBe(1);
-    expect(cdpModifiers({ ...none, ctrlKey: true })).toBe(2);
-    expect(cdpModifiers({ ...none, metaKey: true })).toBe(4);
-    expect(cdpModifiers({ ...none, shiftKey: true })).toBe(8);
-    expect(cdpModifiers({ altKey: true, ctrlKey: true, metaKey: true, shiftKey: true })).toBe(15);
+  it("修飾キーを名前で持つ", () => {
+    // **ビットフラグを画面で作らない。** 実行基盤の都合であり、基盤を
+    // 差し替えると意味が変わる (ADR-0013)。
+    expect(modifiersOf(NONE)).toEqual({ alt: false, ctrl: false, meta: false, shift: false });
+    expect(modifiersOf({ ...NONE, shiftKey: true })).toMatchObject({ shift: true });
   });
 
-  it("押下だけがクリック回数を持つ", () => {
-    // 離す側に入れると二重に数える。
-    const none = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
-    expect(mouseInput("mousePressed", { x: 1, y: 2 }, 0, none).clickCount).toBe(1);
-    expect(mouseInput("mouseReleased", { x: 1, y: 2 }, 0, none).clickCount).toBe(0);
-    expect(mouseInput("mouseMoved", { x: 1, y: 2 }, 0, none).clickCount).toBe(0);
+  it("押下を組み立てる", () => {
+    expect(pointerInput("down", { x: 1, y: 2 }, 0, NONE)).toEqual({
+      kind: "pointer",
+      phase: "down",
+      x: 1,
+      y: 2,
+      button: "left",
+      modifiers: { alt: false, ctrl: false, meta: false, shift: false },
+    });
   });
 
   it("入力に秘密情報を載せない", () => {
-    const none = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
-    expect(Object.keys(mouseInput("mousePressed", { x: 1, y: 2 }, 0, none)).sort()).toEqual([
+    // 送る項目を増やすときは、対象ページへ渡ってよい値かを見る。
+    expect(Object.keys(pointerInput("down", { x: 1, y: 2 }, 0, NONE)).sort()).toEqual([
       "button",
-      "clickCount",
-      "eventType",
+      "kind",
       "modifiers",
-      "type",
+      "phase",
       "x",
       "y",
     ]);
   });
+
+  it("実行基盤の語彙を持たない", () => {
+    // CDP の `input_mouse` / `mousePressed` / ビットフラグが混ざっていたら、
+    // 基盤を差し替えたときに画面まで直すことになる。
+    const serialized = JSON.stringify(pointerInput("down", { x: 1, y: 2 }, 0, NONE));
+    expect(serialized).not.toContain("input_mouse");
+    expect(serialized).not.toContain("mousePressed");
+  });
 });
 
-describe("wheelInput", () => {
+describe("scrollInput", () => {
   const NONE = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
 
   it("スクロール量を載せる", () => {
-    expect(wheelInput({ x: 10, y: 20 }, { deltaX: 0, deltaY: 120 }, NONE)).toEqual({
-      type: "input_mouse",
-      eventType: "mouseWheel",
+    expect(scrollInput({ x: 10, y: 20 }, { deltaX: 0, deltaY: 120 }, NONE)).toEqual({
+      kind: "scroll",
       x: 10,
       y: 20,
-      button: "none",
-      clickCount: 0,
-      modifiers: 0,
-      deltaX: 0,
-      deltaY: 120,
+      dx: 0,
+      dy: 120,
+      modifiers: { alt: false, ctrl: false, meta: false, shift: false },
     });
-  });
-
-  it("ボタンを押さない", () => {
-    expect(wheelInput({ x: 1, y: 1 }, { deltaX: 5, deltaY: -5 }, NONE).button).toBe("none");
   });
 });

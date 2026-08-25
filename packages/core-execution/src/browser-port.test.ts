@@ -71,7 +71,14 @@ describe("BrowserPort の契約", () => {
     const relay = fakePort([]).connect({ endpoint: "ws://127.0.0.1:1/" }, (frame) =>
       frames.push(frame),
     );
-    relay.send("{}");
+    relay.send({
+      kind: "pointer",
+      phase: "down",
+      x: 1,
+      y: 2,
+      button: "left",
+      modifiers: { alt: false, ctrl: false, meta: false, shift: false },
+    });
     relay.close();
     expect(frames).toEqual([]);
   });

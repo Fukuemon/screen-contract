@@ -1,8 +1,14 @@
+import type { PageInput } from "@screen-contract/api";
+
 /**
- * viewport のマウス入力を CDP の座標へ写す。
+ * viewport のマウス入力を対象ページの座標へ写す。
  *
  * **表示は縮尺されている。** `<img>` の実寸ではなく viewport の論理サイズへ
  * 変換しないと、対象ページの別の場所を押すことになる。
+ *
+ * **実行基盤の語彙を組み立てない。** CDP の `input_mouse` や修飾キーのビット
+ * フラグをここで作ると、基盤を差し替えたときに画面まで直すことになる
+ * (ADR-0013)。写像は adapter に閉じる。
  */
 
 export interface Rect {
@@ -37,10 +43,10 @@ export function toViewportPoint(
   };
 }
 
-export type MouseEventType = "mousePressed" | "mouseReleased" | "mouseMoved" | "mouseWheel";
+export type PointerPhase = "down" | "up" | "move";
 
-/** CDP のボタン名。既定は左。 */
-export function cdpButton(button: number): "left" | "middle" | "right" | "none" {
+/** DOM の `MouseEvent.button`。既定は左。 */
+export function buttonOf(button: number): "left" | "middle" | "right" | "none" {
   switch (button) {
     case 0:
       return "left";
@@ -60,61 +66,43 @@ export interface Modifiers {
   readonly shiftKey: boolean;
 }
 
-/** CDP の修飾キーはビットフラグ (Alt=1, Ctrl=2, Meta=4, Shift=8)。 */
-export function cdpModifiers(event: Modifiers): number {
-  return (
-    (event.altKey ? 1 : 0) |
-    (event.ctrlKey ? 2 : 0) |
-    (event.metaKey ? 4 : 0) |
-    (event.shiftKey ? 8 : 0)
-  );
+export function modifiersOf(event: Modifiers) {
+  return {
+    alt: event.altKey,
+    ctrl: event.ctrlKey,
+    meta: event.metaKey,
+    shift: event.shiftKey,
+  };
 }
 
-export interface MouseInput {
-  readonly type: "input_mouse";
-  readonly eventType: MouseEventType;
-  readonly x: number;
-  readonly y: number;
-  readonly button: string;
-  readonly clickCount: number;
-  readonly modifiers: number;
-  readonly deltaX?: number;
-  readonly deltaY?: number;
-}
-
-export function mouseInput(
-  eventType: MouseEventType,
+export function pointerInput(
+  phase: PointerPhase,
   point: Point,
   button: number,
   modifiers: Modifiers,
-): MouseInput {
+): PageInput {
   return {
-    type: "input_mouse",
-    eventType,
+    kind: "pointer",
+    phase,
     x: point.x,
     y: point.y,
-    button: cdpButton(button),
-    // 押下だけが「何回目のクリックか」を持つ。離す側に入れると二重に数える。
-    clickCount: eventType === "mousePressed" ? 1 : 0,
-    modifiers: cdpModifiers(modifiers),
+    button: buttonOf(button),
+    modifiers: modifiersOf(modifiers),
   };
 }
 
 /** ホイールを対象ページのスクロールとして送る。 */
-export function wheelInput(
+export function scrollInput(
   point: Point,
   delta: { readonly deltaX: number; readonly deltaY: number },
   modifiers: Modifiers,
-): MouseInput {
+): PageInput {
   return {
-    type: "input_mouse",
-    eventType: "mouseWheel",
+    kind: "scroll",
     x: point.x,
     y: point.y,
-    button: "none",
-    clickCount: 0,
-    modifiers: cdpModifiers(modifiers),
-    deltaX: delta.deltaX,
-    deltaY: delta.deltaY,
+    dx: delta.deltaX,
+    dy: delta.deltaY,
+    modifiers: modifiersOf(modifiers),
   };
 }

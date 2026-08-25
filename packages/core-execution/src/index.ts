@@ -30,6 +30,7 @@ export {
 } from "./run.js";
 
 import type { ObservedElement, SemanticLocator, Snapshot } from "@screen-contract/domain";
+import type { PageInput } from "./page-input.js";
 
 // 同じ型を core ごとに持たない (context/architecture.md)。
 export type { BoundingBox, ObservedElement, SemanticLocator } from "@screen-contract/domain";
@@ -128,6 +129,15 @@ export function authContextKey(auth: AuthContext): string {
   return auth.kind === "anonymous" ? "anon" : `profile.${auth.name}`;
 }
 
+export {
+  parsePageInput,
+  type InputModifiers,
+  type KeyPhase,
+  type PageInput,
+  type PointerButton,
+  type PointerPhase,
+} from "./page-input.js";
+
 /** run の識別子。保存の鍵に含めるため、プロファイル名と同じ規則で縛る。 */
 export type RunId = string & { readonly __brand: "RunId" };
 
@@ -169,7 +179,8 @@ export interface StreamHandle {
  * 公開せず、Stream Proxy が中継する (ADR-0008)。
  */
 export interface StreamRelay {
-  send(payload: string): void;
+  /** 対象ページへ入力を届ける。実行基盤の語彙への写像は adapter が担う。 */
+  send(input: PageInput): void;
   close(): void;
 }
 
