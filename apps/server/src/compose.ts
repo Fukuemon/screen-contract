@@ -1,7 +1,7 @@
 import { createFsStore } from "@screen-contract/adapter-store";
 import { createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
-import type { StorePort, ViewportControl } from "@screen-contract/app";
+import type { StorePort, UseCases, ViewportControl } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
 import type { MiddlewareHandler } from "hono";
 
@@ -37,8 +37,13 @@ export interface ComposeOptions {
   readonly stream?: MiddlewareHandler | undefined;
   /** Web UI の配信。実体の読み込みは合成ルートが渡す。 */
   readonly web?: WebAssets | undefined;
-  /** live viewport の run。 */
-  readonly viewport?: ViewportControl | undefined;
+  /**
+   * live viewport の run。
+   *
+   * **use case を受け取る形で渡す。** 承認の待ち行列は use case が持つため、
+   * 別に組み立てると依頼が一覧へ出ない (実際にそうなった)。
+   */
+  readonly viewport?: ((useCases: UseCases) => ViewportControl | undefined) | undefined;
 }
 
 export function compose(options: ComposeOptions) {
@@ -50,12 +55,15 @@ export function compose(options: ComposeOptions) {
   // 読めるが、`createApiApp` は `/runs` と同じ処理を二重に持つだけで誰も
   // 呼んでいない。JSON-RPC の入口を生やすときに、そこで組み立てる。
   return {
+    // 承認の掛け所を迂回しない。viewport からの提出も同じ use case を通す
+    // (ADR-0017)。
+    useCases,
     http: createHttpApp({
       useCases,
       policy: options.policy ?? (() => undefined),
       stream: options.stream,
       web: options.web,
-      viewport: options.viewport,
+      viewport: options.viewport?.(useCases),
     }),
   };
 }

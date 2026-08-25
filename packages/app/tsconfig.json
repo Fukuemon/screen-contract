@@ -17,6 +17,9 @@
     },
     {
       "path": "../core-workflow"
+    },
+    {
+      "path": "../core-artifact"
     }
   ]
 }

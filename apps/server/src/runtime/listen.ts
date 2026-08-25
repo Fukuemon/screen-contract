@@ -5,7 +5,12 @@ import type { AuthProfileStore } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
 import { createRunSession, createViewportControl } from "@screen-contract/app";
 import { createStreamEndpoint } from "./stream-endpoint.js";
-import type { AllowedOrigins, Viewport } from "@screen-contract/app";
+import type {
+  AllowedOrigins,
+  DraftSubmission,
+  Viewport,
+  ViewportControl,
+} from "@screen-contract/app";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
 import { createFsWebAssets } from "../serving/web-assets.js";
@@ -83,13 +88,15 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           // 空文字を渡さない。`new URL("")` が TypeError になり、原因の分から
           // ない 500 として返る。列挙が空なら起動時検査で中止している。
           entryUrl: options.entryUrl ?? viewportPort.entryUrl(),
-          runner: () => viewportPort.runner(),
+          perform: (action) => viewportPort.perform(action),
           observe: () => viewportPort.observe(),
           observeVisible: () => viewportPort.observeVisible(),
           currentUrl: () => viewportPort.currentUrl(),
           warnings: () => viewportPort.authWarnings(),
         });
-  const control =
+  // **use case は 1 つだけ組み立てる。** 別に組み立てると承認の待ち行列が
+  // 別の実体になり、依頼が一覧へ出ない。
+  const control = (useCases: DraftSubmission): ViewportControl | undefined =>
     session === undefined ||
     viewportPort === undefined ||
     options.authProfiles === undefined ||
@@ -97,6 +104,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
       ? undefined
       : createViewportControl({
           run: session,
+          useCases,
           viewport: viewportPort,
           allowedOrigins: options.allowedOrigins,
           authProfiles: options.authProfiles,

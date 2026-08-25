@@ -113,7 +113,7 @@ function fakeViewport(frames: readonly string[]) {
       return Promise.resolve({ send: () => undefined, close: () => Promise.resolve() });
     },
     // run を起こさないため、実行の相手は無い。
-    runner: () => undefined,
+    perform: () => Promise.resolve(),
     navigate: () => Promise.resolve(),
     setSize: () => Promise.resolve(),
     captureStorageState: () => Promise.resolve({ cookies: [], localStorage: {} }),

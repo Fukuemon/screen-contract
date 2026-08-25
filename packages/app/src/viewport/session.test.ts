@@ -200,7 +200,10 @@ describe("開き直し", () => {
     await viewport.subscribe(() => undefined);
     await viewport.reset();
     expect(browser.sessions).toBe(2);
-    expect(viewport.runner()).toBeDefined();
+    // 開き直したセッションで実行できる。
+    await expect(
+      viewport.perform({ kind: "open", url: "http://127.0.0.1:5174/x" }),
+    ).resolves.toBeUndefined();
   });
 
   it("購読者が居なければ開き直さない", async () => {
@@ -210,7 +213,10 @@ describe("開き直し", () => {
     await subscription.close();
     await viewport.reset();
     expect(browser.sessions).toBe(1);
-    expect(viewport.runner()).toBeUndefined();
+    // 開いていないセッションで黙って開かない。開くと run の開始が暗黙になる。
+    await expect(
+      viewport.perform({ kind: "open", url: "http://127.0.0.1:5174/x" }),
+    ).rejects.toThrow("開いていません");
   });
 
   it("開き直した後もフレームが届く", async () => {

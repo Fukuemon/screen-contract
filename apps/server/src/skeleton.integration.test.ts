@@ -396,20 +396,11 @@ describe("操作モードの入力転送", () => {
     // 中継条件は server 側の run 状態で判定する (ADR-0008)。client の自称では
     // 満たせない。
     const { createRunSession } = await import("@screen-contract/app");
-    const runner = {
-      observe: async () => ({
-        url: new URL(await session.currentUrl()).pathname,
-        title: "",
-        elements: new Map<string, boolean>(),
-        counts: new Map<string, number>(),
-      }),
-      perform: async (step: ExecutionStep) => {
-        if (step.action.kind === "open") {
-          await session.perform({ kind: "open", url: step.action.url });
-        }
-      },
-    };
-    const run = createRunSession({ entryUrl: `${app.origin}/`, runner: () => runner });
+    const run = createRunSession({
+      entryUrl: `${app.origin}/`,
+      perform: (action) => session.perform(action),
+      currentUrl: () => session.currentUrl(),
+    });
 
     // run を起こす前は中継しない。
     expect(run.relayState()).toBeUndefined();

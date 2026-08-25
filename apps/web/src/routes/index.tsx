@@ -154,6 +154,9 @@ function EditorRoute() {
                   elements={snapshot?.newElements ?? []}
                   onUi={editor.onUi}
                   onClear={editor.clearSteps}
+                  onReplay={editor.replay}
+                  onSubmit={editor.submit}
+                  submitted={editor.submitted}
                 />
               )}
               {panel === "auth" && (

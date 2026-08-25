@@ -7,17 +7,15 @@ import {
 } from "@screen-contract/core-element";
 import type {
   AuthContext,
+  BrowserAction,
   BrowserPort,
   BrowserSession,
   ConsoleMessage,
-  Observation,
-  StepRunner,
   PageInput,
   StorageState,
   StreamRelay,
 } from "@screen-contract/core-execution";
-import type { ExecutionStep } from "@screen-contract/core-workflow";
-import { ConflictError, ValidationError } from "../errors.js";
+import { ConflictError } from "../errors.js";
 
 /** 選択モードで指した要素。 */
 export interface PickedElement {
@@ -78,8 +76,13 @@ export interface Viewport {
    */
   authWarnings(): readonly string[];
   currentUrl(): Promise<string>;
-  /** 実行の相手。セッションが無ければ undefined。 */
-  runner(): StepRunner | undefined;
+  /**
+   * 対象ページで action を実行する。
+   *
+   * **観測は含めない。** 何を観測するかは run を保持する側が決める — 要素 ID
+   * との対応を持っているのはそちらである。
+   */
+  perform(action: BrowserAction): Promise<void>;
 }
 
 export interface ViewportOptions {
@@ -140,6 +143,7 @@ export function createViewport(options: ViewportOptions): Viewport {
 
   return {
     entryUrl: () => options.entryUrl,
+    perform: async (action) => required().perform(action),
     navigate: async (url) => required().perform({ kind: "open", url }),
 
     authWarnings(): readonly string[] {
@@ -175,29 +179,6 @@ export function createViewport(options: ViewportOptions): Viewport {
         box: target.box,
         unique: resolution.kind === "resolved",
         matches: resolution.kind === "ambiguous" ? resolution.matches : 1,
-      };
-    },
-
-    runner(): StepRunner | undefined {
-      const opened = session;
-      if (opened === undefined) {
-        return undefined;
-      }
-      return {
-        observe: async (): Promise<Observation> => ({
-          url: new URL(await opened.currentUrl()).pathname,
-          title: "",
-          elements: new Map(),
-          counts: new Map(),
-        }),
-        perform: async (step: ExecutionStep): Promise<void> => {
-          if (step.action.kind !== "open") {
-            throw new ValidationError(
-              `viewport の run が扱えない action です: ${step.action.kind}`,
-            );
-          }
-          await opened.perform({ kind: "open", url: step.action.url });
-        },
       };
     },
 

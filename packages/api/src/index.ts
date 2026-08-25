@@ -16,6 +16,7 @@ export type {
   ObservedElement,
   PageInput,
   PickedElement,
+  SubmitResult,
   RecordedStep,
   SemanticLocator,
   ViewportControl,

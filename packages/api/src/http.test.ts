@@ -55,6 +55,16 @@ function fakeViewport(calls: string[]): ViewportControl {
     setMode: (mode) => snapshot(`mode:${mode}`),
     setRecording: (recording) => snapshot(`recording:${String(recording)}`),
     clearSteps: () => snapshot("clearSteps"),
+    replay: () => Promise.resolve(snapshot("replay")),
+    submit: () => {
+      calls.push("submit");
+      return Promise.resolve({
+        key: "screens/settings",
+        requestId: "req-1",
+        revision: "rev-1",
+        warnings: [],
+      });
+    },
     snapshot: () => SNAPSHOT,
     navigate: (url) => Promise.resolve(snapshot(`navigate:${url}`)),
     setViewport: (size) =>
@@ -230,6 +240,21 @@ describe("live viewport の操作", () => {
     await s.call("POST", "/viewport/recording", { recording: true });
     await s.call("POST", "/viewport/recording", { recording: false });
     expect(s.calls).toEqual(["recording:true", "recording:false"]);
+  });
+
+  it("記録した手順を再現できる", async () => {
+    const s = setup();
+    expect((await s.call("POST", "/viewport/replay")).status).toBe(200);
+    expect(s.calls).toEqual(["replay"]);
+  });
+
+  it("下書きを承認へ回せる", async () => {
+    // **正本へ直接書かない** (ADR-0017)。承認の掛け所を迂回しない。
+    const s = setup();
+    const response = await s.call("POST", "/viewport/submit");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ key: "screens/settings", requestId: "req-1" });
+    expect(s.calls).toEqual(["submit"]);
   });
 
   it("記録した手順を捨てられる", async () => {

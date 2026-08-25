@@ -6,7 +6,11 @@ import type {
 } from "@screen-contract/core-execution";
 import type { ElementId } from "@screen-contract/domain";
 import { ValidationError } from "../errors.js";
+import type { ApprovalRequest } from "../approval.js";
+import type { Revision } from "../revision.js";
+import type { StoreKey } from "../store.js";
 import type { AuthProfileStore } from "./auth-profiles.js";
+import { renderScreenDraft } from "./screen-document.js";
 import type { AllowedOrigins } from "./origins.js";
 import type { RunSession, ViewportSnapshot } from "./run-session.js";
 import type { StreamMode } from "./run-state.js";
@@ -50,6 +54,20 @@ export interface ViewportControl {
   setRecording(recording: boolean): ViewportSnapshot;
   /** 記録した手順をすべて捨てる。要素の定義と構成番号は残す。 */
   clearSteps(): ViewportSnapshot;
+  /**
+   * 記録した手順を最初から実行する。
+   *
+   * **記録と同じ経路を通す。** 別の経路にすると、記録できたのに再現できない差が
+   * 生まれても気付けない (ADR-0026)。
+   */
+  replay(): Promise<ViewportSnapshot>;
+  /**
+   * いまの画面を下書きとして保存し、承認へ回す。
+   *
+   * **正本へ直接書かない** (ADR-0017)。承認は draft と正本の差分を見て人が
+   * 確定させる操作である。
+   */
+  submit(): Promise<SubmitResult>;
   snapshot(): ViewportSnapshot;
   navigate(url: string): Promise<ViewportSnapshot>;
   setViewport(size: ViewportSize): Promise<ViewportSnapshot>;
@@ -77,6 +95,26 @@ export interface ViewportControl {
   removeAuthProfile(name: string): AuthProfilesView;
 }
 
+/**
+ * 下書きの保存と承認依頼。
+ *
+ * `UseCases` の一部をそのまま受ける。**正本へ直接書く口は持たない** —
+ * 持つと承認の掛け所を迂回できる (ADR-0017)。
+ */
+export interface DraftSubmission {
+  saveDraft(key: StoreKey, content: string): Promise<Revision>;
+  requestApproval(key: StoreKey): Promise<ApprovalRequest>;
+}
+
+/** 承認へ回した結果。 */
+export interface SubmitResult {
+  readonly key: string;
+  readonly requestId: string;
+  readonly revision: string;
+  /** 表に出せなかった要素などの注意書き。**黙って落とさない。** */
+  readonly warnings: readonly string[];
+}
+
 export interface ViewportControlOptions {
   readonly run: RunSession;
   readonly viewport: Viewport;
@@ -84,6 +122,12 @@ export interface ViewportControlOptions {
   readonly authProfiles: AuthProfileStore;
   /** いま使う認証プロファイル。viewport がセッションを開くときに読む。 */
   readonly setActiveProfile: (name: string | undefined) => void;
+  /**
+   * 下書きの保存と承認依頼。
+   *
+   * **承認の掛け所を迂回しない** (ADR-0017)。use case をそのまま受ける。
+   */
+  readonly useCases: DraftSubmission;
 }
 
 export function createViewportControl(options: ViewportControlOptions): ViewportControl {
@@ -145,7 +189,26 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     },
 
     resume: () => options.run.resume(),
+    replay: () => options.run.replay(),
     stop: () => options.run.reset(),
+
+    async submit(): Promise<SubmitResult> {
+      const snapshot = options.run.snapshot();
+      const draft = renderScreenDraft({
+        stateUrl: snapshot.stateUrl,
+        badges: snapshot.badges,
+        elements: snapshot.newElements,
+        steps: snapshot.steps,
+      });
+      const revision = await options.useCases.saveDraft(draft.key, draft.content);
+      const request = await options.useCases.requestApproval(draft.key);
+      return {
+        key: draft.key,
+        requestId: request.id,
+        revision,
+        warnings: draft.warnings.map((warning) => warning.reason),
+      };
+    },
     setMode: (mode) => options.run.setMode(mode),
     setRecording: (recording) => options.run.setRecording(recording),
     clearSteps: () => options.run.clearSteps(),

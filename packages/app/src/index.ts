@@ -138,6 +138,8 @@ export {
 export {
   createViewportControl,
   type AuthProfilesView,
+  type DraftSubmission,
+  type SubmitResult,
   type ViewportControl,
 } from "./viewport/control.js";
 export { type AuthProfileStore } from "./viewport/auth-profiles.js";
@@ -164,6 +166,12 @@ export {
   type ViewportOptions,
   type ViewportSubscription,
 } from "./viewport/session.js";
+export {
+  draftKeyOf,
+  renderScreenDraft,
+  type ScreenDraft,
+  type ScreenDraftInput,
+} from "./viewport/screen-document.js";
 export { stateKeyOf } from "./viewport/state-key.js";
 
 /**

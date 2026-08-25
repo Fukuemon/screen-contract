@@ -11,9 +11,14 @@ import {
 import { ConflictError } from "../errors.js";
 import { stateKeyOf } from "./state-key.js";
 import type { ElementId } from "@screen-contract/domain";
-import type { ExecutionEvent, StepRunner } from "@screen-contract/core-execution";
+import type {
+  BrowserAction,
+  ExecutionEvent,
+  Observation,
+  StepRunner,
+} from "@screen-contract/core-execution";
 import { runSteps } from "@screen-contract/core-execution";
-import type { ExecutionStep } from "@screen-contract/core-workflow";
+import type { Action, ExecutionStep } from "@screen-contract/core-workflow";
 
 /**
  * run の保持。
@@ -99,8 +104,13 @@ function pressPointOf(input: PageInput): { readonly x: number; readonly y: numbe
 
 export interface RunSessionOptions {
   readonly entryUrl: string;
-  /** 実行の相手。viewport が開いたセッションを包んだもの。 */
-  readonly runner: () => StepRunner | undefined;
+  /**
+   * 対象ページで action を実行する。
+   *
+   * **観測は含めない。** 何を観測するかはここが決める — 要素 ID との対応を
+   * 持っているのはこちらである。
+   */
+  readonly perform: (action: BrowserAction) => Promise<void>;
   /**
    * 記録の材料。
    *
@@ -168,6 +178,14 @@ export interface RunSession {
   handleInput(input: PageInput, forward: () => void): Promise<void>;
   /** run を起こす。1 ステップ実行して `paused` に入る。 */
   start(): Promise<ViewportSnapshot>;
+  /**
+   * 記録した手順を最初から実行する。
+   *
+   * **記録と同じ経路を通す。** 別の経路にすると、記録できたのに再現できない
+   * 差が生まれても気付けない。座標のまま残った手順は再現できないため、そこで
+   * 止めて理由を返す (ADR-0026)。
+   */
+  replay(): Promise<ViewportSnapshot>;
   resume(): Promise<ViewportSnapshot>;
   setMode(mode: StreamMode): ViewportSnapshot;
   setRecording(recording: boolean): ViewportSnapshot;
@@ -278,18 +296,66 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     ];
   }
 
-  async function run(pause: boolean): Promise<ViewportSnapshot> {
-    const runner = options.runner();
-    if (runner === undefined) {
-      // viewport が開いていないと実行の相手がいない。黙って idle に留めない。
-      // **入力の誤りではない。** 400 にすると「入力を直せば通る」と読めるが、
-      // 実際に要るのは接続である。
-      throw new ConflictError("実行するセッションがありません");
+  /**
+   * 実行の相手。
+   *
+   * **観測をここで組み立てる。** 期待状態は要素 ID を指すため、可視な Locator を
+   * ID へ写す台帳が要る。viewport 側は台帳を持たない。
+   */
+  function stepRunner(): StepRunner {
+    return {
+      observe: async (): Promise<Observation> => {
+        const [url, locators] = await Promise.all([
+          options.currentUrl?.() ?? Promise.resolve(options.entryUrl),
+          options.observeVisible?.() ?? Promise.resolve([]),
+        ]);
+        const visibleIds = new Set(locators.map((locator) => nextId(locator)));
+        // **知っている要素は「見えない」まで観測する。** 載せないと
+        // `unevaluatable` になり、`visible: false` の期待状態が永久に満たされ
+        // ない。冪等スキップが効かず、再現のたびに同じ操作をやり直す。
+        const elements = new Map(
+          elementIds.entries().map(({ id }) => [id, visibleIds.has(id)] as const),
+        );
+        return {
+          url: new URL(url).pathname,
+          title: "",
+          elements,
+          counts: new Map(),
+        };
+      },
+      perform: async (step: ExecutionStep): Promise<void> => {
+        await options.perform(actionOf(step.action));
+      },
+    };
+  }
+
+  /**
+   * DSL の action を実行基盤の action へ写す。
+   *
+   * **`ref` を Locator へ解決する。** 記録に残すのは要素 ID だが、実際に探す
+   * のは Locator である (ADR-0026)。
+   */
+  function actionOf(action: Action): BrowserAction {
+    if (action.kind === "open") {
+      return { kind: "open", url: action.url };
     }
+    if (action.kind === "click") {
+      const locator = elementIds.locatorOf(action.ref as ElementId);
+      if (locator === undefined) {
+        throw new ConflictError("記録した要素の探し方が分かりません");
+      }
+      return { kind: "click", locator };
+    }
+    // 座標のまま残った手順は再現できない。ADR-0026 は記録を止めないと定めるが、
+    // 再現できないことは黙らせない。
+    throw new ConflictError(`再現できない手順です: ${action.kind}`);
+  }
+
+  async function run(pause: boolean): Promise<ViewportSnapshot> {
     const outcome = await runSteps({
       steps: entrySteps(),
       irVersion: "entry",
-      runner,
+      runner: stepRunner(),
       // 予約は各ステップの完了直後に見られる (ADR-0002)。
       shouldPause: () => pause,
     });
@@ -491,6 +557,38 @@ export function createRunSession(options: RunSessionOptions): RunSession {
 
     start: () => run(true),
     resume: () => run(false),
+
+    async replay(): Promise<ViewportSnapshot> {
+      if (steps.length === 0) {
+        throw new ConflictError("再現する手順がありません");
+      }
+      // entry から始める。**途中の状態から始めない** — 記録は entry への到達を
+      // 前提に積まれている。
+      const executable: ExecutionStep[] = [
+        ...entrySteps(),
+        ...steps.map((step, index) => ({
+          action: step.action,
+          expect: step.expect,
+          // 記録した手順は workflow 文書として扱う。DSL へ確定するのは承認の
+          // あとであり、ここでは出所だけを残す。
+          origin: { document: "workflow" as const, documentId: RUN_ID, index },
+        })),
+      ];
+      const outcome = await runSteps({
+        steps: executable,
+        irVersion: `recording-${String(steps.length)}`,
+        runner: stepRunner(),
+        // 再現は最後まで走らせる。途中で止めると、どこまで再現できたか読めない。
+        shouldPause: () => false,
+      });
+      events = outcome.events;
+      status = outcome.status;
+      if (status !== "paused") {
+        mode = "view";
+        recording = false;
+      }
+      return snapshot();
+    },
 
     setMode(next: StreamMode): ViewportSnapshot {
       // 判定の正本は core にある。ここは保持だけを行う。

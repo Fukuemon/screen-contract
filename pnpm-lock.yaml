@@ -245,6 +245,9 @@ importers:
 
   packages/app:
     dependencies:
+      '@screen-contract/core-artifact':
+        specifier: workspace:*
+        version: link:../core-artifact
       '@screen-contract/core-element':
         specifier: workspace:*
         version: link:../core-element

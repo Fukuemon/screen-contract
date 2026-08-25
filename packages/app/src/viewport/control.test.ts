@@ -52,7 +52,20 @@ function setup() {
   let starts = 0;
   const states: string[] = [];
   const run = {
-    snapshot: () => ({ status: "paused" }),
+    snapshot: () => ({
+      status: "paused",
+      stateUrl: "http://127.0.0.1:5174/",
+      badges: ["el-0001"],
+      newElements: [
+        {
+          id: "el-0001",
+          name: "設定を開く",
+          type: "button",
+          locator: { role: "button", name: "設定を開く" },
+        },
+      ],
+      steps: [],
+    }),
     enterState: (url: string) => void states.push(url),
     start: () => {
       starts += 1;
@@ -76,8 +89,22 @@ function setup() {
     },
   };
 
+  const drafts: { key: string; content: string }[] = [];
+  const requested: string[] = [];
+  const useCases = {
+    saveDraft: (key: string, content: string) => {
+      drafts.push({ key, content });
+      return Promise.resolve("rev-1");
+    },
+    requestApproval: (key: string) => {
+      requested.push(key);
+      return Promise.resolve({ id: "req-1", key, revision: "rev-1" });
+    },
+  } as never;
+
   const control = createViewportControl({
     run,
+    useCases,
     viewport,
     allowedOrigins,
     authProfiles,
@@ -96,6 +123,8 @@ function setup() {
     runResets: () => runResets,
     starts: () => starts,
     states,
+    drafts,
+    requested,
     active: () => active,
   };
 }
@@ -228,5 +257,29 @@ describe("認証プロファイル", () => {
     const s = setup();
     await s.control.saveAuthProfile("admin");
     expect(s.control.removeAuthProfile("admin")).toMatchObject({ profiles: [] });
+  });
+});
+
+describe("承認へ回す", () => {
+  it("下書きを保存してから依頼する", async () => {
+    // **正本へ直接書かない** (ADR-0017)。承認は draft と正本の差分を人が見て
+    // 確定させる操作である。
+    const s = setup();
+    const result = await s.control.submit();
+    expect(s.drafts).toHaveLength(1);
+    expect(s.requested).toEqual([s.drafts[0]?.key]);
+    expect(result.revision).toBe("rev-1");
+  });
+
+  it("画面状態から鍵を作る", async () => {
+    const s = setup();
+    const result = await s.control.submit();
+    expect(result.key).toBe("screens/127-0-0-1-5174");
+  });
+
+  it("下書きに構成番号の表を載せる", async () => {
+    const s = setup();
+    await s.control.submit();
+    expect(s.drafts[0]?.content).toContain("| 番号 | 名称 | 種別 | 備考 |");
   });
 });

@@ -1,4 +1,4 @@
-import { Circle, Square, TriangleAlert, Trash2 } from "lucide-react";
+import { Circle, ClipboardCheck, Play, Square, TriangleAlert, Trash2 } from "lucide-react";
 import type { ElementDefView, RecordedStepView } from "../../../gateways/workflow-server.js";
 import { Badge } from "../../ui/badge.js";
 import { Button } from "../../ui/button.js";
@@ -26,6 +26,12 @@ export interface RecordingViewProps {
   readonly onUi: (action: UiAction) => void;
   /** 記録した手順をすべて捨てる。**追記しかしないため、やり直す手段が要る。** */
   readonly onClear: () => void;
+  /** 記録した手順を最初から実行する。 */
+  readonly onReplay: () => void;
+  /** いまの画面を下書きとして保存し、承認へ回す。 */
+  readonly onSubmit: () => void;
+  /** 承認へ回した結果。 */
+  readonly submitted: string | undefined;
 }
 
 /** 記録の操作と、記録した手順の一覧。 */
@@ -92,6 +98,27 @@ export function RecordingView(props: RecordingViewProps) {
               : REJECTION_TEXT[blocked]}
         </p>
       </div>
+
+      {props.steps.length > 0 && !props.ui.recording && (
+        <div className="flex shrink-0 items-center gap-2 border-t border-line/40 px-3 py-2.5">
+          {/* 記録できたのに再現できない差に気付けるよう、同じ経路で実行する。 */}
+          <Button onClick={props.onReplay}>
+            <Play className="size-3.5" aria-hidden />
+            再生
+          </Button>
+          {/* **正本へ直接書かない** (ADR-0017)。承認は人が差分を見て確定させる。 */}
+          <Button tone="primary" onClick={props.onSubmit}>
+            <ClipboardCheck className="size-3.5" aria-hidden />
+            承認へ回す
+          </Button>
+        </div>
+      )}
+
+      {props.submitted !== undefined && (
+        <p role="status" className="shrink-0 px-3 py-2 text-xs text-accent">
+          {props.submitted}
+        </p>
+      )}
 
       {props.steps.length === 0 ? (
         <EmptyState>記録を開始して対象ページをクリックすると、手順がここに積まれます。</EmptyState>

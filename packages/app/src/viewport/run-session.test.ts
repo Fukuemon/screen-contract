@@ -1,32 +1,41 @@
-import type { Observation, StepRunner } from "@screen-contract/core-execution";
-import type { ExecutionStep } from "@screen-contract/core-workflow";
+import type { BrowserAction } from "@screen-contract/core-execution";
+import { ConflictError } from "../errors.js";
 import { describe, expect, it } from "vitest";
 import type { ElementId } from "@screen-contract/domain";
 import { createRunSession, type RunSession } from "./run-session.js";
 
 const ENTRY = "http://127.0.0.1:5174/";
 
-function observation(url: string): Observation {
-  return { url, title: "", elements: new Map(), counts: new Map() };
-}
-
-/** Port の相手は fake を使う (context/testing.md)。 */
-function fakeRunner(initialUrl = "/other"): StepRunner & { readonly performed: ExecutionStep[] } {
-  const performed: ExecutionStep[] = [];
-  let url = initialUrl;
+/**
+ * 対象ページの fake (context/testing.md)。
+ *
+ * `perform` と `currentUrl` を持つ。**観測は run 側が組み立てる** ため、
+ * ここは「いまどこに居るか」だけを返す。
+ */
+function fakeRunner(initialUrl = "/other") {
+  const performed: BrowserAction[] = [];
+  let path = initialUrl;
   return {
     performed,
-    observe: () => Promise.resolve(observation(url)),
-    perform: (step) => {
-      performed.push(step);
-      url = "/";
+    perform: (action: BrowserAction) => {
+      performed.push(action);
+      if (action.kind === "open") {
+        path = new URL(action.url).pathname;
+      }
       return Promise.resolve();
     },
+    currentUrl: () => Promise.resolve(`http://127.0.0.1:5174${path}`),
   };
 }
 
-function session(runner: StepRunner | undefined) {
-  return createRunSession({ entryUrl: ENTRY, runner: () => runner });
+function session(runner: ReturnType<typeof fakeRunner> | undefined) {
+  // セッションが無いときは観測も実行も断る。合成ルートの `Viewport` と同じ形。
+  const closed = () => Promise.reject(new ConflictError("セッションが開いていません"));
+  return createRunSession({
+    entryUrl: ENTRY,
+    perform: runner?.perform ?? closed,
+    currentUrl: runner?.currentUrl ?? closed,
+  });
 }
 
 describe("run の入口", () => {
@@ -35,7 +44,7 @@ describe("run の入口", () => {
     const runner = fakeRunner();
     const snapshot = await session(runner).start();
     expect(snapshot.status).toBe("paused");
-    expect(runner.performed.map((step) => step.action)).toEqual([{ kind: "open", url: ENTRY }]);
+    expect(runner.performed).toEqual([{ kind: "open", url: ENTRY }]);
   });
 
   it("既に到達していれば冪等スキップで開き直さない", async () => {
@@ -46,7 +55,7 @@ describe("run の入口", () => {
   });
 
   it("実行の相手がいなければ黙って idle に留めない", async () => {
-    await expect(session(undefined).start()).rejects.toThrow("セッションがありません");
+    await expect(session(undefined).start()).rejects.toThrow("セッションが開いていません");
   });
 
   it("再開すると completed で終わる", async () => {
@@ -226,7 +235,7 @@ describe("入力の記録と転送", () => {
   function recording(page: ReturnType<typeof fakePage>) {
     const s = createRunSession({
       entryUrl: ENTRY,
-      runner: () => fakeRunner(),
+      perform: () => Promise.resolve(),
       observe: page.observe,
       currentUrl: page.currentUrl,
       // 実時間へ依存させない。fake は転送と同時に変わる。
@@ -351,7 +360,7 @@ describe("入力の記録と転送", () => {
     let elements = [{ role: "button", name: "開く", box: box(0, 0) }];
     const s = createRunSession({
       entryUrl: ENTRY,
-      runner: () => fakeRunner(),
+      perform: () => Promise.resolve(),
       observe: () => {
         ticks += 1;
         // 転送から 3 回目の観測でようやく変わる。
@@ -394,7 +403,7 @@ describe("入力の順序", () => {
     let elements = [{ role: "button", name: "開く", box: { x: 0, y: 0, width: 10, height: 10 } }];
     const s = createRunSession({
       entryUrl: ENTRY,
-      runner: () => fakeRunner(),
+      perform: () => Promise.resolve(),
       observe: () => Promise.resolve(elements),
       // 観測に時間がかかる状況を作る。実物では要素数に比例して伸びる。
       observeVisible: async () => {
@@ -423,7 +432,7 @@ describe("入力の順序", () => {
     const order: string[] = [];
     const s = createRunSession({
       entryUrl: ENTRY,
-      runner: () => fakeRunner(),
+      perform: () => Promise.resolve(),
       observe: () => Promise.reject(new Error("取得できません")),
       currentUrl: () => Promise.resolve(ENTRY),
       settle: { attempts: 0, intervalMs: 0 },
@@ -449,7 +458,7 @@ describe("転送と反映待ちの分離", () => {
     let elements = [{ role: "button", name: "開く", box }];
     const s = createRunSession({
       entryUrl: ENTRY,
-      runner: () => fakeRunner(),
+      perform: () => Promise.resolve(),
       observe: () => Promise.resolve(elements),
       observeVisible: () =>
         Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
@@ -474,5 +483,149 @@ describe("転送と反映待ちの分離", () => {
       ref: idOf(s, { role: "heading", name: "設定" }),
       visible: true,
     });
+  });
+});
+
+describe("記録の再現", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = { x: 0, y: 0, width: 10, height: 10 };
+  const press = (x: number, y: number) =>
+    ({ kind: "pointer", phase: "down", x, y, button: "left", modifiers: NONE }) as const;
+
+  /** 記録を 1 手だけ積んだ run。 */
+  async function recorded() {
+    const performed: BrowserAction[] = [];
+    let elements = [{ role: "button", name: "開く", box }];
+    let path = "/other";
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: (action) => {
+        performed.push(action);
+        if (action.kind === "open") {
+          path = new URL(action.url).pathname;
+        }
+        if (action.kind === "click") {
+          elements = [{ role: "heading", name: "設定", box }];
+        }
+        return Promise.resolve();
+      },
+      currentUrl: () => Promise.resolve(`http://127.0.0.1:5174${path}`),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await s.handleInput(press(5, 5), () => {
+      elements = [{ role: "heading", name: "設定", box }];
+    });
+    performed.length = 0;
+    return {
+      session: s,
+      performed,
+      /** 記録前の画面へ戻す。 */
+      reset: () => {
+        elements = [{ role: "button", name: "開く", box }];
+        path = "/other";
+      },
+    };
+  }
+
+  it("記録した手順を entry から実行する", async () => {
+    // 途中の状態から始めない。記録は entry への到達を前提に積まれている。
+    const r = await recorded();
+    r.reset();
+    await r.session.replay();
+    expect(r.performed).toEqual([
+      { kind: "open", url: ENTRY },
+      { kind: "click", locator: { role: "button", name: "開く" } },
+    ]);
+  });
+
+  it("既に entry に居れば開き直さない", async () => {
+    // 冪等スキップが効く。効かないと、再現のたびに画面が巻き戻る。
+    const r = await recorded();
+    await r.session.replay();
+    expect(r.performed.filter((action) => action.kind === "open")).toEqual([]);
+  });
+
+  it("要素 ID ではなく Locator で探す", async () => {
+    // 記録に残すのは ID だが、実際に探すのは Locator である (ADR-0026)。
+    const r = await recorded();
+    r.reset();
+    await r.session.replay();
+    const click = r.performed.find((action) => action.kind === "click");
+    expect(click).toEqual({ kind: "click", locator: { role: "button", name: "開く" } });
+  });
+
+  it("手順が無ければ再現しない", async () => {
+    const s = session(fakeRunner());
+    await s.start();
+    await expect(s.replay()).rejects.toThrow("再現する手順がありません");
+  });
+
+  it("最後まで走らせる", async () => {
+    // 途中で止めると、どこまで再現できたか読めない。
+    const r = await recorded();
+    r.reset();
+    const snapshot = await r.session.replay();
+    expect(snapshot.status).not.toBe("paused");
+  });
+
+  it("再現したら操作モードと記録を降ろす", async () => {
+    const r = await recorded();
+    r.reset();
+    const snapshot = await r.session.replay();
+    expect(snapshot.mode).toBe("view");
+    expect(snapshot.recording).toBe(false);
+  });
+});
+
+describe("再現の冪等スキップ", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = { x: 0, y: 0, width: 10, height: 10 };
+
+  it("既に到達している手順をやり直さない", async () => {
+    // **知っている要素は「見えない」まで観測する。** 載せないと
+    // `visible: false` の期待状態が `unevaluatable` になり、冪等スキップが
+    // 効かない。再現のたびに同じ操作をやり直すことになる。
+    const performed: BrowserAction[] = [];
+    let elements = [{ role: "button", name: "開く", box }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: (action) => {
+        performed.push(action);
+        if (action.kind === "click") {
+          elements = [{ role: "heading", name: "設定", box }];
+        }
+        return Promise.resolve();
+      },
+      currentUrl: () => Promise.resolve(ENTRY),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await s.handleInput(
+      { kind: "pointer", phase: "down", x: 5, y: 5, button: "left", modifiers: NONE },
+      () => {
+        elements = [{ role: "heading", name: "設定", box }];
+      },
+    );
+    s.setRecording(false);
+
+    // 記録した後の状態のまま再現する。既に満たしているので何もしない。
+    performed.length = 0;
+    const snapshot = await s.replay();
+    expect(performed).toEqual([]);
+    expect(snapshot.events.map((event) => event.kind)).toContain("step-skipped");
+    expect(snapshot.status).toBe("completed");
   });
 });

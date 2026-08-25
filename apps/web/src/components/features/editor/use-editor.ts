@@ -91,6 +91,26 @@ export function useEditor() {
   }, [recording, refreshSnapshot]);
 
   const clearSteps = useCallback(() => dispatch((api) => api.clearSteps()), [dispatch]);
+  const replay = useCallback(() => dispatch((api) => api.replay()), [dispatch]);
+
+  /** 承認へ回した結果。**黙って進めない** — どの鍵で回したかを出す。 */
+  const [submitted, setSubmitted] = useState<string | undefined>(undefined);
+  const submit = useCallback(() => {
+    if (client === undefined) {
+      return;
+    }
+    void client
+      .submit()
+      .then((result) => {
+        setSubmitted(
+          result.warnings.length === 0
+            ? `${result.key} を承認へ回しました。`
+            : `${result.key} を承認へ回しました (注意 ${String(result.warnings.length)} 件)。`,
+        );
+        setError(undefined);
+      })
+      .catch((cause: Error) => setError(cause.message));
+  }, [client]);
 
   const clearLogs = useCallback(() => setMessages([]), []);
 
@@ -158,6 +178,9 @@ export function useEditor() {
     busy: viewport.busy,
     clearLogs,
     clearSteps,
+    replay,
+    submit,
+    submitted,
     connected,
     dispatch,
     elements,

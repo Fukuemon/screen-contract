@@ -1,4 +1,9 @@
-import type { ApprovalRequest, ApprovalResult, AuthProfilesView } from "@screen-contract/api";
+import type {
+  ApprovalRequest,
+  ApprovalResult,
+  AuthProfilesView,
+  SubmitResult,
+} from "@screen-contract/api";
 import { parseSnapshot, type ElementDefView, type ViewportSnapshot } from "../entities/snapshot.js";
 import { httpBase, type ServerTarget } from "../lib/connection.js";
 
@@ -51,6 +56,10 @@ export interface WorkflowServerClient {
   setRecording(recording: boolean): Promise<ViewportSnapshot>;
   /** 記録した手順をすべて捨てる。要素の定義と構成番号は残す。 */
   clearSteps(): Promise<ViewportSnapshot>;
+  /** 記録した手順を最初から実行する。 */
+  replay(): Promise<ViewportSnapshot>;
+  /** いまの画面を下書きとして保存し、承認へ回す。 */
+  submit(): Promise<SubmitResult>;
   navigate(url: string): Promise<ViewportSnapshot>;
   setViewport(size: { readonly width: number; readonly height: number }): Promise<ViewportSnapshot>;
   resolveAt(point: {
@@ -173,6 +182,8 @@ export function createWorkflowServerClient(
     setMode: (mode) => postSnapshot("/viewport/mode", { mode }),
     setRecording: (recording) => postSnapshot("/viewport/recording", { recording }),
     clearSteps: () => snapshot("/viewport/recording", { method: "DELETE" }),
+    replay: () => postSnapshot("/viewport/replay"),
+    submit: () => post<SubmitResult>("/viewport/submit"),
     navigate: (url) => postSnapshot("/viewport/navigate", { url }),
     setViewport: (size) => postSnapshot("/viewport/size", size),
 

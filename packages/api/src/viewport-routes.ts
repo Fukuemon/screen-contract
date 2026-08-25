@@ -24,6 +24,10 @@ export function registerViewportRoutes(app: Hono, viewport: ViewportControl): vo
   });
   app.post("/viewport/resume", async (c) => c.json(await viewport.resume()));
   app.post("/viewport/stop", (c) => c.json(viewport.stop()));
+  // 記録した手順を最初から実行する。記録と同じ経路を通す (ADR-0026)。
+  app.post("/viewport/replay", async (c) => c.json(await viewport.replay()));
+  // 下書きを保存して承認へ回す。**正本へ直接書かない** (ADR-0017)。
+  app.post("/viewport/submit", async (c) => c.json(await viewport.submit()));
   app.post("/viewport/mode", async (c) => {
     const { mode } = (await c.req.json()) as { mode?: unknown };
     if (mode !== "view" && mode !== "operate") {
