@@ -160,7 +160,14 @@ export function parseRunId(raw: string): RunId {
  */
 export type BrowserAction =
   | { readonly kind: "open"; readonly url: string }
-  | { readonly kind: "click"; readonly locator: SemanticLocator };
+  | { readonly kind: "click"; readonly locator: SemanticLocator }
+  /**
+   * 入力欄を埋める。
+   *
+   * **値を argv へ載せない実装を要求する** (context/infrastructure.md)。資格情報が
+   * 入りうるため、`ps` から読める経路で渡してはいけない。
+   */
+  | { readonly kind: "fill"; readonly locator: SemanticLocator; readonly value: string };
 
 /** スクリーンショットのバイナリ。注釈は core/artifact が別途重ねる。 */
 export interface Screenshot {

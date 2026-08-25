@@ -1,4 +1,5 @@
 export { createOriginsConfig } from "./origins-config.js";
+export { createSecretStore, SecretError, type SecretStoreOptions } from "./secrets.js";
 export { generateKey, SealError, type SealedEnvelope } from "./sealed.js";
 export {
   createAuthProfileStore,

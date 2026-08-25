@@ -1,4 +1,4 @@
-import { createElementIdRegistry } from "@screen-contract/core-element";
+import { createElementIdRegistry, elementAt } from "@screen-contract/core-element";
 import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
 import type { PageInput } from "@screen-contract/core-execution";
 import type { RunState, StreamMode } from "./run-state.js";
@@ -9,6 +9,7 @@ import {
   type RecordingSession,
 } from "../recording.js";
 import { ConflictError } from "../errors.js";
+import { secretNameOf, type SecretStore } from "./secrets.js";
 import { stateKeyOf } from "./state-key.js";
 import type { ElementId } from "@screen-contract/domain";
 import type {
@@ -130,6 +131,13 @@ export interface RunSessionOptions {
   readonly currentUrl?: (() => Promise<string>) | undefined;
   /** 利用者へ出す注意書きの取得元。 */
   readonly warnings?: (() => readonly string[]) | undefined;
+  /**
+   * 入力値の置き場。
+   *
+   * **記録に値を残さない** (workflow-dsl feature)。渡さないと入力を記録しない
+   * — 値の行き先が無いまま名前だけ残すと、再現できない手順になる。
+   */
+  readonly secrets?: SecretStore | undefined;
   /** 操作の反映を待つ条件。テストでは 0 回にして実時間へ依存させない。 */
   readonly settle?: SettleOptions | undefined;
 }
@@ -232,6 +240,20 @@ export function createRunSession(options: RunSessionOptions): RunSession {
    * 直前に確定した状態はそれを満たす。
    */
   let resolvable: readonly ObservedElement[] = [];
+  /**
+   * いま文字を入れている入力欄と、入れた文字。
+   *
+   * **値をここから外へ出さない。** 焦点が移った時点で暗号化した置き場へ移し、
+   * 記録には名前だけを残す (context/infrastructure.md)。
+   */
+  let typing: { readonly locator: SemanticLocator; text: string } | undefined;
+  /**
+   * 記録を始めた画面。
+   *
+   * **再生はここから始める。** 列挙の先頭 (entry) から始めると、別の画面で
+   * 記録した手順が entry へ飛ばされて再現できない。
+   */
+  let recordedFrom: string | undefined;
 
   function badges(): readonly ElementId[] {
     return badgesByState.get(stateKey) ?? [];
@@ -285,12 +307,17 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     return added;
   }
 
-  /** entry へ到達する 1 ステップ。ここから記録した steps が積み上がる。 */
-  function entrySteps(): readonly ExecutionStep[] {
+  /**
+   * 到達の 1 ステップ。ここから記録した steps が積み上がる。
+   *
+   * @param url - 開く先。再生では**記録を始めた画面**を渡す。列挙の先頭 (entry)
+   *   から始めると、別の画面で記録した手順が entry へ飛ばされて再現できない。
+   */
+  function entrySteps(url: string = options.entryUrl): readonly ExecutionStep[] {
     return [
       {
-        action: { kind: "open", url: options.entryUrl },
-        expect: [{ kind: "url", path: new URL(options.entryUrl).pathname }],
+        action: { kind: "open", url },
+        expect: [{ kind: "url", path: new URL(url).pathname }],
         origin: { document: "workflow", documentId: "entry", index: 0 },
       },
     ];
@@ -335,16 +362,30 @@ export function createRunSession(options: RunSessionOptions): RunSession {
    * **`ref` を Locator へ解決する。** 記録に残すのは要素 ID だが、実際に探す
    * のは Locator である (ADR-0026)。
    */
+  /** 要素 ID から探し方を引く。引けない参照は再現できない。 */
+  function locatorFor(ref: string): SemanticLocator {
+    const locator = elementIds.locatorOf(ref as ElementId);
+    if (locator === undefined) {
+      throw new ConflictError("記録した要素の探し方が分かりません");
+    }
+    return locator;
+  }
+
   function actionOf(action: Action): BrowserAction {
     if (action.kind === "open") {
       return { kind: "open", url: action.url };
     }
     if (action.kind === "click") {
-      const locator = elementIds.locatorOf(action.ref as ElementId);
-      if (locator === undefined) {
-        throw new ConflictError("記録した要素の探し方が分かりません");
+      return { kind: "click", locator: locatorFor(action.ref) };
+    }
+    if (action.kind === "fill" && "secret" in action) {
+      // **値は実行の直前に解決する。** 記録にも DSL にも持たない
+      // (workflow-dsl feature)。
+      const value = options.secrets?.load(action.secret);
+      if (value === undefined) {
+        throw new ConflictError("記録した入力値が見つかりません");
       }
-      return { kind: "click", locator };
+      return { kind: "fill", locator: locatorFor(action.ref), value };
     }
     // 座標のまま残った手順は再現できない。ADR-0026 は記録を止めないと定めるが、
     // 再現できないことは黙らせない。
@@ -369,6 +410,50 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     return snapshot();
   }
 
+  /** 文字を入れられる要素か。ここに無い role へは入力を記録しない。 */
+  function isTextInput(role: string): boolean {
+    return role === "textbox" || role === "searchbox" || role === "combobox";
+  }
+
+  /**
+   * 入力中の文字を記録へ確定させる。
+   *
+   * **値は暗号化した置き場へ移し、記録には名前だけを残す。** 記録は正本と実行
+   * 履歴に残るため、資格情報が一度入ると後から取り除けない (workflow-dsl
+   * feature)。
+   */
+  function flushTyping(): void {
+    const pending = typing;
+    typing = undefined;
+    if (pending === undefined || pending.text.length === 0 || options.secrets === undefined) {
+      return;
+    }
+    const ref = nextId(pending.locator);
+    const secret = secretNameOf(stateKey, ref);
+    options.secrets.save(secret, pending.text);
+    if (!newElements.some((element) => element.id === ref)) {
+      newElements = [
+        ...newElements,
+        {
+          id: ref,
+          name: pending.locator.name,
+          type: pending.locator.role,
+          locator: pending.locator,
+        },
+      ];
+    }
+    // **直前までのクリックを確定させてから積む。** 記録 session は開始時点からの
+    // クリックを毎回作り直すため、確定させずに積むと fill が前へ回り、順序が
+    // 入れ替わる。
+    confirmed = steps;
+    session = startRecording(RUN_ID, [...newElements]);
+    steps = [
+      ...confirmed,
+      { action: { kind: "fill", ref, secret }, expect: [], id: `step-${String(confirmed.length)}` },
+    ];
+    confirmed = steps;
+  }
+
   /**
    * 入力を 1 つ処理する。
    *
@@ -376,6 +461,19 @@ export function createRunSession(options: RunSessionOptions): RunSession {
    * 状態で解決する」経路が呼び出し側の書き方次第で生まれ、静かに壊れる。
    */
   async function handle(input: PageInput, forward: () => void): Promise<void> {
+    // 文字は入力欄へ溜める。**転送はする** — 溜めるのは記録のためであり、
+    // 対象ページへ届かないと画面が進まない。
+    if (input.kind === "key" && recording) {
+      if (typing !== undefined && input.phase === "text" && input.text !== undefined) {
+        typing.text += input.text;
+      } else if (input.phase === "down") {
+        // Enter や Tab は入力の区切りである。ここで確定させる。
+        flushTyping();
+      }
+      forward();
+      return;
+    }
+
     const point = pressPointOf(input);
     // 記録していないときも転送する。記録の有無で操作が効いたり効かなくなったり
     // しない。押下以外 (移動・離す・ホイール) は 1 手順に数えない — 数えると
@@ -384,6 +482,15 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       forward();
       return;
     }
+    // 別の場所を押したら、それまでの入力を確定させる。
+    flushTyping();
+    // **押した時点で焦点を決める。** 反映待ちのあとに決めると、その間に届いた
+    // 文字が行き先を持たず、入力が丸ごと記録から落ちる。
+    const focused = elementAt(resolvable, point.x, point.y);
+    typing =
+      focused !== undefined && isTextInput(focused.role)
+        ? { locator: { role: focused.role, name: focused.name }, text: "" }
+        : undefined;
     const observe = options.observe;
     if (observe === undefined) {
       forward();
@@ -491,6 +598,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       recording = false;
       confirmed = steps;
       session = undefined;
+      recordedFrom = undefined;
       events = [];
       return snapshot();
     },
@@ -559,13 +667,15 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     resume: () => run(false),
 
     async replay(): Promise<ViewportSnapshot> {
+      // 入力中のまま再現へ入らない。溜めた文字が記録に入らず、手順が欠ける。
+      flushTyping();
       if (steps.length === 0) {
         throw new ConflictError("再現する手順がありません");
       }
       // entry から始める。**途中の状態から始めない** — 記録は entry への到達を
       // 前提に積まれている。
       const executable: ExecutionStep[] = [
-        ...entrySteps(),
+        ...entrySteps(recordedFrom ?? options.entryUrl),
         ...steps.map((step, index) => ({
           action: step.action,
           expect: step.expect,
@@ -600,10 +710,16 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     },
 
     setRecording(next: ViewportSnapshot["recording"]): ViewportSnapshot {
+      const wasRecording = recording;
       recording = status === "paused" && mode === "operate" ? next : false;
+      if (wasRecording && !recording) {
+        // 止める前に入力中のものを確定させる。捨てると手順が欠ける。
+        flushTyping();
+      }
       if (recording && session === undefined) {
         // 記録した steps の遷移元は run の到達状態から決まる (ADR-0026)。
         session = startRecording(RUN_ID, [...newElements]);
+        recordedFrom ??= stateKey;
         // 最初のクリックを解決する材料を先に取る。取らないと 1 手目だけが
         // 座標のまま残る。
         void options

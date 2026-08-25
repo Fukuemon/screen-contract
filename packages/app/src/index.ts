@@ -172,6 +172,7 @@ export {
   type ScreenDraft,
   type ScreenDraftInput,
 } from "./viewport/screen-document.js";
+export { secretNameOf, type SecretStore } from "./viewport/secrets.js";
 export { stateKeyOf } from "./viewport/state-key.js";
 
 /**

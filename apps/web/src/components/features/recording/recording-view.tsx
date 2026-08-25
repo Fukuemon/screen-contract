@@ -1,4 +1,12 @@
-import { Circle, ClipboardCheck, Play, Square, TriangleAlert, Trash2 } from "lucide-react";
+import {
+  Circle,
+  ClipboardCheck,
+  KeyRound,
+  Play,
+  Square,
+  TriangleAlert,
+  Trash2,
+} from "lucide-react";
 import type { ElementDefView, RecordedStepView } from "../../../gateways/workflow-server.js";
 import { Badge } from "../../ui/badge.js";
 import { Button } from "../../ui/button.js";
@@ -129,10 +137,20 @@ export function RecordingView(props: RecordingViewProps) {
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs text-muted tabular-nums">{index + 1}</span>
                 <code className="min-w-0 flex-1 truncate text-xs">
+                  {/* **値を出さない。** 入力値は暗号化した置き場にあり、画面に
+                      出すと資格情報が肩越しに読める (workflow-dsl feature)。 */}
                   {step.action.kind === "click"
                     ? (nameOf.get(step.action.ref) ?? step.action.ref)
-                    : `座標 ${String(step.action.x)}, ${String(step.action.y)}`}
+                    : step.action.kind === "fill"
+                      ? `${nameOf.get(step.action.ref) ?? step.action.ref} へ入力`
+                      : `座標 ${String(step.action.x)}, ${String(step.action.y)}`}
                 </code>
+                {step.action.kind === "fill" && (
+                  <Badge tone="muted">
+                    <KeyRound className="size-3" aria-hidden />
+                    secret
+                  </Badge>
+                )}
                 {step.action.kind === "clickPoint" && (
                   <Badge tone="warn">
                     <TriangleAlert className="size-3" aria-hidden />

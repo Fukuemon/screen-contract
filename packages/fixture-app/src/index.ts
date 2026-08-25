@@ -37,7 +37,10 @@ function documentRoot(): string {
 function resolveTarget(root: string, pathname: string): string | undefined {
   let relative: string;
   try {
-    relative = decodeURIComponent(pathname === "/" ? "/index.html" : pathname).slice(1);
+    // ディレクトリ指定は `index.html` へ落とす。落とさないと拡張子が無く、
+    // 415 になる。
+    const decoded = decodeURIComponent(pathname);
+    relative = (decoded.endsWith("/") ? `${decoded}index.html` : decoded).slice(1);
   } catch {
     return undefined;
   }

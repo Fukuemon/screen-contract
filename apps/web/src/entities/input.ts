@@ -106,3 +106,35 @@ export function scrollInput(
     modifiers: modifiersOf(modifiers),
   };
 }
+
+/**
+ * キー入力を対象ページへ送る。
+ *
+ * **文字は `text` として送る。** キーコードから文字を組み立てると、配列や IME に
+ * 依存する。1 文字の入力はそのまま文字として渡し、制御キーだけ名前で渡す。
+ */
+export function keyInput(
+  event: { readonly key: string; readonly ctrlKey: boolean; readonly metaKey: boolean } & Modifiers,
+): PageInput | undefined {
+  // 修飾キー単体は送らない。押しっぱなしの間ずっと届き、対象が誤動作する。
+  if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+    return { kind: "key", phase: "text", text: event.key, modifiers: modifiersOf(event) };
+  }
+  // 名前付きのキーだけを通す。ここに無いものは対象ページで意味を持たない。
+  const named = new Set([
+    "Enter",
+    "Tab",
+    "Backspace",
+    "Delete",
+    "Escape",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "Home",
+    "End",
+  ]);
+  return named.has(event.key)
+    ? { kind: "key", phase: "down", key: event.key, modifiers: modifiersOf(event) }
+    : undefined;
+}

@@ -12,6 +12,7 @@ import type {
   PickedElementView,
 } from "../../../gateways/workflow-server.js";
 import {
+  keyInput,
   pointerInput,
   scrollInput,
   toViewportPoint,
@@ -110,6 +111,36 @@ export function ViewportView(props: ViewportViewProps) {
     frame.addEventListener("wheel", onWheel, { passive: false });
     return () => frame.removeEventListener("wheel", onWheel);
   }, [frame, onPageInput, pointOf]);
+
+  /**
+   * キー入力を対象ページへ送る。
+   *
+   * **window で拾う。** 対象ページは映像であり、こちらの DOM には入力先が無い。
+   * viewport がフォーカスを持っていても、キーは何にも入らない。
+   *
+   * 転送しない状態では拾わない。拾うと、画面側のショートカットまで奪う。
+   */
+  useEffect(() => {
+    if (frame === null || !forwards) {
+      return undefined;
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      // URL 欄など、画面側の入力中は奪わない。
+      if (target !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) {
+        return;
+      }
+      const input = keyInput(event);
+      if (input === undefined) {
+        return;
+      }
+      // Tab と Enter は画面側の既定動作を持つ。対象へ送る以上は止める。
+      event.preventDefault();
+      onPageInput(input);
+    };
+    globalThis.addEventListener("keydown", onKey);
+    return () => globalThis.removeEventListener("keydown", onKey);
+  }, [forwards, frame, onPageInput]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

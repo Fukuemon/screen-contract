@@ -16,7 +16,15 @@ import type { ElementId } from "@screen-contract/domain";
 /** 記録した 1 手。DSL の action 語彙に対応する。 */
 export type RecordedAction =
   | { readonly kind: "click"; readonly ref: ElementId }
-  | { readonly kind: "clickPoint"; readonly x: number; readonly y: number };
+  | { readonly kind: "clickPoint"; readonly x: number; readonly y: number }
+  /**
+   * 入力欄を埋める。
+   *
+   * **値を持たない。** 記録は正本と実行履歴に残るため、資格情報が一度入ると
+   * 後から取り除けない (workflow-dsl feature)。参照するのは名前だけで、値は
+   * 暗号化した置き場にある (context/infrastructure.md)。
+   */
+  | { readonly kind: "fill"; readonly ref: ElementId; readonly secret: string };
 
 /** 操作の前後で観測した、Expectation の候補になりうる項目。 */
 export interface RecordedObservation {

@@ -17,7 +17,15 @@ export type Action =
   | { readonly kind: "open"; readonly url: string }
   | { readonly kind: "click"; readonly ref: string }
   | { readonly kind: "clickPoint"; readonly x: number; readonly y: number }
+  /**
+   * 入力欄を埋める。
+   *
+   * `value` と `secret` は**排他**である。両方書けると、どちらが使われるか
+   * 読み手に決められない (workflow-dsl feature)。`secret` は値を DSL に持たず、
+   * 実行時に名前で解決する。
+   */
   | { readonly kind: "fill"; readonly ref: string; readonly value: string }
+  | { readonly kind: "fill"; readonly ref: string; readonly secret: string }
   | { readonly kind: "hover"; readonly ref: string }
   | { readonly kind: "scroll"; readonly ref: string };
 

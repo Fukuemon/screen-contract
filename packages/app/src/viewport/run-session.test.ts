@@ -629,3 +629,138 @@ describe("再現の冪等スキップ", () => {
     expect(snapshot.status).toBe("completed");
   });
 });
+
+describe("入力値の記録", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = (x: number, y: number) => ({ x, y, width: 100, height: 20 });
+  const press = (x: number, y: number) =>
+    ({ kind: "pointer", phase: "down", x, y, button: "left", modifiers: NONE }) as const;
+  const text = (value: string) =>
+    ({ kind: "key", phase: "text", text: value, modifiers: NONE }) as const;
+  const enter = () => ({ kind: "key", phase: "down", key: "Enter", modifiers: NONE }) as const;
+
+  /** 入力欄を 2 つ持つ画面。 */
+  function loginPage() {
+    return [
+      { role: "textbox", name: "メールアドレス", box: box(0, 0) },
+      { role: "textbox", name: "パスワード", box: box(0, 50) },
+      { role: "button", name: "サインイン", box: box(0, 100) },
+    ];
+  }
+
+  function fakeSecrets() {
+    const saved = new Map<string, string>();
+    return {
+      saved,
+      store: {
+        assertName: () => undefined,
+        list: () => [...saved.keys()].sort(),
+        save: (name: string, value: string) => void saved.set(name, value),
+        load: (name: string) => saved.get(name),
+        remove: (name: string) => void saved.delete(name),
+      },
+    };
+  }
+
+  async function recording() {
+    const secrets = fakeSecrets();
+    const elements = loginPage();
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: () => Promise.resolve(),
+      currentUrl: () => Promise.resolve(ENTRY),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      secrets: secrets.store,
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return { session: s, secrets };
+  }
+
+  async function typeInto(s: RunSession, x: number, y: number, value: string) {
+    await s.handleInput(press(x, y), () => undefined);
+    for (const character of value) {
+      await s.handleInput(text(character), () => undefined);
+    }
+  }
+
+  it("記録に入力した値を残さない", async () => {
+    // **ここが本題である。** 記録は正本と実行履歴に残るため、資格情報が一度
+    // 入ると後から取り除けない (workflow-dsl feature)。
+    const r = await recording();
+    await typeInto(r.session, 50, 10, "user@example.test");
+    await typeInto(r.session, 50, 60, "pa55word");
+    r.session.setRecording(false);
+    expect(JSON.stringify(r.session.snapshot())).not.toContain("pa55word");
+    expect(JSON.stringify(r.session.snapshot())).not.toContain("user@example.test");
+  });
+
+  it("値は暗号化した置き場へ移す", async () => {
+    // 移さないと、名前だけ残って再現できない手順になる。
+    const r = await recording();
+    await typeInto(r.session, 50, 60, "pa55word");
+    r.session.setRecording(false);
+    expect([...r.secrets.saved.values()]).toContain("pa55word");
+  });
+
+  it("入力欄ごとに別の名前を振る", async () => {
+    const r = await recording();
+    await typeInto(r.session, 50, 10, "user@example.test");
+    await typeInto(r.session, 50, 60, "pa55word");
+    r.session.setRecording(false);
+    expect(r.secrets.store.list()).toHaveLength(2);
+  });
+
+  it("名前に値を混ぜない", async () => {
+    // 混ぜると、名前を見るだけで値が分かる。
+    const r = await recording();
+    await typeInto(r.session, 50, 60, "pa55word");
+    r.session.setRecording(false);
+    expect(r.secrets.store.list().join(",")).not.toContain("pa55word");
+  });
+
+  it("手順に secret の名前を残す", async () => {
+    const r = await recording();
+    await typeInto(r.session, 50, 60, "pa55word");
+    r.session.setRecording(false);
+    const fill = r.session.snapshot().steps.find((step) => step.action.kind === "fill");
+    expect(fill?.action).toMatchObject({ kind: "fill", secret: expect.any(String) as never });
+  });
+
+  it("Enter で入力を確定させる", async () => {
+    // 確定させないと、送信して画面が変わったあとに手順が欠ける。
+    const r = await recording();
+    await typeInto(r.session, 50, 60, "pa55word");
+    await r.session.handleInput(enter(), () => undefined);
+    expect(r.session.snapshot().steps.some((step) => step.action.kind === "fill")).toBe(true);
+  });
+
+  it("入力欄でない場所を押しても記録しない", async () => {
+    const r = await recording();
+    await typeInto(r.session, 50, 110, "abc");
+    r.session.setRecording(false);
+    expect(r.secrets.store.list()).toEqual([]);
+  });
+
+  it("何も入れずに移っても記録しない", async () => {
+    const r = await recording();
+    await r.session.handleInput(press(50, 10), () => undefined);
+    await r.session.handleInput(press(50, 110), () => undefined);
+    r.session.setRecording(false);
+    expect(r.secrets.store.list()).toEqual([]);
+  });
+
+  it("文字も対象ページへ転送する", async () => {
+    // 溜めるのは記録のためであり、届かないと画面が進まない。
+    const r = await recording();
+    let forwarded = 0;
+    await r.session.handleInput(press(50, 60), () => undefined);
+    await r.session.handleInput(text("a"), () => (forwarded += 1));
+    expect(forwarded).toBe(1);
+  });
+});

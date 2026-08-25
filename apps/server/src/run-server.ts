@@ -13,6 +13,7 @@ import {
   createAuthProfileStore,
   createKeystore,
   createOriginsConfig,
+  createSecretStore,
 } from "@screen-contract/adapter-store";
 import { parseAuthProfileName } from "@screen-contract/core-execution";
 import { resolveStateDir } from "./startup/state-dir.js";
@@ -73,7 +74,11 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
   try {
     // いま使う認証プロファイル。viewport がセッションを開くときに読む。
     let activeProfile: string | undefined;
-    const authProfiles = createAuthProfileStore({ stateDir, keystore: createKeystore() });
+    const keystore = createKeystore();
+    const authProfiles = createAuthProfileStore({ stateDir, keystore });
+    // 入力値は DSL にも実行履歴にも入れない。ここだけが持つ
+    // (context/infrastructure.md)。
+    const secrets = createSecretStore({ stateDir, keystore });
 
     // **具象は 1 つだけ作る。** 2 つ作ると、home の解決元まで食い違い、
     // テストが差し替えた側と実際に動く側がずれる (ADR-0023)。
@@ -98,6 +103,7 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
           console.error(`screen-contract-server: 実行してよい対象へ ${origin} を足しました`),
       }),
       authProfiles,
+      secrets,
       setActiveProfile: (name) => {
         activeProfile = name;
       },

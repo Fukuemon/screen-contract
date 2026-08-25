@@ -17,6 +17,13 @@ interface FramePayload {
 export interface StreamClient {
   /** 入力を転送する。中継してよいかの判定は core が済ませている。 */
   send(input: PageInput): void;
+  /**
+   * 接続が開くまで待つ。
+   *
+   * **開く前に送ると落ちる。** 映像の購読は開くのを待たずに済む (来たものを
+   * 流すだけ) が、こちらから送る経路は待たなければならない。
+   */
+  ready(): Promise<void>;
   close(): void;
 }
 
@@ -106,7 +113,21 @@ export function connectStream(options: ConnectStreamOptions): StreamClient {
   socket.addEventListener("close", () => options.onClose?.());
   socket.addEventListener("error", () => options.onClose?.());
 
+  const opened = new Promise<void>((resolve, reject) => {
+    if (socket.readyState === WebSocket.OPEN) {
+      resolve();
+      return;
+    }
+    socket.addEventListener("open", () => resolve());
+    // 開けなかったことを握り潰さない。待ち続けると操作が固まる。
+    socket.addEventListener("error", () =>
+      reject(new AgentBrowserError("browser/unresponsive", "配信へ接続できません")),
+    );
+  });
+
   return {
+    ready: () => opened,
+
     send(input: PageInput): void {
       if (socket.readyState !== WebSocket.OPEN) {
         throw new AgentBrowserError("browser/unresponsive", "配信への接続が開いていません");

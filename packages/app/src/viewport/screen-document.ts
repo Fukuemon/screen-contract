@@ -54,10 +54,14 @@ export function draftKeyOf(stateUrl: string): StoreKey {
 function stepLines(steps: readonly RecordedStep[], elements: readonly ElementDef[]): string[] {
   const nameOf = new Map(elements.map((element) => [element.id, element.name]));
   return steps.map((step, index) => {
+    // **値を書かない。** 下書きは正本になるため、資格情報が一度入ると後から
+    // 取り除けない (workflow-dsl feature)。参照するのは secret の名前だけ。
     const what =
       step.action.kind === "click"
         ? `${nameOf.get(step.action.ref) ?? step.action.ref} をクリック`
-        : `座標 ${String(step.action.x)}, ${String(step.action.y)} をクリック (要素へ解決できず)`;
+        : step.action.kind === "fill"
+          ? `${nameOf.get(step.action.ref) ?? step.action.ref} へ入力 (secret: ${step.action.secret})`
+          : `座標 ${String(step.action.x)}, ${String(step.action.y)} をクリック (要素へ解決できず)`;
     const expectations =
       step.expect.length === 0 ? " — 期待状態なし" : ` — 期待状態 ${String(step.expect.length)} 件`;
     return `${String(index + 1)}. ${what}${expectations}`;

@@ -8,6 +8,7 @@ import { createStreamEndpoint } from "./stream-endpoint.js";
 import type {
   AllowedOrigins,
   DraftSubmission,
+  SecretStore,
   Viewport,
   ViewportControl,
 } from "@screen-contract/app";
@@ -51,6 +52,8 @@ export interface ListenOptions {
   readonly allowedOrigins?: AllowedOrigins | undefined;
   /** 認証プロファイルの保管。渡さないと認証まわりの endpoint を生やさない。 */
   readonly authProfiles?: AuthProfileStore | undefined;
+  /** 入力値の置き場。渡さないと入力を記録しない。 */
+  readonly secrets?: SecretStore | undefined;
   /** いま使う認証プロファイルを合成ルートへ伝える。 */
   readonly setActiveProfile?: ((name: string | undefined) => void) | undefined;
   /**
@@ -102,6 +105,7 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
           observeVisible: () => viewportPort.observeVisible(),
           currentUrl: () => viewportPort.currentUrl(),
           warnings: () => viewportPort.authWarnings(),
+          secrets: options.secrets,
         });
   // **use case は 1 つだけ組み立てる。** 別に組み立てると承認の待ち行列が
   // 別の実体になり、依頼が一覧へ出ない。
