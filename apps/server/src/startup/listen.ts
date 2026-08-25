@@ -1,6 +1,7 @@
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { WebSocketServer } from "ws";
 import { createStreamConnection, createStreamProxy, type RunState } from "@screen-contract/api";
+import type { Viewport, ViewportSubscription } from "./viewport.js";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
 import { createFsWebAssets } from "./web-assets.js";
@@ -36,6 +37,13 @@ export interface ListenOptions {
   readonly host?: LifecycleHost | undefined;
   /** 中継条件の判定に使う run の状態。渡さないと入力はすべて破棄される。 */
   readonly runState?: (() => RunState | undefined) | undefined;
+  /**
+   * live viewport の映像源。
+   *
+   * 渡さないと viewport は「接続していません」のままになる。**映像の配信に
+   * 中継条件は掛からない** (検査が要るのは逆方向の入力転送だけ)。
+   */
+  readonly viewport?: Viewport | undefined;
 }
 
 export interface RunningServer {
@@ -64,22 +72,50 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
   const stream = upgradeWebSocket((c) => {
     void c;
     let connection: ReturnType<typeof createStreamConnection> | undefined;
+    let subscription: ViewportSubscription | undefined;
+    // **接続ごとに持つ。** 共有すると、1 本目が認証を通しただけで 2 本目にも
+    // 映像が流れる。
+    let resolveAuthenticated = (): void => undefined;
+    const authenticated = new Promise<void>((resolve) => {
+      resolveAuthenticated = resolve;
+    });
     return {
       onOpen: (_event, ws) => {
         const proxy = createStreamProxy({
-          // 上流 (ブラウザ) への転送は adapter が繋ぐ。skeleton では捨てる。
-          upstream: { send: () => undefined },
+          // 上流 (ブラウザ) への転送。viewport を繋いでいなければ捨てる。
+          upstream: { send: (payload) => subscription?.send(payload) },
           downstream: { send: (payload) => ws.send(payload) },
           runState,
         });
         connection = createStreamConnection({ token: policy?.token ?? "", proxy });
+
+        // **認証を通す前に映像を流さない。** 流すと、トークンを持たない接続へ
+        // 対象アプリの画面が届く。
+        void (async () => {
+          await authenticated;
+          try {
+            subscription = await options.viewport?.subscribe((dataUri) => {
+              proxy.publishFrame(dataUri);
+            });
+          } catch {
+            ws.close(1011, "viewport unavailable");
+          }
+        })();
       },
       onMessage: (event, ws) => {
         const raw = typeof event.data === "string" ? event.data : "";
         // **最初のフレームで認証する。** 通らなければ接続を閉じる。
-        if (connection?.receive(raw) !== undefined) {
+        if (connection === undefined || connection.receive(raw) !== undefined) {
           ws.close(1008, "rejected");
+          return;
         }
+        if (connection.authenticated()) {
+          resolveAuthenticated();
+        }
+      },
+      onClose: () => {
+        void subscription?.close();
+        subscription = undefined;
       },
     };
   });

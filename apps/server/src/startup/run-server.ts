@@ -1,10 +1,15 @@
 import { join } from "node:path";
-import { isChromeAvailable, resolveChromeInstall } from "@screen-contract/adapter-browser";
+import {
+  createAgentBrowserPort,
+  isChromeAvailable,
+  resolveChromeInstall,
+} from "@screen-contract/adapter-browser";
 import { StartupAbort } from "./abort.js";
 import { runStartupChecks } from "./checks.js";
 import { loadProductConfig } from "./config.js";
 import { listen, type RunningServer } from "./listen.js";
 import { resolveStateDir } from "./state-dir.js";
+import { createViewport } from "./viewport.js";
 
 /**
  * 起動の本体。終了コードと出力を戻り値にして、プロセスを起こさずに検証できる形にする。
@@ -33,13 +38,15 @@ const PRODUCT_CONFIG_NAME = "screen-contract.config.json";
 
 export async function runServer(env: ServerEnv): Promise<ServerResult> {
   let stateDir: string;
+  let allowedOrigins: readonly string[];
   try {
     const chrome = resolveChromeInstall(env.home);
+    allowedOrigins = loadProductConfig(join(env.cwd, PRODUCT_CONFIG_NAME)).allowedOrigins;
     stateDir = runStartupChecks({
       stateDir: resolveStateDir(env.xdgStateHome, env.home),
       forbiddenRoots: env.forbiddenRoots,
       isBrowserAvailable: () => isChromeAvailable(chrome.executablePath),
-      allowedOrigins: loadProductConfig(join(env.cwd, PRODUCT_CONFIG_NAME)).allowedOrigins,
+      allowedOrigins,
       browserInstallCommand: "pnpm browser:install",
       productConfigName: PRODUCT_CONFIG_NAME,
     });
@@ -58,7 +65,16 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
   // ポートは OS に割り当てさせる。トークンと接続先ファイルは listen の後に
   // 確定する (待受アドレスが決まらないと接続先を書けない)。
   try {
-    const server = await listen({ stateDir, webRoot: env.webRoot });
+    const server = await listen({
+      stateDir,
+      webRoot: env.webRoot,
+      // **列挙した origin の先頭を開く。** 列挙外へ open しない (ADR-0017)。
+      // 列挙が空なら起動時検査で中止しているため、ここには必ず 1 件ある。
+      viewport: createViewport({
+        browser: createAgentBrowserPort({ home: env.home }),
+        entryUrl: allowedOrigins[0] as string,
+      }),
+    });
     return {
       exitCode: 0,
       stderr: `screen-contract-server: http://127.0.0.1:${server.port} で待ち受けています\n`,

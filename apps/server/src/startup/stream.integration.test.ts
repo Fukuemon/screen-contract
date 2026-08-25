@@ -135,6 +135,72 @@ describe("Stream Proxy の接続", () => {
   });
 });
 
+describe("live viewport の映像", () => {
+  /** フレームを 1 枚だけ流す fake。実ブラウザを起こさない。 */
+  function fakeViewport(frames: readonly string[]) {
+    return {
+      subscribe: (onFrame: (uri: string) => void) => {
+        for (const frame of frames) {
+          setTimeout(() => onFrame(frame), 10);
+        }
+        return Promise.resolve({ send: () => undefined, close: () => Promise.resolve() });
+      },
+    };
+  }
+
+  function collectFrames(
+    running: RunningServer,
+    frames: readonly string[],
+    authenticate: boolean,
+  ): Promise<readonly string[]> {
+    return new Promise((resolve, reject) => {
+      const received: string[] = [];
+      const ws = new WebSocket(`ws://127.0.0.1:${running.port}/stream`);
+      ws.addEventListener("open", () => {
+        if (authenticate) {
+          ws.send(JSON.stringify({ kind: "auth", token: running.token, runId: "run-1" }));
+        }
+        setTimeout(() => {
+          ws.close();
+          resolve(received);
+        }, 400);
+      });
+      ws.addEventListener("message", (event) => {
+        const { data } = event as { data: unknown };
+        if (typeof data === "string" && data.startsWith("data:")) {
+          received.push(data);
+        }
+      });
+      ws.addEventListener("error", reject);
+      void frames;
+    });
+  }
+
+  it("認証を通したら映像が届く", async () => {
+    server = await listen({
+      stateDir,
+      host: fakeHost(),
+      viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
+    });
+    expect(await collectFrames(server, [], true)).toEqual(["data:image/jpeg;base64,AAA"]);
+  });
+
+  it("認証を通す前に映像を流さない", async () => {
+    // 流すと、トークンを持たない接続へ対象アプリの画面が届く。
+    server = await listen({
+      stateDir,
+      host: fakeHost(),
+      viewport: fakeViewport(["data:image/jpeg;base64,AAA"]),
+    });
+    expect(await collectFrames(server, [], false)).toEqual([]);
+  });
+
+  it("viewport を渡さなければ映像は流れない", async () => {
+    server = await listen({ stateDir, host: fakeHost() });
+    expect(await collectFrames(server, [], true)).toEqual([]);
+  });
+});
+
 describe("Web UI の配信", () => {
   const WEB_ROOT = fileURLToPath(new URL("../../../web/dist/client/", import.meta.url));
 

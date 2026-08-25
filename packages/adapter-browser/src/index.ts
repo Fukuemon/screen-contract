@@ -16,6 +16,7 @@ export {
 } from "./cli.js";
 export { readObservedElements } from "./session.js";
 export { AgentBrowserError } from "./error.js";
+export { connectStream, type ConnectStreamOptions, type StreamClient } from "./stream.js";
 
 /**
  * agent-browser を子プロセスとして駆動する。CLI の呼び出しは本 adapter に閉じる。

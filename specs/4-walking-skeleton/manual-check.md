@@ -112,8 +112,13 @@ cat "${XDG_STATE_HOME:-$HOME/.local/state}/screen-contract/runtime.json"  # => �
 
 ## 未実装で確認できない項目
 
-手順 4〜7 は run を一時停止させる経路が要る。**`run.start` / `pause` の HTTP endpoint は
-まだ無い** ため、現時点では 1〜3 と 9〜11、および認可の負例までを確認できる。
+手順 3〜8 は run を一時停止させる経路が要る。**`run.start` / `pause` の HTTP endpoint は
+まだ無い** ため、現時点では次までを確認できる。
+
+- 1〜2 (起動・配信・トークンの埋め込み・**live viewport に映像が映ること**)
+- 9〜11 (承認の差分ゲート)
+- 認可の負例
+
 残りは [index.md](index.md) の `## 実装で見つかった上位資料の欠落` を参照する。
 
 ## 確認記録
