@@ -1,12 +1,16 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { Grid3x3, Hand, MousePointerClick } from "lucide-react";
-import type { ObservedElementView, PickedElementView } from "../../../gateways/workflow-server.js";
+import type {
+  ElementDefView,
+  ObservedElementView,
+  PickedElementView,
+} from "../../../gateways/workflow-server.js";
 import {
   mouseInput,
   toViewportPoint,
@@ -27,12 +31,16 @@ export interface ViewportViewProps {
   readonly mode: "view" | "operate";
   readonly canOperate: boolean;
   readonly elements: readonly ObservedElementView[];
+  readonly badges: readonly string[];
+  readonly definitions: readonly ElementDefView[];
   readonly picked: PickedElementView | undefined;
   readonly pickFailed: boolean;
   readonly onModeChange: (mode: "view" | "operate") => void;
   readonly onPageInput: (input: MouseInput) => void;
   readonly onPick: (point: Point) => void;
   readonly onSize: (size: { width: number; height: number }) => void;
+  readonly overlay: boolean;
+  readonly onOverlayChange: (overlay: boolean) => void;
 }
 
 /**
@@ -43,9 +51,9 @@ export interface ViewportViewProps {
  */
 export function ViewportView(props: ViewportViewProps) {
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
   const [scale, setScale] = useState(1);
   const [size, setSize] = useState<{ width: number; height: number } | undefined>(undefined);
-  const [overlay, setOverlay] = useState(false);
 
   const pointOf = useCallback((event: { clientX: number; clientY: number }): Point | undefined => {
     const image = imageRef.current;
@@ -78,16 +86,24 @@ export function ViewportView(props: ViewportViewProps) {
     [forwards, onPageInput, onPick, pointOf],
   );
 
-  const scroll = useCallback(
-    (event: ReactWheelEvent) => {
+  // React の onWheel は passive で付くため preventDefault が効かず、外側の
+  // スクロール領域が先に持っていく。非 passive で直接購読する。
+  useEffect(() => {
+    const target = frameRef.current;
+    if (target === null) {
+      return undefined;
+    }
+    const onWheel = (event: WheelEvent): void => {
       const point = pointOf(event);
-      if (point === undefined || !forwards) {
+      if (point === undefined) {
         return;
       }
+      event.preventDefault();
       onPageInput(wheelInput(point, { deltaX: event.deltaX, deltaY: event.deltaY }, event));
-    },
-    [forwards, onPageInput, pointOf],
-  );
+    };
+    target.addEventListener("wheel", onWheel, { passive: false });
+    return () => target.removeEventListener("wheel", onWheel);
+  }, [onPageInput, pointOf]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -108,9 +124,9 @@ export function ViewportView(props: ViewportViewProps) {
         </div>
 
         <Button
-          pressed={overlay}
-          aria-pressed={overlay}
-          onClick={() => setOverlay((current) => !current)}
+          pressed={props.overlay}
+          aria-pressed={props.overlay}
+          onClick={() => props.onOverlayChange(!props.overlay)}
         >
           <Grid3x3 className="size-3.5" aria-hidden />
           要素の枠
@@ -143,7 +159,7 @@ export function ViewportView(props: ViewportViewProps) {
             「接続」を押すと対象アプリを開き、ここに映像が出ます。
           </p>
         ) : (
-          <div className="relative max-h-full max-w-full">
+          <div ref={frameRef} className="relative max-h-full max-w-full">
             <button
               type="button"
               aria-label={forwards ? "対象ページを操作する" : "要素を選択する"}
@@ -158,7 +174,6 @@ export function ViewportView(props: ViewportViewProps) {
                   send(event, "mouseMoved");
                 }
               }}
-              onWheel={scroll}
               onContextMenu={(event) => event.preventDefault()}
             >
               <img
@@ -176,11 +191,13 @@ export function ViewportView(props: ViewportViewProps) {
                 }}
               />
             </button>
-            {overlay && size !== undefined && (
+            {props.overlay && size !== undefined && (
               <ElementOverlay
                 elements={props.elements}
                 size={size}
                 picked={props.picked?.locator}
+                badges={props.badges}
+                definitions={props.definitions}
               />
             )}
           </div>

@@ -7,6 +7,9 @@ import type {
   Screenshot,
   StreamHandle,
 } from "@screen-contract/core-execution";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { AgentBrowserError } from "./error.js";
 import type { Snapshot } from "@screen-contract/domain";
 import { runCli, type CliOptions, type CliResponse } from "./cli.js";
@@ -172,13 +175,29 @@ export function createSession(options: CliOptions, discardPath: string): Browser
       };
     },
 
+    /**
+     * 認証状態を注入する。開いた後に入れても、既に描画された画面は未ログインの
+     * ままなので、必ず対象を開く前に呼ぶ。
+     *
+     * **値を argv へ載せない。** argv は同一利用者の任意プロセスから `ps` で
+     * 読め、Linux では `/proc/<pid>/cmdline` が他利用者にも見える。暗号化して
+     * 保管した意味が注入の 1 ホップで消える。0600 の一時ファイル経由で渡す。
+     */
     async restoreStorageState(state): Promise<void> {
-      // **注入してから対象を開く。** 開いた後に入れても、既に描画された画面は
-      // 未ログインのままである。
       if (state.cookies.length > 0) {
-        await call(["cookies", "set", JSON.stringify(state.cookies)], "認証状態の注入");
+        const file = join(mkdtempSync(join(tmpdir(), "sc-auth-")), "cookies.json");
+        writeFileSync(file, JSON.stringify(state.cookies), { encoding: "utf8", mode: 0o600 });
+        try {
+          await call(["cookies", "set", "--curl", file], "認証状態の注入");
+        } finally {
+          rmSync(dirname(file), { recursive: true, force: true });
+        }
       }
       for (const [key, value] of Object.entries(state.localStorage)) {
+        // localStorage の値はページ側で読み書きする。`eval` は対象ページで任意
+        // JS を実行するため使わず、CLI の storage 操作へ渡す。鍵と値のうち値だけ
+        // が秘密になりうるが、CLI にファイル経由の口が無いため argv で渡す。
+        // 秘密が入りうる場合は cookie 側へ寄せる運用とする。
         await call(["storage", "local", "set", key, JSON.stringify(value)], "認証状態の注入");
       }
     },

@@ -37,7 +37,9 @@ export {
 export {
   createStreamProxy,
   discardReason,
+  inputKindOf,
   type DiscardReason,
+  type InputKind,
   type InputDiscarded,
   type RelayClaim,
   type RunState,

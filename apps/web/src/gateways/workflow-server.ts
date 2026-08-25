@@ -17,7 +17,7 @@ export interface RecordedStepView {
   readonly warning?: string | undefined;
 }
 
-interface ElementDefView {
+export interface ElementDefView {
   readonly id: string;
   readonly name: string;
   readonly type: string;
@@ -34,6 +34,8 @@ export interface ViewportSnapshot {
   readonly entryUrl: string;
   readonly steps: readonly RecordedStepView[];
   readonly newElements: readonly ElementDefView[];
+  /** 構成番号順の要素 ID。位置がそのまま番号になる (ADR-0005)。 */
+  readonly badges: readonly string[];
 }
 
 export interface ObservedElementView {
@@ -75,6 +77,9 @@ export interface WorkflowServerClient {
   consoleMessages(): Promise<
     readonly { readonly id: string; readonly level: string; readonly text: string }[]
   >;
+  addBadge(locator: { readonly role: string; readonly name: string }): Promise<ViewportSnapshot>;
+  removeBadge(id: string): Promise<ViewportSnapshot>;
+  moveBadge(id: string, to: number): Promise<ViewportSnapshot>;
   allowedOrigins(): Promise<readonly string[]>;
   addAllowedOrigin(origin: string): Promise<readonly string[]>;
   listAuthProfiles(): Promise<readonly string[]>;
@@ -160,6 +165,12 @@ export function createWorkflowServerClient(
         text: message.text ?? "",
       }));
     },
+
+    addBadge: (locator) => post<ViewportSnapshot>("/viewport/badges", locator),
+    removeBadge: (id) =>
+      json<ViewportSnapshot>(`/viewport/badges/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    moveBadge: (id, to) =>
+      post<ViewportSnapshot>(`/viewport/badges/${encodeURIComponent(id)}/move`, { to }),
 
     async allowedOrigins(): Promise<readonly string[]> {
       return (await json<{ origins: readonly string[] }>("/viewport/origins")).origins;

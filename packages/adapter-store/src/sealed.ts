@@ -14,6 +14,9 @@ const FORMAT_VERSION = 1;
 const ALGORITHM = "aes-256-gcm";
 /** GCM の nonce は 96 bit が推奨。長さを変えると相互運用できなくなる。 */
 const NONCE_BYTES = 12;
+/** GCM のタグ長。**固定する。** Node は 4 バイトのタグも受けるため、
+ * 指定しないと攻撃者が 32 bit のタグを置いて偽造の総当たりを 2^32 に落とせる。 */
+const TAG_BYTES = 16;
 const KEY_BYTES = 32;
 
 export interface SealedEnvelope {
@@ -56,7 +59,7 @@ export function seal(
     throw new SealError("鍵の長さが規則に合いません");
   }
   const nonce = randomBytes(NONCE_BYTES);
-  const cipher = createCipheriv(ALGORITHM, key, nonce);
+  const cipher = createCipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
   cipher.setAAD(additionalData(keyVersion, profile));
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return {
@@ -81,10 +84,15 @@ export function open(envelope: SealedEnvelope, key: Buffer, profile: string): st
   if (key.length !== KEY_BYTES) {
     throw new SealError("鍵の長さが規則に合いません");
   }
-  const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(envelope.nonce, "base64"));
-  decipher.setAAD(additionalData(envelope.keyVersion, profile));
-  decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
+  const nonce = Buffer.from(envelope.nonce, "base64");
+  const tag = Buffer.from(envelope.tag, "base64");
+  if (nonce.length !== NONCE_BYTES || tag.length !== TAG_BYTES) {
+    throw new SealError("認証状態のファイルが壊れています");
+  }
   try {
+    const decipher = createDecipheriv(ALGORITHM, key, nonce, { authTagLength: TAG_BYTES });
+    decipher.setAAD(additionalData(envelope.keyVersion, profile));
+    decipher.setAuthTag(tag);
     return Buffer.concat([
       decipher.update(Buffer.from(envelope.ciphertext, "base64")),
       decipher.final(),

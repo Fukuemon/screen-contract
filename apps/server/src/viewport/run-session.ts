@@ -1,5 +1,10 @@
 import type { RunState, StreamMode } from "@screen-contract/api";
-import { startRecording, type RecordedStep, type RecordingSession } from "@screen-contract/app";
+import {
+  startRecording,
+  type RecordedObservation,
+  type RecordedStep,
+  type RecordingSession,
+} from "@screen-contract/app";
 import type { ElementDef, ObservedElement, SemanticLocator } from "@screen-contract/core-element";
 import type { ElementId } from "@screen-contract/domain";
 import type { ExecutionEvent, StepRunner } from "@screen-contract/core-execution";
@@ -33,6 +38,12 @@ interface RunSnapshot {
   /** 記録した手順。承認へ回す draft の中身になる。 */
   readonly steps: readonly (RecordedStep & { readonly id: string })[];
   readonly newElements: readonly ElementDef[];
+  /**
+   * 構成番号。**リストの位置がそのまま番号になる** (ADR-0005)。
+   *
+   * 要素定義は番号を持たない。並びを変えれば番号が変わる。
+   */
+  readonly badges: readonly string[];
 }
 
 export interface RunSessionOptions {
@@ -51,6 +62,18 @@ export interface RunSessionOptions {
 }
 
 export interface RunSession {
+  /**
+   * run を未開始へ戻す。
+   *
+   * セッションを捨てたのに `paused` のままにすると、Stream Proxy が存在しない
+   * セッションへ入力を中継し続け、画面も「一時停止中」を表示し続ける。
+   */
+  reset(): RunSnapshot;
+  /** 選択した要素へ番号を付ける。既に付いていれば何もしない。 */
+  addBadge(locator: SemanticLocator): RunSnapshot;
+  removeBadge(id: string): RunSnapshot;
+  /** 並べ替える。番号は 1..N の連番を保ち、欠番を作らない (ADR-0005)。 */
+  moveBadge(id: string, to: number): RunSnapshot;
   /**
    * 入力を記録する。**転送の直前に呼ぶ。**
    *
@@ -80,6 +103,9 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   /** 手順は追記のみで並べ替えない。連番をそのまま識別子にする。 */
   let steps: readonly (RecordedStep & { id: string })[] = [];
   let newElements: readonly ElementDef[] = [];
+  let badges: readonly string[] = [];
+  /** 記録を止めた時点までの手順。再開しても消さない。 */
+  let confirmed: readonly (RecordedStep & { id: string })[] = [];
 
   function snapshot(): RunSnapshot {
     return {
@@ -91,6 +117,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       entryUrl: options.entryUrl,
       steps,
       newElements,
+      badges,
     };
   }
 
@@ -138,22 +165,95 @@ export function createRunSession(options: RunSessionOptions): RunSession {
   }
 
   return {
+    reset(): RunSnapshot {
+      status = "idle";
+      mode = "view";
+      recording = false;
+      confirmed = steps;
+      session = undefined;
+      events = [];
+      return snapshot();
+    },
+
+    addBadge(locator: SemanticLocator): RunSnapshot {
+      const id = nextId(locator);
+      if (!newElements.some((element) => element.id === id)) {
+        newElements = [...newElements, { id, name: locator.name, type: locator.role, locator }];
+      }
+      if (!badges.includes(id)) {
+        badges = [...badges, id];
+      }
+      return snapshot();
+    },
+
+    removeBadge(id: string): RunSnapshot {
+      badges = badges.filter((badge) => badge !== id);
+      return snapshot();
+    },
+
+    moveBadge(id: string, to: number): RunSnapshot {
+      const from = badges.indexOf(id);
+      if (from < 0 || to < 0 || to >= badges.length) {
+        return snapshot();
+      }
+      const next = [...badges];
+      next.splice(from, 1);
+      next.splice(to, 0, id);
+      badges = next;
+      return snapshot();
+    },
+
     async observeClick(point): Promise<void> {
       // 記録していないときは何もしない。黙って記録しない (web-editor feature)。
       if (!recording || session === undefined || options.observe === undefined) {
         return;
       }
-      const url = (await options.currentUrl?.()) ?? options.entryUrl;
-      const observation = { url, title: "", visibleRefs: [] };
+      const observe = options.observe;
+      const currentUrl = options.currentUrl;
+
+      /**
+       * 操作の前後の観測。
+       *
+       * **呼ぶたびに取り直す。** 同じ値を返すと `expectationCandidates` が
+       * 「変化した項目」を 1 つも見つけられず、記録した手順が必ず期待状態を
+       * 持たなくなる。期待状態が無いと冪等スキップが効かない。
+       */
+      const snapshotObservation = async (): Promise<RecordedObservation> => {
+        const [url, elements] = await Promise.all([
+          currentUrl?.() ?? Promise.resolve(options.entryUrl),
+          observe(),
+        ]);
+        return {
+          url: new URL(url).pathname,
+          title: "",
+          visibleRefs: elements.map((element) =>
+            nextId({ role: element.role, name: element.name }),
+          ),
+        };
+      };
+
       await session.click(
-        { elements: await options.observe(), x: point.x, y: point.y, nextId },
+        { elements: await observe(), x: point.x, y: point.y, nextId },
         // 転送そのものは Stream Proxy が行う。ここでは記録だけを担う。
         () => Promise.resolve(),
-        () => Promise.resolve(observation),
+        snapshotObservation,
       );
       const draft = session.finish();
-      steps = draft.steps.map((step, index) => ({ ...step, id: `step-${String(index)}` }));
-      newElements = draft.newElements;
+      // 記録を止めて再開しても前の手順を消さない。session は開始時点からの
+      // 手順しか持たないため、確定済みの分へ追記する。
+      steps = [
+        ...confirmed,
+        ...draft.steps.map((step, index) => ({
+          ...step,
+          id: `step-${String(confirmed.length + index)}`,
+        })),
+      ];
+      newElements = [
+        ...newElements.filter(
+          (element) => !draft.newElements.some((added) => added.id === element.id),
+        ),
+        ...draft.newElements,
+      ];
     },
 
     start: () => run(true),
@@ -175,6 +275,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
         session = startRecording(RUN_ID, [...newElements]);
       }
       if (!recording) {
+        confirmed = steps;
         session = undefined;
       }
       return snapshot();

@@ -49,6 +49,14 @@ const RESERVED = new Set([
   ...Array.from({ length: 10 }, (_, i) => `lpt${String(i)}`),
 ]);
 
+/**
+ * 予約語。匿名実行を表す内部表現と衝突するため使わせない。
+ *
+ * 予約しないと `authContextKey` が両者を同じ鍵へ潰し、匿名実行の結果が
+ * 認証済みの Baseline を上書きする (ADR-0022)。
+ */
+const RESERVED_NAMES = new Set(["anonymous"]);
+
 function isPortable(name: string): boolean {
   // Windows は末尾のドットと空白を落とす。`a.` と `a` が同じファイルを指す。
   return !/[. ]$/.test(name) && !RESERVED.has((name.split(".")[0] ?? "").toLowerCase());
@@ -62,6 +70,8 @@ export class AuthProfileError extends Error {
 }
 
 export interface AuthProfileStore {
+  /** 規則に合う名前か。合わなければ投げる。 */
+  assertName(name: string): void;
   list(): readonly string[];
   save(name: string, state: unknown): void;
   load(name: string): unknown;
@@ -75,7 +85,7 @@ export interface AuthProfileStoreOptions {
 }
 
 function assertName(name: string): void {
-  if (!PROFILE_NAME.test(name) || !isPortable(name)) {
+  if (!PROFILE_NAME.test(name) || RESERVED_NAMES.has(name) || !isPortable(name)) {
     // 拒否した値をメッセージへ入れない。ログや応答へ外部入力が反射する。
     throw new AuthProfileError(
       "認証プロファイル名の規則に合いません (小文字英数で始まり、. _ - を含む 64 文字以内)",
@@ -92,15 +102,22 @@ export function createAuthProfileStore(options: AuthProfileStoreOptions): AuthPr
   }
 
   return {
+    assertName,
+
     list(): readonly string[] {
       if (!existsSync(directory)) {
         return [];
       }
-      return readdirSync(directory)
-        .filter((entry) => entry.endsWith(EXTENSION))
-        .map((entry) => entry.slice(0, -EXTENSION.length))
-        .filter((name) => PROFILE_NAME.test(name))
-        .sort();
+      return (
+        readdirSync(directory)
+          .filter((entry) => entry.endsWith(EXTENSION))
+          .map((entry) => entry.slice(0, -EXTENSION.length))
+          // 一覧と操作の規則を揃える。揃えないと、一覧に出るのに開けない名前が残る。
+          .filter(
+            (name) => PROFILE_NAME.test(name) && !RESERVED_NAMES.has(name) && isPortable(name),
+          )
+          .sort()
+      );
     },
 
     save(name: string, state: unknown): void {

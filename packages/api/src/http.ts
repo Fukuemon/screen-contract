@@ -19,6 +19,27 @@ import {
  */
 
 /** 拒否の理由を応答へそのまま出さない。攻撃者へどこで落ちたかを教える。 */
+/**
+ * 検証由来と判断する失敗。
+ *
+ * 各層の検証エラーは `name` を自分のクラス名へ上書きするため、名前を列挙して
+ * 判定する。列挙に無いものは想定外として 500 にする。
+ */
+const VALIDATION_ERROR_NAMES = new Set([
+  "Error",
+  "SyntaxError",
+  "OriginError",
+  "AuthProfileError",
+  "SealError",
+  "StoreError",
+  "WorkflowError",
+  "ArtifactPathError",
+]);
+
+function isValidationError(error: Error): boolean {
+  return VALIDATION_ERROR_NAMES.has(error.name);
+}
+
 const STATUS: Readonly<Record<AuthRejection, 401 | 403>> = {
   "missing-token": 401,
   "bad-token": 401,
@@ -70,6 +91,10 @@ export interface ViewportControl {
   observeElements(): Promise<readonly unknown[]>;
   /** 対象ページのコンソール出力。 */
   consoleMessages(): Promise<readonly unknown[]>;
+  /** 構成番号を付ける。リストの位置がそのまま番号になる (ADR-0005)。 */
+  addBadge(locator: { readonly role: string; readonly name: string }): unknown;
+  removeBadge(id: string): unknown;
+  moveBadge(id: string, to: number): unknown;
   /** 実行してよい origin。UI はここから選ぶ。 */
   allowedOrigins(): readonly string[];
   /**
@@ -211,6 +236,24 @@ export function createHttpApp(options: HttpAppOptions): Hono {
       c.json({ messages: await viewport.consoleMessages() }),
     );
 
+    app.post("/viewport/badges", async (c) => {
+      const { role, name } = (await c.req.json()) as { role?: unknown; name?: unknown };
+      if (typeof role !== "string" || typeof name !== "string") {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(viewport.addBadge({ role, name }));
+    });
+
+    app.delete("/viewport/badges/:id", (c) => c.json(viewport.removeBadge(c.req.param("id"))));
+
+    app.post("/viewport/badges/:id/move", async (c) => {
+      const { to } = (await c.req.json()) as { to?: unknown };
+      if (typeof to !== "number" || !Number.isInteger(to)) {
+        return c.json({ error: "bad-request" }, 400);
+      }
+      return c.json(viewport.moveBadge(c.req.param("id"), to));
+    });
+
     app.get("/viewport/origins", (c) => c.json({ origins: viewport.allowedOrigins() }));
 
     app.post("/viewport/origins", async (c) => {
@@ -301,8 +344,14 @@ export function createHttpApp(options: HttpAppOptions): Hono {
   //
   // **応答へ例外の中身を出さない。** 検証の失敗メッセージには規則が載るが、
   // 想定外の失敗にはパスや secret が載りうる。詳細は server 側にだけ残す。
+  /**
+   * 検証由来の失敗と想定外の失敗を分ける。
+   *
+   * **名前ではなく型で判定する。** 文字列比較だと、`name` を上書きした
+   * エラークラスを足すたびに分類から漏れ、入力ミスが 500 になる。
+   */
   app.onError((error, c) => {
-    if (error instanceof SyntaxError || error.name === "Error") {
+    if (isValidationError(error)) {
       return c.json({ error: "bad-request" }, 400);
     }
     // 障害の一次観測点は標準出力である (context/infrastructure.md)。

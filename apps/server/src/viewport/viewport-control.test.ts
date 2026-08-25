@@ -30,13 +30,25 @@ function setup() {
   } as unknown as Viewport;
 
   const authProfiles = {
+    assertName: (name: string) => {
+      if (!/^[a-z0-9][a-z0-9._-]*$/.test(name) || name === "anonymous") {
+        throw new Error("認証プロファイル名の規則に合いません");
+      }
+    },
     list: () => [...saved.keys()].sort(),
     save: (name: string, state: unknown) => void saved.set(name, state),
     load: (name: string) => saved.get(name),
     remove: (name: string) => void saved.delete(name),
   } as AuthProfileStore;
 
-  const run = { snapshot: () => ({ status: "paused" }) } as unknown as RunSession;
+  let runResets = 0;
+  const run = {
+    snapshot: () => ({ status: "paused" }),
+    reset: () => {
+      runResets += 1;
+      return { status: "idle" };
+    },
+  } as unknown as RunSession;
 
   const added: string[] = [];
   const origins = [...ALLOWED];
@@ -67,6 +79,7 @@ function setup() {
     sizes,
     saved,
     resets: () => resets,
+    runResets: () => runResets,
     active: () => active,
   };
 }
@@ -131,6 +144,21 @@ describe("認証プロファイル", () => {
     await s.control.useAuthProfile("admin");
     expect(s.active()).toBe("admin");
     expect(s.resets()).toBe(1);
+    // run も戻す。戻さないと、捨てたセッションへ入力を中継し続ける。
+    expect(s.runResets()).toBe(1);
+  });
+
+  it("規則に合わない名前へ切り替えない", async () => {
+    // 通すと不正な名前が保持され、失敗が次にセッションを開くときまで遅れる。
+    const s = setup();
+    await expect(s.control.useAuthProfile("../../etc/passwd")).rejects.toThrow("規則に合いません");
+    expect(s.active()).toBeUndefined();
+    expect(s.resets()).toBe(0);
+  });
+
+  it("予約語へ切り替えない", async () => {
+    const s = setup();
+    await expect(s.control.useAuthProfile("anonymous")).rejects.toThrow("規則に合いません");
   });
 
   it("匿名へ戻せる", async () => {

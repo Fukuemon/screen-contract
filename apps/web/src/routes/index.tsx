@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Circle, ClipboardCheck, Monitor, Play, Plug, Plus } from "lucide-react";
 import { AuthView } from "../components/features/auth/auth-view.js";
+import { BadgesView } from "../components/features/badges/badges-view.js";
 import { LogPanel, type ConsoleMessage } from "../components/features/logs/log-panel.js";
 import { RecordingView } from "../components/features/recording/recording-view.js";
 import { ViewportView } from "../components/features/viewport/viewport-view.js";
@@ -19,7 +20,7 @@ import type { ObservedElementView } from "../gateways/workflow-server.js";
 
 export const Route = createFileRoute("/")({ component: EditorRoute });
 
-type PanelId = "record" | "auth" | "logs";
+type PanelId = "badges" | "record" | "auth" | "logs";
 
 /** エディタ画面。状態と通信をここに集め、描画は view へ委ねる。 */
 function EditorRoute() {
@@ -28,11 +29,12 @@ function EditorRoute() {
   const stream = useStream("current");
   const auth = useAuthProfiles(client);
 
-  const [panel, setPanel] = useState<PanelId>("record");
+  const [panel, setPanel] = useState<PanelId>("badges");
   const [size, setSize] = useState<{ width: number; height: number } | undefined>(undefined);
   const [draftUrl, setDraftUrl] = useState<string | undefined>(undefined);
   const [elements, setElements] = useState<readonly ObservedElementView[]>([]);
   const [messages, setMessages] = useState<readonly ConsoleMessage[]>([]);
+  const [error, setError] = useState<string | undefined>(undefined);
 
   const snapshot = viewport.snapshot;
   const status = snapshot?.status ?? "idle";
@@ -41,18 +43,32 @@ function EditorRoute() {
   const mode = snapshot?.mode ?? "view";
   const recording = snapshot?.recording ?? false;
   const url = draftUrl ?? snapshot?.entryUrl ?? "";
-  const error = clientError ?? viewport.error ?? stream.error ?? auth.error;
+  const shownError = error ?? clientError ?? viewport.error ?? stream.error ?? auth.error;
 
-  // 枠の表示に使う要素は、映像が変わるたびに取り直す。
-  useEffect(() => {
-    if (client === undefined || !connected) {
+  const [overlay, setOverlay] = useState(false);
+
+  /**
+   * 枠に使う要素を取り直す。
+   *
+   * **フレームごとに取り直さない。** 取得は `--annotate` の CLI 呼び出しで
+   * 1 回 70ms ほどかかり、フレームは連続で届く。取得が積み上がって遅れ、
+   * 失敗すると一覧が消える。
+   */
+  const refreshElements = useCallback(() => {
+    if (client === undefined) {
       return;
     }
     void client
       .observeElements()
       .then(setElements)
-      .catch(() => setElements([]));
-  }, [client, connected, stream.frame]);
+      .catch((cause: Error) => setError(cause.message));
+  }, [client]);
+
+  useEffect(() => {
+    if (overlay && connected) {
+      refreshElements();
+    }
+  }, [connected, overlay, refreshElements]);
 
   const refreshLogs = useCallback(() => {
     if (client === undefined) {
@@ -202,12 +218,21 @@ function EditorRoute() {
             mode={mode}
             canOperate={paused}
             elements={elements}
+            badges={snapshot?.badges ?? []}
+            definitions={snapshot?.newElements ?? []}
             picked={viewport.picked}
             pickFailed={viewport.pickFailed}
             onModeChange={(next) => onUi({ kind: "set-mode", mode: next })}
             onPageInput={(input) => stream.sendInput(input)}
             onPick={(point) => viewport.pick(point)}
             onSize={setSize}
+            overlay={overlay}
+            onOverlayChange={(next) => {
+              setOverlay(next);
+              if (next) {
+                refreshElements();
+              }
+            }}
           />
 
           <aside className="flex w-80 shrink-0 flex-col border-l border-line/40">
@@ -216,6 +241,7 @@ function EditorRoute() {
               active={panel}
               onChange={setPanel}
               items={[
+                { id: "badges", label: "構成番号", count: snapshot?.badges.length },
                 {
                   id: "record",
                   label: "記録",
@@ -229,6 +255,16 @@ function EditorRoute() {
               ]}
             />
             <div className="min-h-0 flex-1 overflow-auto border-t border-line/40">
+              {panel === "badges" && (
+                <BadgesView
+                  badges={snapshot?.badges ?? []}
+                  elements={snapshot?.newElements ?? []}
+                  picked={viewport.picked?.locator}
+                  onAdd={(locator) => viewport.run((api) => api.addBadge(locator))}
+                  onRemove={(id) => viewport.run((api) => api.removeBadge(id))}
+                  onMove={(id, to) => viewport.run((api) => api.moveBadge(id, to))}
+                />
+              )}
               {panel === "record" && (
                 <RecordingView
                   ui={{ mode, recording }}
@@ -258,12 +294,12 @@ function EditorRoute() {
           </aside>
         </div>
 
-        {error !== undefined && (
+        {shownError !== undefined && (
           <p
             role="alert"
             className="shrink-0 border-t border-line/40 bg-danger/10 px-4 py-2 text-sm text-danger"
           >
-            {error}
+            {shownError}
           </p>
         )}
       </div>

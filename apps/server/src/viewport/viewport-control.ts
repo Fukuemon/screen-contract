@@ -44,6 +44,9 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     resolveAt: (point) => options.viewport.resolveAt(point),
     observeElements: () => options.viewport.observe(),
     consoleMessages: () => options.viewport.consoleMessages(),
+    addBadge: (locator) => options.run.addBadge(locator),
+    removeBadge: (id) => options.run.removeBadge(id),
+    moveBadge: (id, to) => options.run.moveBadge(id, to),
     allowedOrigins: () => options.allowedOrigins.list(),
     addAllowedOrigin: (origin) => options.allowedOrigins.add(origin),
 
@@ -67,10 +70,15 @@ export function createViewportControl(options: ViewportControlOptions): Viewport
     },
 
     async useAuthProfile(name: string | undefined): Promise<unknown> {
+      if (name !== undefined) {
+        // 境界で弾く。通すと不正な名前が「有効なプロファイル」として保持され、
+        // 失敗が次にセッションを開くときまで遅れる。
+        options.authProfiles.assertName(name);
+      }
       options.setActiveProfile(name);
-      // **セッションを作り直す。** 開いたままの画面へ注入しても、既に描画された
-      // ものは前の状態のままである。
       await options.viewport.reset();
+      // run も戻す。戻さないと、捨てたセッションへ入力を中継し続ける。
+      options.run.reset();
       return { active: name ?? null };
     },
 

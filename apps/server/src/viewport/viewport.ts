@@ -97,6 +97,8 @@ export function createViewport(options: ViewportOptions): Viewport {
   }
 
   async function stop(): Promise<void> {
+    // 購読も落とす。残すと、誰も start() を呼び直さないまま映像が来なくなる。
+    listeners.clear();
     client?.close();
     client = undefined;
     starting = undefined;

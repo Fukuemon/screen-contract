@@ -53,9 +53,31 @@ export interface InputDiscarded {
  * **client 側の制御だけでは規則にならない。** 認証を通したクライアントは
  * Proxy へ直接送れるため、UI の制御は迂回できる (ADR-0008)。
  */
+/**
+ * 入力の種類。**payload を server が読んで決める。** client には名乗らせない。
+ *
+ * スクロールは要素選択の前提であり、画面の外にある要素へ届くために要る。
+ * 操作モードを要求すると、選択モードで下端の要素を選べない。
+ */
+export type InputKind = "scroll" | "operation";
+
+export function inputKindOf(payload: string): InputKind {
+  try {
+    const value: unknown = JSON.parse(payload);
+    return typeof value === "object" &&
+      value !== null &&
+      (value as Record<string, unknown>)["eventType"] === "mouseWheel"
+      ? "scroll"
+      : "operation";
+  } catch {
+    return "operation";
+  }
+}
+
 export function discardReason(
   state: RunState | undefined,
   claim: RelayClaim,
+  kind: InputKind = "operation",
 ): DiscardReason | undefined {
   if (state === undefined) {
     return "no-run";
@@ -68,7 +90,7 @@ export function discardReason(
   if (!state.paused) {
     return "not-paused";
   }
-  if (state.mode !== "operate") {
+  if (kind === "operation" && state.mode !== "operate") {
     return "not-operate-mode";
   }
   return undefined;
@@ -117,7 +139,7 @@ export function createStreamProxy(deps: StreamProxyDeps): StreamProxy {
     },
 
     forwardInput(claim: RelayClaim, payload: string): InputDiscarded | undefined {
-      const reason = discardReason(deps.runState.current(), claim);
+      const reason = discardReason(deps.runState.current(), claim, inputKindOf(payload));
       if (reason !== undefined) {
         const event: InputDiscarded = {
           kind: "input-discarded",
