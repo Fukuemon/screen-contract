@@ -49,7 +49,17 @@ function resolveTarget(root: string, pathname: string): string | undefined {
   }
 }
 
-export async function startFixtureApp(): Promise<FixtureApp> {
+export interface FixtureAppOptions {
+  /**
+   * 待受ポート。既定は 0 (OS に割り当てさせる)。
+   *
+   * 手動確認では固定したい。プロダクト設定の `allowedOrigins` へ書く origin が
+   * 起動のたびに変わると、確認手順が組めない。
+   */
+  readonly port?: number | undefined;
+}
+
+export async function startFixtureApp(options: FixtureAppOptions = {}): Promise<FixtureApp> {
   const root = documentRoot();
 
   const server: Server = createServer((request, response) => {
@@ -85,7 +95,7 @@ export async function startFixtureApp(): Promise<FixtureApp> {
       fail(error);
     };
     server.once("error", onError);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(options.port ?? 0, "127.0.0.1", () => {
       server.removeListener("error", onError);
       done();
     });

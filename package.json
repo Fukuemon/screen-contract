@@ -10,6 +10,7 @@
     "prepare": "lefthook install",
     "dev": "tsc --build --watch",
     "build": "turbo run build",
+    "serve": "turbo run build && node apps/server/dist/bin/serve.js",
     "typecheck": "tsc --build",
     "lint": "oxlint --type-aware && pnpm typecheck",
     "format": "oxfmt --check --ignore-path .oxfmtignore . && prettier --check \"**/*.{md,yml,yaml,json}\"",
