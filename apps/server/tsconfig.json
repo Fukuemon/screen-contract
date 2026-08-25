@@ -23,6 +23,21 @@
     },
     {
       "path": "../../packages/core-execution"
+    },
+    {
+      "path": "../../packages/core-element"
+    },
+    {
+      "path": "../../packages/core-artifact"
+    },
+    {
+      "path": "../../packages/core-workflow"
+    },
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/fixture-app"
     }
   ]
 }

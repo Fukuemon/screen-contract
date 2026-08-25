@@ -81,6 +81,21 @@ importers:
       '@screen-contract/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@screen-contract/core-artifact':
+        specifier: workspace:*
+        version: link:../../packages/core-artifact
+      '@screen-contract/core-element':
+        specifier: workspace:*
+        version: link:../../packages/core-element
+      '@screen-contract/core-workflow':
+        specifier: workspace:*
+        version: link:../../packages/core-workflow
+      '@screen-contract/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@screen-contract/fixture-app':
+        specifier: workspace:*
+        version: link:../../packages/fixture-app
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3

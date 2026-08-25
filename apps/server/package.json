@@ -23,6 +23,11 @@
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",
+    "@screen-contract/core-artifact": "workspace:*",
+    "@screen-contract/core-element": "workspace:*",
+    "@screen-contract/core-workflow": "workspace:*",
+    "@screen-contract/domain": "workspace:*",
+    "@screen-contract/fixture-app": "workspace:*",
     "@types/node": "^24.0.0",
     "vitest": "^4.1.10"
   }
