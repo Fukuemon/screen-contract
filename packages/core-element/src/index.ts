@@ -80,14 +80,30 @@ function area(box: BoundingBox): number {
  * 大きい要素を先に選ぶと、常に外側のコンテナが当たって操作対象へ届かない。
  * 面積が同じときは一覧の並び順を保つ。同じ入力から同じ出力になるようにする。
  */
+export interface ElementAtOptions {
+  /**
+   * 操作の対象にできるものだけを見る。
+   *
+   * **記録では真にする。** 地の文は最小の box を持ちやすく、そのまま選ぶと
+   * ボタンのラベルを押しただけで「テキストをクリックした」と記録される。
+   * 再現のときに Locator で探せず、手順が座標のまま残る (ADR-0026)。
+   */
+  readonly actionableOnly?: boolean | undefined;
+}
+
 export function elementAt(
   elements: readonly ObservedElement[],
   x: number,
   y: number,
+  options: ElementAtOptions = {},
 ): ObservedElement | undefined {
   let best: ObservedElement | undefined;
   for (const element of elements) {
     if (!contains(element.box, x, y)) {
+      continue;
+    }
+    // 既定は「操作できる」。取得手段が区別を持たない実行基盤があるため。
+    if (options.actionableOnly === true && element.actionable === false) {
       continue;
     }
     if (best === undefined || area(element.box) < area(best.box)) {

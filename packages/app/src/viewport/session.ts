@@ -166,6 +166,12 @@ export function createViewport(options: ViewportOptions): Viewport {
       }
     },
 
+    /**
+     * 座標を要素へ解決する。
+     *
+     * **地の文も選べる。** 画面仕様書は説明文にも番号を振る。操作の記録では
+     * 除くが (再現できないため)、選択では含める。
+     */
     async resolveAt(point): Promise<PickedElement | undefined> {
       const observed = await required().observeElements();
       const target = elementAt(observed, point.x, point.y);

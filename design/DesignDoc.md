@@ -399,6 +399,7 @@ Feature は core モジュールと一対一に対応させ、interface・adapte
 | [adr/0027](../adr/0027-agent-browser-bundling.md)       | agent-browser を npm 依存として同梱しブラウザは起動時に検査する判断               | execution                    |
 | [adr/0028](../adr/0028-annotated-artifact-format.md)    | 注釈画像を SVG とし生スクリーンショットを別ファイルで参照する判断                 | artifact-generation          |
 | [adr/0029](../adr/0029-recording-state-key.md)          | 記録中の画面状態を URL の代理鍵で識別する判断                                     | web-editor                   |
+| [adr/0030](../adr/0030-cdp-for-observation.md)          | 画面の観測に CDP を直接使う判断 (操作は CLI のまま)                               | element-mapping              |
 
 ## Open Questions / Future Work
 

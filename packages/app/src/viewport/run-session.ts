@@ -253,6 +253,24 @@ export function createRunSession(options: RunSessionOptions): RunSession {
    */
   let typing: { readonly locator: SemanticLocator; text: string } | undefined;
   /**
+   * 受けた入力の通し番号。
+   *
+   * **反映待ちを打ち切るために持つ。** 待っている間に次の操作が始まったら、
+   * そこから先の変化はこの手順の結果ではない。待ち続けると、次の操作で起きた
+   * 変化を前の手順の期待状態として記録してしまう (入力欄を押した手順に、その後に
+   * 打った文字が現れたことが載る)。
+   *
+   * **離すと移動では進めない。** どちらも押下と同じ 1 回のクリックの一部であり、
+   * 画面が変わるのは離した後である。進めると、クリックの結果を観測する前に
+   * 打ち切ってしまう。
+   */
+  let inputSequence = 0;
+
+  /** 新しい操作の始まりか。離すと移動は前の操作の続きである。 */
+  function startsAction(input: PageInput): boolean {
+    return input.kind !== "pointer" || input.phase === "down";
+  }
+  /**
    * 記録を始めた画面。
    *
    * **再生はここから始める。** 列挙の先頭 (entry) から始めると、別の画面で
@@ -465,7 +483,7 @@ export function createRunSession(options: RunSessionOptions): RunSession {
    * **解決 → 転送 → 検証の順を内側で守る** (ADR-0026)。外へ出すと「操作後の
    * 状態で解決する」経路が呼び出し側の書き方次第で生まれ、静かに壊れる。
    */
-  async function handle(input: PageInput, forward: () => void): Promise<void> {
+  async function handle(input: PageInput, sequence: number, forward: () => void): Promise<void> {
     // 文字は入力欄へ溜める。**転送はする** — 溜めるのは記録のためであり、
     // 対象ページへ届かないと画面が進まない。
     if (input.kind === "key" && recording) {
@@ -489,18 +507,26 @@ export function createRunSession(options: RunSessionOptions): RunSession {
     }
     // 別の場所を押したら、それまでの入力を確定させる。
     flushTyping();
-    // **押した時点で焦点を決める。** 反映待ちのあとに決めると、その間に届いた
-    // 文字が行き先を持たず、入力が丸ごと記録から落ちる。
-    const focused = elementAt(resolvable, point.x, point.y);
-    typing =
-      focused !== undefined && isTextInput(focused.role)
-        ? { locator: { role: focused.role, name: focused.name }, text: "" }
-        : undefined;
     const observe = options.observe;
     if (observe === undefined) {
       forward();
       return;
     }
+    // 材料がまだ無ければここで取る。**1 手目だけが座標のまま残るのを避ける** —
+    // 記録を始めた直後の先読みは間に合わないことがある。
+    if (resolvable.length === 0) {
+      resolvable = await observe();
+    }
+    // **押した時点で焦点を決める。** 反映待ちのあとに決めると、その間に届いた
+    // 文字が行き先を持たず、入力が丸ごと記録から落ちる。
+    //
+    // **地の文は見ない。** ラベルは押した要素より小さい box を持ちやすく、
+    // そのまま選ぶと入力欄ではなくその中の文字を選んでしまう。
+    const focused = elementAt(resolvable, point.x, point.y, { actionableOnly: true });
+    typing =
+      focused !== undefined && isTextInput(focused.role)
+        ? { locator: { role: focused.role, name: focused.name }, text: "" }
+        : undefined;
     const visible =
       options.observeVisible ??
       (async (): Promise<readonly SemanticLocator[]> =>
@@ -546,7 +572,16 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       let after = await observeOnce();
       for (let attempt = 0; attempt < settle.attempts && same(before, after); attempt += 1) {
         await delay(settle.intervalMs);
-        after = await observeOnce();
+        // **次の入力が来たら打ち切る。** そこから先の変化はこの手順の結果では
+        // ない。読んだ結果も捨てる — 読んでいる間に来ることがある。
+        if (sequence !== inputSequence) {
+          break;
+        }
+        const next = await observeOnce();
+        if (sequence !== inputSequence) {
+          break;
+        }
+        after = next;
       }
       return after;
     };
@@ -555,7 +590,14 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       // **クリックの手前で取り直さない。** 取得は要素数に比例し、実測で
       // 518 要素 892ms かかる。転送がそのぶん遅れると、押下と離すの間隔が
       // 開いてクリックとして成立しない。
-      { elements: resolvable, x: point.x, y: point.y, nextId },
+      // **地の文を渡さない。** クリックを記録しても Locator で探せず、再現の
+      // ときに座標のまま残る (ADR-0026)。
+      {
+        elements: resolvable.filter((element) => element.actionable !== false),
+        x: point.x,
+        y: point.y,
+        nextId,
+      },
       // **転送を session の内側で行う。** 外へ出すと、操作前の状態で「後」を
       // 観測する経路が生まれ、期待状態が静かに空になる (ADR-0026)。
       () => {
@@ -654,9 +696,10 @@ export function createRunSession(options: RunSessionOptions): RunSession {
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
+      const mine = startsAction(input) ? (inputSequence += 1) : inputSequence;
       const done = forwarded
         .then(() =>
-          handle(input, () => {
+          handle(input, mine, () => {
             forward();
             // ここで次の入力を通す。反映待ちは鎖の外で続ける。
             release();

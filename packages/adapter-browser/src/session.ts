@@ -3,7 +3,6 @@ import type {
   SemanticLocator,
   StorageRestoreReport,
   StorageState,
-  BoundingBox,
   BrowserAction,
   BrowserSession,
   ObservedElement,
@@ -12,6 +11,7 @@ import type {
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { connectCdp, pageEndpoint, type CdpClient } from "./cdp.js";
 import { AgentBrowserError } from "./error.js";
 import { connectStream, type StreamClient } from "./stream.js";
 import type { Snapshot } from "@screen-contract/domain";
@@ -52,22 +52,6 @@ function readRecord(value: unknown, what: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function readBox(value: unknown): BoundingBox | undefined {
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-  const { x, y, width, height } = value as Record<string, unknown>;
-  if (
-    typeof x !== "number" ||
-    typeof y !== "number" ||
-    typeof width !== "number" ||
-    typeof height !== "number"
-  ) {
-    return undefined;
-  }
-  return { x, y, width, height };
-}
-
 function actionArgs(action: BrowserAction): readonly string[] | undefined {
   switch (action.kind) {
     case "open":
@@ -91,9 +75,6 @@ export type RawSession = Omit<BrowserSession, "connect" | "restoreReport"> & {
   streamEndpoint(): Promise<string>;
 };
 
-/** box をまとめて引くときの同時実行数。1 件ずつ待つと要素数に比例して伸びる。 */
-const BOX_CONCURRENCY = 32;
-
 export function createSession(options: CliOptions, discardPath: string): RawSession {
   /**
    * 文字を送るための配信への接続。
@@ -102,6 +83,15 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
    * 使わないセッションでも socket を 1 本掴む。
    */
   let typingRelay: StreamClient | undefined;
+  /**
+   * 観測のための CDP 接続。
+   *
+   * **観測にだけ使う** (ADR-0030)。CLI だけでは地の文に要素参照が振られず、
+   * 説明文へ番号を振れない。操作は CLI のままにする。
+   */
+  let cdpClient: CdpClient | undefined;
+  /** 接続中の約束。**同時に呼ばれても 1 本に収める** — 2 本開くと片方が漏れる。 */
+  let cdpConnecting: Promise<CdpClient> | undefined;
   const call = async (args: readonly string[], what: string): Promise<unknown> =>
     requireSuccess(await runCli(options, args), what);
 
@@ -115,6 +105,47 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
       throw new AgentBrowserError("browser/unresponsive", "配信ハンドルの応答に port がありません");
     }
     return `ws://127.0.0.1:${String(port)}`;
+  }
+
+  /**
+   * 対象タブの CDP へ繋ぐ。
+   *
+   * `get cdp-url` が返すのはブラウザの endpoint である。**タブを選ぶ必要がある** —
+   * ブラウザ側へ繋いでも AX ツリーは取れない。
+   */
+  async function cdp(): Promise<CdpClient> {
+    if (cdpClient?.alive() === true) {
+      return cdpClient;
+    }
+    // **同時に呼ばれても 1 本に収める。** 2 本開くと片方が漏れ、CLI の呼び出しも
+    // 二重になる。
+    cdpConnecting ??= (async (): Promise<CdpClient> => {
+      const data = readRecord(
+        await call(["get", "cdp-url"], "CDP の接続先の取得"),
+        "CDP の接続先の取得",
+      );
+      const cdpUrl = data["cdpUrl"];
+      if (typeof cdpUrl !== "string") {
+        throw new AgentBrowserError("browser/unresponsive", "CDP の接続先を取得できません");
+      }
+      const opened = await connectCdp({
+        endpoint: await pageEndpoint(cdpUrl, await currentUrlOf()),
+      });
+      cdpClient = opened;
+      return opened;
+    })();
+    try {
+      return await cdpConnecting;
+    } finally {
+      // 失敗しても次で開き直せるようにする。残すと同じ失敗を永久に掴む。
+      cdpConnecting = undefined;
+    }
+  }
+
+  async function currentUrlOf(): Promise<string> {
+    const data = readRecord(await call(["get", "url"], "現在 URL の取得"), "現在 URL の取得");
+    const url = data["url"] ?? data["result"];
+    return typeof url === "string" ? url : "";
   }
 
   async function typing(): Promise<StreamClient> {
@@ -239,57 +270,20 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
     /**
      * box 付きの要素一覧。
      *
-     * **注釈スクリーンショットを使わない。** `--annotate` は box を返す代わりに
-     * **対象ページへ赤い枠と番号を描き込む** (agent-browser 0.34.0 で実測)。
-     * その描画は配信の映像に映り、直後のクリックとも競合する。
+     * **CLI では地の文を取れない** (ADR-0030)。`snapshot` も `--annotate` も、
+     * 要素参照を振るのは role と accessible name の両方を持つ要素だけである。
+     * `--annotate` は加えて**対象ページへ枠と番号を描き込む**。
      *
-     * 代わりに `snapshot` で ref を取り、`get box` で 1 件ずつ引く。実測で
-     * 518 要素 892ms (`--annotate` は 314ms) だが、描き込まない。
+     * CDP の AX ツリーから取る。実測で 1208 要素 809ms (`--annotate` は 518 要素
+     * 314ms だが描き込む)。
      */
     async observeElements(): Promise<readonly ObservedElement[]> {
-      const data = readRecord(await call(["snapshot"], "要素一覧の取得"), "要素一覧の取得");
-      const refs = data["refs"];
-      if (typeof refs !== "object" || refs === null) {
-        return [];
-      }
-      const entries = Object.entries(refs as Record<string, unknown>).flatMap(([ref, value]) => {
-        const entry = (typeof value === "object" && value !== null ? value : {}) as Record<
-          string,
-          unknown
-        >;
-        return typeof entry["role"] === "string" && typeof entry["name"] === "string"
-          ? [{ ref, role: entry["role"], name: entry["name"] }]
-          : [];
-      });
+      return (await cdp()).observe();
+    },
 
-      const observed: ObservedElement[] = [];
-      // まとめて投げる。1 件ずつ待つと要素数に比例して線形に伸びる。
-      for (let at = 0; at < entries.length; at += BOX_CONCURRENCY) {
-        const chunk = entries.slice(at, at + BOX_CONCURRENCY);
-        const boxes = await Promise.all(
-          chunk.map(async (entry) => {
-            try {
-              return readRecord(
-                await call(["get", "box", `@${entry.ref}`], "要素の位置の取得"),
-                "要素の位置の取得",
-              );
-            } catch {
-              // 1 件取れないだけで一覧を落とさない。画面から消えた要素は
-              // ref が無効になる。
-              return undefined;
-            }
-          }),
-        );
-        for (const [index, raw] of boxes.entries()) {
-          const entry = chunk[index];
-          const box = readBox(raw);
-          if (entry === undefined || box === undefined) {
-            continue;
-          }
-          observed.push({ role: entry.role, name: entry.name, box });
-        }
-      }
-      return observed;
+    /** 可視な要素の Locator。**box を取らない。** */
+    async observeVisible(): Promise<readonly SemanticLocator[]> {
+      return (await cdp()).observeNames();
     },
 
     async currentUrl(): Promise<string> {
@@ -358,32 +352,6 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
           };
     },
 
-    /**
-     * 可視な要素の Locator。
-     *
-     * **`snapshot` を使う。** `--annotate screenshot` は box を返す代わりに
-     * 対象ページへ枠と番号を描き込む (実測)。box が要らない用途で使うと、
-     * 描画が配信へ映り、操作の邪魔になる。
-     */
-    async observeVisible(): Promise<readonly SemanticLocator[]> {
-      const data = readRecord(await call(["snapshot"], "要素の取得"), "要素の取得");
-      const refs = data["refs"];
-      if (typeof refs !== "object" || refs === null) {
-        return [];
-      }
-      const locators: SemanticLocator[] = [];
-      for (const value of Object.values(refs as Record<string, unknown>)) {
-        const entry = (typeof value === "object" && value !== null ? value : {}) as Record<
-          string,
-          unknown
-        >;
-        if (typeof entry["role"] === "string" && typeof entry["name"] === "string") {
-          locators.push({ role: entry["role"], name: entry["name"] });
-        }
-      }
-      return locators;
-    },
-
     async consoleMessages(): Promise<readonly ConsoleMessage[]> {
       const data = readRecord(await call(["console"], "コンソールの取得"), "コンソールの取得");
       if (!Array.isArray(data["messages"])) {
@@ -417,6 +385,9 @@ export function createSession(options: CliOptions, discardPath: string): RawSess
       // 文字を送るための接続も閉じる。残すと socket が漏れる。
       typingRelay?.close();
       typingRelay = undefined;
+      cdpClient?.close();
+      cdpClient = undefined;
+      cdpConnecting = undefined;
       // 回収するのはセッションまでで、daemon は落とさない。daemon は他の
       // 利用とも共有される資源である (ADR-0027)。
       await call(["close"], "セッションの終了");

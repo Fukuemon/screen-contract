@@ -764,3 +764,126 @@ describe("入力値の記録", () => {
     expect(forwarded).toBe(1);
   });
 });
+
+describe("記録の 1 手目", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = { x: 0, y: 0, width: 100, height: 40 };
+
+  it("先読みが間に合わなくても座標のまま残さない", () => {
+    // 記録を始めた直後に押されると、材料の先読みが終わっていない。取れて
+    // いなければその場で取る。取らないと 1 手目だけが `clickPoint` になる。
+    const elements = [{ role: "button", name: "開く", box }];
+    let observed = 0;
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: () => Promise.resolve(),
+      currentUrl: () => Promise.resolve(ENTRY),
+      // 先読みが間に合わない状況を作る。実物では CDP へ繋ぐぶん待つ。
+      observe: async () => {
+        observed += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return elements;
+      },
+      observeVisible: () => Promise.resolve([{ role: "button", name: "開く" }]),
+      settle: { attempts: 0, intervalMs: 0 },
+    });
+    return s
+      .start()
+      .then(() => {
+        s.setMode("operate");
+        s.setRecording(true);
+        // 先読みを待たずに押す。
+        return s.handleInput(
+          { kind: "pointer", phase: "down", x: 5, y: 5, button: "left", modifiers: NONE },
+          () => undefined,
+        );
+      })
+      .then(() => {
+        expect(s.snapshot().steps[0]?.action).toMatchObject({ kind: "click" });
+        expect(observed).toBeGreaterThan(0);
+      });
+  });
+});
+
+describe("反映待ちの打ち切り", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = { x: 0, y: 0, width: 100, height: 40 };
+
+  it("次の入力が来たら待つのをやめる", async () => {
+    // **待ち続けると、次の操作で起きた変化を前の手順の期待状態にしてしまう。**
+    // 入力欄を押した手順に、その後に打った文字が現れたことが載る。載ると
+    // 再現のときに満たせず、必ず失敗する。
+    let elements = [{ role: "textbox", name: "メール", box }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: () => Promise.resolve(),
+      currentUrl: () => Promise.resolve(ENTRY),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      // 押しただけでは変わらない画面。待ち続ければ後続の変化を拾ってしまう。
+      settle: { attempts: 20, intervalMs: 5 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+
+    const pressed = s.handleInput(
+      { kind: "pointer", phase: "down", x: 5, y: 5, button: "left", modifiers: NONE },
+      () => undefined,
+    );
+    // 押下の反映待ちの最中に文字を打つ。打った結果が画面へ現れる。
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await s.handleInput({ kind: "key", phase: "text", text: "a", modifiers: NONE }, () => {
+      elements = [
+        { role: "textbox", name: "メール", box },
+        { role: "StaticText", name: "a", box },
+      ];
+    });
+    await pressed;
+
+    // 押下の手順に「a が現れた」を載せない。
+    const first = s.snapshot().steps[0];
+    expect(first?.action.kind).toBe("click");
+    expect(JSON.stringify(first?.expect ?? [])).not.toContain("el-0002");
+  });
+});
+
+describe("反映待ちと 1 回のクリック", () => {
+  const NONE = { alt: false, ctrl: false, meta: false, shift: false } as const;
+  const box = { x: 0, y: 0, width: 100, height: 40 };
+
+  it("離すまでは打ち切らない", async () => {
+    // **画面が変わるのは離した後である。** 離すで打ち切ると、クリックの結果を
+    // 観測する前に止まり、期待状態が空になる。
+    let elements = [{ role: "button", name: "開く", box }];
+    const s = createRunSession({
+      entryUrl: ENTRY,
+      perform: () => Promise.resolve(),
+      currentUrl: () => Promise.resolve(ENTRY),
+      observe: () => Promise.resolve(elements),
+      observeVisible: () =>
+        Promise.resolve(elements.map((element) => ({ role: element.role, name: element.name }))),
+      settle: { attempts: 20, intervalMs: 5 },
+    });
+    await s.start();
+    s.setMode("operate");
+    s.setRecording(true);
+
+    const pressed = s.handleInput(
+      { kind: "pointer", phase: "down", x: 5, y: 5, button: "left", modifiers: NONE },
+      () => undefined,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    // 離すで画面が変わる。実物のクリックと同じ順序。
+    await s.handleInput(
+      { kind: "pointer", phase: "up", x: 5, y: 5, button: "left", modifiers: NONE },
+      () => {
+        elements = [{ role: "heading", name: "設定", box }];
+      },
+    );
+    await pressed;
+
+    expect(s.snapshot().steps[0]?.expect.length).toBeGreaterThan(0);
+  });
+});

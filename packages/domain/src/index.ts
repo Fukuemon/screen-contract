@@ -44,4 +44,12 @@ export interface ObservedElement {
   readonly role: string;
   readonly name: string;
   readonly box: BoundingBox;
+  /**
+   * 操作の対象にできるか。
+   *
+   * **地の文は `false`。** 番号は振れるが、クリックを記録しても再現できない —
+   * テキストノードは Locator で探せる要素ではない。省略したときは操作できる
+   * ものとして扱う (取得手段が区別を持たない実行基盤がある)。
+   */
+  readonly actionable?: boolean | undefined;
 }
