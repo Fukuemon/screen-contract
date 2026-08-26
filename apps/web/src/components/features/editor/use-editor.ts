@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PageInput } from "@screen-contract/api";
 import { forwardsToPage, rejectUiAction, type UiAction } from "../../../entities/mode.js";
-import { originOf } from "../../../entities/target.js";
+import { originOf, resolveTarget } from "../../../entities/target.js";
 import { useAuthProfiles } from "../../../gateways/use-auth-profiles.js";
 import { useStream } from "../../../gateways/use-stream.js";
 import { useViewportRun } from "../../../gateways/use-viewport-run.js";
@@ -10,6 +11,14 @@ import type { ConsoleMessage } from "../logs/log-panel.js";
 
 /** run は 1 本しか動かさない。Stream Proxy へ名乗る要求元も固定でよい。 */
 const RUN_ID = "current";
+
+/**
+ * 入力が止まってから枠を取り直すまで。
+ *
+ * 短くすると、スクロールの最中に何度も取りに行って遅れが積み上がる。長くすると、
+ * ずれた枠を見ている時間が伸びる。
+ */
+const STALE_DELAY_MS = 350;
 
 /**
  * エディタ画面の状態と通信。
@@ -45,14 +54,20 @@ export function useEditor() {
   const mode = snapshot?.mode ?? "view";
   const recording = snapshot?.recording ?? false;
   const url = draftUrl ?? snapshot?.entryUrl ?? "";
-  const origin = originOf(url);
+  /**
+   * 入力の解決先。
+   *
+   * **path の直打ちを受ける。** origin を省いた入力は、いま見ている画面へ寄せる。
+   * 寄せる先は `stateId` (いま居る画面) であり、列挙の先頭ではない。
+   */
+  const target = resolveTarget(url, snapshot?.stateId ?? snapshot?.entryUrl ?? "");
+  const origin = originOf(target ?? url);
 
   /**
    * 枠に使う要素を取り直す。
    *
-   * **フレームごとに取り直さない。** 取得は `--annotate` の CLI 呼び出しで
-   * 1 回 70ms ほどかかり、フレームは連続で届く。取得が積み上がって遅れ、
-   * 失敗すると一覧が消える。
+   * **フレームごとに取り直さない。** 取得は要素数に比例し、実物では 1 回
+   * 800ms ほどかかる。フレームは連続で届くため、取得が積み上がって遅れる。
    */
   const refreshElements = useCallback(() => {
     if (client === undefined) {
@@ -125,6 +140,32 @@ export function useEditor() {
   }, [client]);
 
   const { sendInput } = stream;
+  /**
+   * 対象ページへ入力を送る。
+   *
+   * **枠を出しているなら取り直す。** box は対象ページの viewport 座標であり、
+   * スクロールで一斉にずれる。押した時点の枠が残ると、別の要素に枠が付いて
+   * いるように見える。
+   *
+   * 取り直しは要素数に比例して重い (実物で 800ms) ため、入力が止まってから
+   * 1 度だけ行う。
+   */
+  const stale = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const send = useCallback(
+    (input: PageInput) => {
+      sendInput(input);
+      if (!overlay) {
+        return;
+      }
+      clearTimeout(stale.current);
+      stale.current = setTimeout(() => refreshElements(), STALE_DELAY_MS);
+    },
+    [overlay, refreshElements, sendInput],
+  );
+
+  // 画面を離れるときに残さない。残すと、消えた画面へ向けて取得が走る。
+  useEffect(() => () => clearTimeout(stale.current), []);
+
   const onUi = useCallback(
     (action: UiAction) => {
       if (rejectUiAction({ mode, recording }, action, { paused: connected }) !== undefined) {
@@ -151,13 +192,18 @@ export function useEditor() {
    * 残すと、居ない要素へ番号を付けられるように見える。
    */
   const navigateTo = useCallback(
-    (target: string) => {
-      setDraftUrl(target);
+    (input: string) => {
+      const to = resolveTarget(input, snapshot?.stateId ?? snapshot?.entryUrl ?? "");
+      if (to === undefined) {
+        setError("URL として解釈できません。path だけを打つときは、先に対象を選んでください。");
+        return;
+      }
+      setDraftUrl(to);
       clearPick();
-      dispatch((api) => api.navigate(target));
+      dispatch((api) => api.navigate(to));
       refreshElements();
     },
-    [clearPick, dispatch, refreshElements],
+    [clearPick, dispatch, refreshElements, snapshot?.entryUrl, snapshot?.stateId],
   );
 
   /** 対象を選ぶ。**繋がっていればその場で移る。** 選んだのに何も起きないと読めない。 */
@@ -198,7 +244,7 @@ export function useEditor() {
     refreshElements,
     refreshLogs,
     selectTarget,
-    sendInput,
+    sendInput: send,
     setOverlay,
     setUrl: setDraftUrl,
     snapshot,

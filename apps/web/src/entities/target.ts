@@ -5,6 +5,40 @@
  * 列挙する規則は変えない (ADR-0017)。パスは自由に入れられる。
  */
 
+/**
+ * 入力から対象 URL を作る。
+ *
+ * **path の直打ちを受ける。** `/settings` や `settings?a=1` のように origin を
+ * 省いた入力を、いま見ている画面の origin へ解決する。省けないと、対象を切り替える
+ * たびに origin を打ち直すことになる。
+ *
+ * `//evil.test/` のような入力で origin が入れ替わらないことを確かめる。入れ替わる
+ * と、列挙という安全装置を URL 欄から迂回できる (ADR-0017)。
+ *
+ * @param base - いま見ている画面。ここの origin へ寄せる。
+ */
+export function resolveTarget(input: string, base: string): string | undefined {
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return undefined;
+  }
+  if (originOf(trimmed) !== undefined) {
+    return trimmed;
+  }
+  const origin = originOf(base);
+  if (origin === undefined) {
+    return undefined;
+  }
+  let resolved: URL;
+  try {
+    resolved = new URL(trimmed, origin);
+  } catch {
+    return undefined;
+  }
+  // origin が入れ替わる入力は受けない。`//evil.test/` がこれに当たる。
+  return resolved.origin === origin ? resolved.toString() : undefined;
+}
+
 /** 入力から origin を取り出す。取り出せなければ undefined。 */
 export function originOf(raw: string): string | undefined {
   try {

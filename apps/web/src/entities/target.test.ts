@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidViewport, originOf, VIEWPORT_PRESETS } from "./target.js";
+import { isValidViewport, originOf, resolveTarget, VIEWPORT_PRESETS } from "./target.js";
 
 describe("originOf", () => {
   it("URL から origin を取り出す", () => {
@@ -40,5 +40,44 @@ describe("isValidViewport", () => {
   it("境界を通す", () => {
     expect(isValidViewport({ width: 200, height: 200 })).toBe(true);
     expect(isValidViewport({ width: 4096, height: 4096 })).toBe(true);
+  });
+});
+
+describe("resolveTarget", () => {
+  const BASE = "http://127.0.0.1:5174/settings";
+
+  it("完全な URL はそのまま使う", () => {
+    expect(resolveTarget("https://note.com/x", BASE)).toBe("https://note.com/x");
+  });
+
+  it("path の直打ちを今の画面へ寄せる", () => {
+    // **省けないと、対象を切り替えるたびに origin を打ち直すことになる。**
+    expect(resolveTarget("/login/", BASE)).toBe("http://127.0.0.1:5174/login/");
+  });
+
+  it("先頭のスラッシュが無くても受ける", () => {
+    expect(resolveTarget("login/", BASE)).toBe("http://127.0.0.1:5174/login/");
+  });
+
+  it("query と fragment を保つ", () => {
+    expect(resolveTarget("/items?page=2#top", BASE)).toBe("http://127.0.0.1:5174/items?page=2#top");
+  });
+
+  it("前後の空白を落とす", () => {
+    expect(resolveTarget("  /login/  ", BASE)).toBe("http://127.0.0.1:5174/login/");
+  });
+
+  it("origin が入れ替わる入力を受けない", () => {
+    // 受けると、列挙という安全装置を URL 欄から迂回できる (ADR-0017)。
+    expect(resolveTarget("//evil.test/", BASE)).toBeUndefined();
+  });
+
+  it.each([
+    ["空", "", BASE],
+    ["空白だけ", "   ", BASE],
+    ["寄せる先が無い", "/login/", ""],
+    ["寄せる先が URL でない", "/login/", "not-a-url"],
+  ])("%s なら解決しない", (_label, input, base) => {
+    expect(resolveTarget(input, base)).toBeUndefined();
   });
 });
