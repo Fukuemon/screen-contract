@@ -11,7 +11,8 @@
   },
   "scripts": {
     "build": "tsc --build",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "serve": "node dist/bin/serve.js"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",

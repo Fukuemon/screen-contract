@@ -28,3 +28,8 @@ __pycache__/
 .rulesync/
 rulesync.jsonc
 scripts/link.sh
+apps/web/.tanstack/
+apps/web/.output/
+apps/web/.nitro/
+
+apps/web/dist/

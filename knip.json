@@ -22,8 +22,9 @@
       "project": ["src/**/*.ts"]
     },
     "apps/web": {
-      "entry": ["src/main.ts", "src/**/*.test.ts"],
-      "project": ["src/**/*.ts"]
+      "entry": ["src/router.tsx", "src/routes/**/*.tsx", "src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignoreDependencies": ["tailwindcss"]
     },
     "apps/mcp-bridge": {
       "entry": ["src/index.ts", "src/**/*.test.ts"],
@@ -32,6 +33,15 @@
     "e2e": {
       "entry": ["src/**/*.ts", "scripts/*.mjs"],
       "project": ["src/**/*.ts", "scripts/*.mjs"]
+    },
+    "packages/adapter-browser": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["agent-browser"]
+    },
+    "packages/fixture-app": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "src/bin/serve.ts"],
+      "project": ["src/**/*.ts"]
     }
   }
 }

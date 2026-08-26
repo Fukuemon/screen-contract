@@ -1,0 +1,11 @@
+{
+  // Node で動き、かつ Hono を使うパッケージ (packages/api / apps/server)。
+  // Hono の型は `hono/client` 経由でグローバルの `WebSocket` 型を参照するが、
+  // node.json の lib (ES2023) には無い。`lib` へ DOM を足すと `document` や
+  // `window` が自分のコードでも型として通り、Node で落ちる誤りを型検査が
+  // 見逃す。**third-party の .d.ts だけを黙らせる。**
+  "extends": "./node.json",
+  "compilerOptions": {
+    "skipLibCheck": true
+  }
+}

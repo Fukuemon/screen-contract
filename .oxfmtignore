@@ -5,6 +5,7 @@
 # 担当を分けるため、oxfmt にはこのファイルを渡す (context/toolchain.md)。
 
 # TypeScript / JavaScript 以外は prettier が担当する
+*.css
 *.json
 *.jsonc
 *.md
@@ -27,3 +28,5 @@ build/
 .wt/
 .ai-out/
 .rulesync/
+# 生成物。TanStack Router が routes から作る。手で直さない。
+apps/web/src/routeTree.gen.ts

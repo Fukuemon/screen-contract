@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>設定画面</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+      }
+      dialog {
+        padding: 1.5rem;
+        border: 1px solid #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>設定画面</h1>
+    <p>walking skeleton が操作する対象アプリです。内容を固定します。</p>
+
+    <!--
+      role と accessible name で一意に解決できることを保証する。
+      記録が座標に落ちない条件であり、skeleton の座標解決は role+name だけに絞る。
+      同じ role と name の組を 2 つ置かない。
+    -->
+    <button type="button" id="open-settings" aria-haspopup="dialog">設定を開く</button>
+
+    <!-- 入力と資格情報の記録を確かめる対象。値は fixture の中で固定する。 -->
+    <p><a href="/login/">ログイン画面へ</a></p>
+
+    <dialog id="settings" aria-label="設定">
+      <h2>設定</h2>
+      <p>モーダルの中身です。</p>
+      <!--
+        閉じる操作は逆向きの遷移であり、状態を増やさない。状態は default と
+        モーダル表示の 2 つのままである。手動確認で開閉を繰り返せるよう残す。
+      -->
+      <button type="button" id="close-settings">閉じる</button>
+    </dialog>
+
+    <script>
+      // 外部リソースを参照しない。読み込み順や通信の有無で状態が変わると、
+      // こちらの変更と相手の変更を区別できなくなる (context/testing.md)。
+      const dialog = document.getElementById("settings");
+      document.getElementById("open-settings").addEventListener("click", () => {
+        dialog.showModal();
+      });
+      document.getElementById("close-settings").addEventListener("click", () => {
+        dialog.close();
+      });
+    </script>
+  </body>
+</html>

@@ -14,10 +14,12 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@screen-contract/app": "workspace:*"
+    "@screen-contract/app": "workspace:*",
+    "hono": "^4.13.4"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",
+    "@types/node": "^24.10.1",
     "vitest": "^4.1.10"
   }
 }

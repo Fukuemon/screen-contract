@@ -1,3 +1,72 @@
+/**
+ * interface 層 (web) が使う型の窓口。
+ *
+ * web は core / domain へ直接依存できない (context/architecture.md)。実行
+ * イベントのように表示へ要る型は、api が型として中継する。
+ */
+export type {
+  ApprovalRequest,
+  ApprovalResult,
+  AuthProfilesView,
+  BoundingBox,
+  ConsoleMessage,
+  ElementDef,
+  ElementId,
+  ExecutionEvent,
+  ObservedElement,
+  PageInput,
+  PickedElement,
+  SubmitResult,
+  RecordedStep,
+  SemanticLocator,
+  ViewportControl,
+  ViewportSize,
+  ViewportSnapshot,
+} from "@screen-contract/app";
+
+export { createHttpApp, type DevAssets, type HttpAppOptions, type WebAssets } from "./http.js";
+export {
+  bootCookie,
+  BOOT_COOKIE,
+  BOOT_QUERY,
+  checkBootTicket,
+  type BootOutcome,
+  type BootRequest,
+} from "./boot-ticket.js";
+export {
+  createStreamConnection,
+  type StreamConnection,
+  type StreamConnectionDeps,
+  type StreamFrame,
+  type StreamRejection,
+} from "./stream-endpoint.js";
+export {
+  isAllowedHost,
+  isAllowedOrigin,
+  rejectRequest,
+  tokensMatch,
+  type AuthInput,
+  type AuthPolicy,
+  type AuthRejection,
+  type OriginPolicy,
+} from "./auth.js";
+export {
+  createStreamProxy,
+  discardReason,
+  inputKindOf,
+  type DiscardReason,
+  type InputKind,
+  type InputDiscarded,
+  type RelayClaim,
+  type RunState,
+  type RunStateSource,
+  type StreamMode,
+  type StreamProxy,
+  type StreamProxyDeps,
+  type FrameSink,
+  type InputSink,
+} from "./stream.js";
+
 import { parseStartRunInput, type UseCases } from "@screen-contract/app";
 
 /**

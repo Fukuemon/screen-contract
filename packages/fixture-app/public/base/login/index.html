@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>ログイン</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+      }
+      label {
+        display: block;
+        margin: 0.75rem 0;
+      }
+      input {
+        display: block;
+        margin-top: 0.25rem;
+        padding: 0.35rem;
+        width: 18rem;
+      }
+      [hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ログイン</h1>
+
+    <!--
+      role と accessible name で一意に解決できることを保証する。同じ組を 2 つ
+      置かない (context/testing.md の fixture 対象アプリ)。
+    -->
+    <form id="login">
+      <label>
+        メールアドレス
+        <input id="email" type="email" name="email" autocomplete="username" />
+      </label>
+      <label>
+        パスワード
+        <input id="password" type="password" name="password" autocomplete="current-password" />
+      </label>
+      <button type="submit" id="submit">サインイン</button>
+    </form>
+
+    <p id="error" hidden>メールアドレスかパスワードが違います</p>
+
+    <section id="welcome" hidden>
+      <h2>ようこそ</h2>
+      <p id="who"></p>
+      <button type="button" id="signout">サインアウト</button>
+    </section>
+
+    <script>
+      // 外部リソースを参照しない。読み込み順や通信の有無で状態が変わると、
+      // こちらの変更と相手の変更を区別できなくなる (context/testing.md)。
+      //
+      // **固定の資格情報を持つ。** 記録した手順が資格情報を持たないことを
+      // 確かめるための対象であり、実在のアカウントは使わない。
+      const EMAIL = "user@example.test";
+      const PASSWORD = "pa55word";
+
+      const form = document.getElementById("login");
+      const error = document.getElementById("error");
+      const welcome = document.getElementById("welcome");
+      const who = document.getElementById("who");
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const email = document.getElementById("email").value;
+        const password = document.getElementById("password").value;
+        if (email === EMAIL && password === PASSWORD) {
+          who.textContent = email;
+          form.hidden = true;
+          error.hidden = true;
+          welcome.hidden = false;
+          return;
+        }
+        error.hidden = false;
+      });
+
+      document.getElementById("signout").addEventListener("click", () => {
+        form.hidden = false;
+        welcome.hidden = true;
+        document.getElementById("password").value = "";
+      });
+    </script>
+  </body>
+</html>

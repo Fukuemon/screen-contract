@@ -1,4 +1,39 @@
-import type { Snapshot } from "@screen-contract/domain";
+export {
+  EXECUTION_ERROR_CODES,
+  isExecutionFailure,
+  type ExecutionErrorCode,
+  type ExecutionFailure,
+} from "./errors.js";
+export {
+  allSatisfied,
+  canSkip,
+  evaluate,
+  type EvaluationOutcome,
+  type EvaluationResult,
+  type Observation,
+} from "./evaluate.js";
+export {
+  reconstruct,
+  rerunStep,
+  resumeRun,
+  runSteps,
+  type EvaluationPhase,
+  type ExecutionEvent,
+  type RerunOptions,
+  type ResumeOptions,
+  type RunOptions,
+  type RunOutcome,
+  type StepOutcome,
+  type StepResult,
+  type StepRunner,
+  type TerminalRunStatus,
+} from "./run.js";
+
+import type { ObservedElement, SemanticLocator, Snapshot } from "@screen-contract/domain";
+import type { PageInput } from "./page-input.js";
+
+// 同じ型を core ごとに持たない (context/architecture.md)。
+export type { BoundingBox, ObservedElement, SemanticLocator } from "@screen-contract/domain";
 
 /**
  * Windows が予約しているデバイス名。**拡張子を付けても予約されたまま**である
@@ -94,6 +129,15 @@ export function authContextKey(auth: AuthContext): string {
   return auth.kind === "anonymous" ? "anon" : `profile.${auth.name}`;
 }
 
+export {
+  parsePageInput,
+  type InputModifiers,
+  type KeyPhase,
+  type PageInput,
+  type PointerButton,
+  type PointerPhase,
+} from "./page-input.js";
+
 /** run の識別子。保存の鍵に含めるため、プロファイル名と同じ規則で縛る。 */
 export type RunId = string & { readonly __brand: "RunId" };
 
@@ -108,19 +152,157 @@ export function parseRunId(raw: string): RunId {
   return raw as RunId;
 }
 
+/**
+ * DSL の action。意味論 (実行・検証の仕方) は core/execution が定める。
+ *
+ * skeleton で実行系が通すのは `open` と `click` だけである。語彙の残りは
+ * core/workflow が Schema として受け付け、正規化で未対応として弾く。
+ */
+export type BrowserAction =
+  | { readonly kind: "open"; readonly url: string }
+  | { readonly kind: "click"; readonly locator: SemanticLocator }
+  /**
+   * 入力欄を埋める。
+   *
+   * **値を argv へ載せない実装を要求する** (context/infrastructure.md)。資格情報が
+   * 入りうるため、`ps` から読める経路で渡してはいけない。
+   */
+  | { readonly kind: "fill"; readonly locator: SemanticLocator; readonly value: string };
+
+/** スクリーンショットのバイナリ。注釈は core/artifact が別途重ねる。 */
+export interface Screenshot {
+  readonly bytes: Uint8Array;
+}
+
+/**
+ * 配信への接続。
+ *
+ * **endpoint の形と protocol は adapter に閉じる。** 実行基盤のポートを外部へ
+ * 公開せず、Stream Proxy が中継する (ADR-0008)。
+ */
+export interface StreamRelay {
+  /** 対象ページへ入力を届ける。実行基盤の語彙への写像は adapter が担う。 */
+  send(input: PageInput): void;
+  close(): void;
+}
+
+/**
+ * 対象ページのコンソール出力 1 件。
+ *
+ * **実行基盤の生の形をそのまま流さない。** 流すと CDP の語彙が interface 層まで
+ * 漏れ、基盤を差し替えられなくなる (ADR-0013)。
+ */
+export interface ConsoleMessage {
+  /** `log` / `warn` / `error` など。実行基盤の値をそのまま使う。 */
+  readonly level: string;
+  readonly text: string;
+}
+
 /** ブラウザ実行基盤を差し替え可能にする Port。実装は adapter/browser (ADR-0013)。 */
 export interface BrowserPort {
   /**
    * 認証コンテキストは必須とする。省略できると「認証なし」が既定になるため
-   * (ADR-0022)。Storage State の復号と注入は adapter/browser の責務。
+   * (ADR-0022)。**Storage State の復号と注入は adapter/browser の責務**であり、
+   * 復号した状態を core / app へ渡さない。注入は対象を開く前に行う。
    */
   createSession(auth: AuthContext): Promise<BrowserSession>;
 }
 
+/**
+ * セッションはページ状態と要素参照を保持する第一級の抽象である。
+ * 一時停止中も生存させる (execution feature)。
+ */
 export interface BrowserSession {
+  /** 型付きの action 実行。CLI の呼び出し形式と JSON のパースは adapter に閉じる。 */
+  perform(action: BrowserAction): Promise<void>;
   snapshot(): Promise<Snapshot>;
+  screenshot(): Promise<Screenshot>;
+  /**
+   * 座標から要素を解決するための box 付き要素一覧。
+   *
+   * **対象ページへ描き込む実装がありうる。** box の取得に注釈スクリーンショット
+   * を使う実行基盤では、取得のたびに枠と番号がページへ描かれる (agent-browser
+   * 0.34.0 で実測)。それが配信の映像に映り、操作の邪魔にもなる。**box が要ら
+   * ない用途では `observeVisible` を使う。**
+   */
+  observeElements(): Promise<readonly ObservedElement[]>;
+  /**
+   * 可視な要素の Locator。**box を伴わない。**
+   *
+   * 期待状態の候補を作るのに要るのは「何が見えているか」だけである。box まで
+   * 取ると、対象ページへ描き込む実装で操作の邪魔になる。
+   */
+  observeVisible(): Promise<readonly SemanticLocator[]>;
+  currentUrl(): Promise<string>;
+  /**
+   * 配信へ繋ぐ。1 フレームぶんの data URI を渡す。
+   *
+   * **セッションに属する。** Port 側に置くと、返る relay の寿命がセッションと
+   * 型の上で無関係になり、閉じ忘れを型で防げない。`close()` が relay も閉じる。
+   */
+  connect(onFrame: (dataUri: string) => void): Promise<StreamRelay>;
+  /** 一時停止中もセッションを生かし続ける。 */
+  keepalive(): Promise<void>;
+  /** 対象ページのコンソール出力。 */
+  consoleMessages(): Promise<readonly ConsoleMessage[]>;
+  /**
+   * viewport の寸法を変える。
+   *
+   * **CSS ピクセルで指定する。** 対象アプリの responsive の分岐と対応させる
+   * ためであり、実機の画素数ではない。
+   */
+  setViewport(size: ViewportSize): Promise<void>;
+  /**
+   * 認証状態 (Storage State) を取り出す。
+   *
+   * Baseline は (screen, state, authProfile) で識別される (ADR-0022)。
+   * 取り出した状態は**暗号化して保存する** — 復号と注入は adapter の責務で
+   * あり、core は不透明な値として扱う。
+   */
+  captureStorageState(): Promise<StorageState>;
+  /**
+   * 認証状態を注入する。**注入してから対象を開く。**
+   *
+   * 入れられなかった項目を返す。**黙って落とさない** — 入ったつもりで
+   * 未ログインの画面を撮ると、その差分が仕様の変更として記録される。
+   */
+  restoreStorageState(state: StorageState): Promise<StorageRestoreReport>;
+  /**
+   * このセッションを開くときの注入で入らなかったもの。
+   *
+   * **利用者へ出すために持つ。** ログだけに残すと届かず、入ったつもりで
+   * 未ログインの画面を撮ることになる。
+   */
+  restoreReport(): StorageRestoreReport;
   close(): Promise<void>;
 }
 
-/** 実行時エラーの機械可読コード。認証状態の失効を呼び出し側が判別できるようにする。 */
-export type ExecutionErrorCode = "auth/expired";
+/**
+ * 認証状態の注入の結果。
+ *
+ * 実行基盤によっては入れられない領域がある。**入らなかったことを値で返す。**
+ * 例外にすると cookie だけでも入る場合に全部が失敗し、ログを見るだけにすると
+ * 利用者に届かない。
+ */
+export interface StorageRestoreReport {
+  /** 入れられなかった Web Storage の鍵。**値は含めない。** */
+  readonly skippedKeys: readonly string[];
+  /** 入れられなかった理由。利用者へそのまま出せる 1 文にする。 */
+  readonly reason?: string | undefined;
+}
+
+export interface ViewportSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * ブラウザの認証状態。
+ *
+ * **core は中身を解釈しない。** Cookie と Web Storage の形は実行基盤の都合で
+ * あり、core が知ると基盤を差し替えられなくなる (ADR-0013)。
+ */
+export interface StorageState {
+  readonly cookies: readonly unknown[];
+  readonly localStorage: Readonly<Record<string, unknown>>;
+}

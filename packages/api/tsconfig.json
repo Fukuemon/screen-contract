@@ -1,5 +1,5 @@
 {
-  "extends": "@screen-contract/config/tsconfig/base.json",
+  "extends": "@screen-contract/config/tsconfig/server.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"

@@ -23,6 +23,8 @@ features:
     source_refs:
       - adr/0011-dsl-as-source-of-truth.md
       - adr/0022-auth-state-storage.md
+      - adr/0026-operation-recording.md
+      - specs/4-walking-skeleton/
     coverage: full
 
   - name: execution
@@ -40,8 +42,11 @@ features:
       - design/features/execution/DesignDoc_execution.md
       - context/infrastructure.md
     source_refs:
+      - adr/0002-pause-semantics.md
       - adr/0018-ir-version-pinning.md
       - adr/0022-auth-state-storage.md
+      - adr/0027-agent-browser-bundling.md
+      - specs/4-walking-skeleton/
     coverage: full
 
   - name: element-mapping
@@ -52,6 +57,8 @@ features:
     source_refs:
       - adr/0019-agent-led-ai-suggestions.md
       - adr/0020-suggestion-pull-queue.md
+      - adr/0026-operation-recording.md
+      - specs/4-walking-skeleton/
     coverage: full
 
   - name: artifact-generation
@@ -69,6 +76,8 @@ features:
       - design/features/artifact-generation/DesignDoc_artifact-generation.md
     source_refs:
       - adr/0022-auth-state-storage.md
+      - adr/0028-annotated-artifact-format.md
+      - specs/4-walking-skeleton/
     coverage: full
 
   - name: change-detection
@@ -78,6 +87,7 @@ features:
       - design/features/change-detection/DesignDoc_change-detection.md
     source_refs:
       - adr/0022-auth-state-storage.md
+      - adr/0028-annotated-artifact-format.md
     coverage: full
 
   - name: web-editor
@@ -95,8 +105,11 @@ features:
       - design/features/web-editor/DesignDoc_web-editor.md
       - context/infrastructure.md
     source_refs:
+      - adr/0008-stream-proxy.md
       - adr/0021-agent-interface-authz.md
       - adr/0020-suggestion-pull-queue.md
+      - adr/0026-operation-recording.md
+      - specs/4-walking-skeleton/
     coverage: full
 
   - name: agent-interface

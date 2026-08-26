@@ -1,5 +1,5 @@
 {
-  "extends": "@screen-contract/config/tsconfig/base.json",
+  "extends": "@screen-contract/config/tsconfig/node.json",
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist"
@@ -8,6 +8,18 @@
   "references": [
     {
       "path": "../core-execution"
+    },
+    {
+      "path": "../core-element"
+    },
+    {
+      "path": "../domain"
+    },
+    {
+      "path": "../core-workflow"
+    },
+    {
+      "path": "../core-artifact"
     }
   ]
 }

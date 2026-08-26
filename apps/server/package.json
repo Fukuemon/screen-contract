@@ -8,20 +8,29 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "dev": "cd ../.. && SCREEN_CONTRACT_DEV_ORIGIN=http://127.0.0.1:5175 node apps/server/dist/bin/serve.js",
     "test": "vitest run --passWithNoTests",
     "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.1",
     "@screen-contract/adapter-browser": "workspace:*",
     "@screen-contract/adapter-store": "workspace:*",
-    "@screen-contract/agent": "workspace:*",
     "@screen-contract/api": "workspace:*",
     "@screen-contract/app": "workspace:*",
-    "@screen-contract/core-execution": "workspace:*"
+    "@screen-contract/core-element": "workspace:*",
+    "@screen-contract/core-execution": "workspace:*",
+    "hono": "^4.13.4",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",
+    "@screen-contract/core-artifact": "workspace:*",
+    "@screen-contract/core-workflow": "workspace:*",
+    "@screen-contract/domain": "workspace:*",
+    "@screen-contract/fixture-app": "workspace:*",
     "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
     "vitest": "^4.1.10"
   }
 }

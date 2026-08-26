@@ -10,11 +10,15 @@
     }
   },
   "scripts": {
+    "browser:install": "node scripts/browser-install.mjs",
     "build": "tsc --build",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@screen-contract/core-execution": "workspace:*"
+    "@puppeteer/browsers": "3.2.1",
+    "@screen-contract/core-execution": "workspace:*",
+    "@screen-contract/domain": "workspace:*",
+    "agent-browser": "0.34.0"
   },
   "devDependencies": {
     "@screen-contract/config": "workspace:*",

@@ -31,6 +31,10 @@
 
 **破棄したことをイベントとして残す。** 黙って捨てると、UI 側の不具合と迂回の試みを区別できない。
 
+イベントの名前は `input-discarded` とし、**破棄の理由 (`paused` でない / 操作モードでない / 要求元の run でない) を含める**。
+
+**このイベントを実行イベント列 (ExecutionEvent) へ混ぜない。** 実行イベントは core/execution が定義し run 単位で発行順序が決定的である一方、入力の破棄は Stream Proxy で起き、破棄条件の 1 つ「対象 run が要求元のものでない」では**結びつけるべき run が定まらない**。加えて api から core/execution の語彙のイベントを起こす形は、interface → core の直接依存を禁じる [context/architecture.md](../context/architecture.md) と擦れる。`input-discarded` は Stream Proxy 側の語彙とする。
+
 ## 代替案
 
 - **agent-browser へ直接接続**: ホップが 1 つ減り低遅延だが、無認証ポートの公開と接続先の分散 (UI が実行基盤のポートを知る) が残り、リモート化した時点で構成変更が必要になるため却下。ローカル利用での遅延差は 1 中継分であり、体験を左右する規模ではないと判断した。
@@ -58,9 +62,10 @@
   - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に接続構成を反映 — 本 commit で実施
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「Browser Stream の公開方式」を削除 — 本 commit で実施
   - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) に、入力転送を server 側で検証する契約を追加する — 実施済み
+  - **追記 (2026-08-23)**: `input-discarded` を Stream Proxy 側のイベントとして [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) の「Stream の接続構成」へ定義する — 本 commit で実施 (`specs/4-walking-skeleton/` の D25 / D27)
 
 ## 関連ドキュメント / チケット
 
 - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md)
 - [context/infrastructure.md](../context/infrastructure.md): MVP はローカル実行前提
-- spec / PR: なし
+- spec / PR: `specs/4-walking-skeleton/` の D27 (破棄のイベント語彙)

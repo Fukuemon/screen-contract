@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/*
+ * 配色とタイポの正本は design-system/screen-contract/MASTER.md。
+ * **部品へ色を直書きしない。** 直書きすると、片方だけ変えた状態が残る。
+ *
+ * dark を既定にする。開発者が長時間見る画面であり、対象アプリの映像
+ * (多くは明るい) との対比で viewport の輪郭が読める。
+ */
+@theme {
+  --color-bg: #0f172a;
+  --color-surface: #1b2336;
+  --color-elevated: #272f42;
+  --color-line: #475569;
+  --color-ink: #f8fafc;
+  --color-muted: #94a3b8;
+  --color-accent: #22c55e;
+  --color-on-accent: #0f172a;
+  /*
+   * danger は 3 つに分ける。1 つで済ませると、白文字を載せた面が 3.76:1 に
+   * なり WCAG の 4.5:1 へ届かない。最も読めてほしいラベルが最も読めなくなる。
+   *
+   * - `danger`   枠とアイコン (bg の上で 4.74:1)
+   * - `danger-solid` 白文字を載せる面 (6.47:1)
+   * - `danger-fg`    薄い面の上に置く文字 (5.27:1)
+   */
+  --color-danger: #ef4444;
+  --color-danger-solid: #b91c1c;
+  --color-danger-fg: #f87171;
+  --color-warn: #f59e0b;
+  --color-info: #60a5fa;
+  /* elevated に重なる経路では #60a5fa が 4.04:1 まで落ちる。 */
+  --color-info-fg: #93c5fd;
+
+  --font-sans:
+    "IBM Plex Sans", system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* 本文 16px、行間 1.5。小さくすると長時間の閲覧で読めなくなる。 */
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /*
+   * **フォーカスリングを消さない。** キーボードだけで辿れなくなる。
+   * `:focus-visible` に限ることで、マウス操作では出さない。
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-info);
+    outline-offset: 2px;
+  }
+
+  /* 動きで意味を伝えるが、**減らす設定を尊重する**。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

@@ -14,6 +14,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@screen-contract/core-workflow": "workspace:*",
     "@screen-contract/domain": "workspace:*"
   },
   "devDependencies": {

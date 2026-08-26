@@ -3,8 +3,12 @@ packages:
   - packages/*
   - e2e
 
-# postinstall でネイティブバイナリを取得するパッケージを明示的に許可する。
-# 許可しないと pnpm が build script を黙って飛ばし、lefthook install が失敗して
-# git hook が張られない (品質ゲートが無効になる)。
+# postinstall を走らせる必要があるパッケージを明示的に許可する。
+# lefthook: 許可しないと pnpm が build script を黙って飛ばし、lefthook install が
+# 失敗して git hook が張られない (品質ゲートが無効になる)。
+# agent-browser: 許可しないとネイティブバイナリの実行ビットが落ちたままになり、
+# CLI を直接 spawn できない。JS wrapper 経由でも動くが、呼び出しごとに node の
+# 起動が挟まる (実測で 1 回あたり約 94ms の差)。ADR-0027。
 onlyBuiltDependencies:
+  - agent-browser
   - lefthook

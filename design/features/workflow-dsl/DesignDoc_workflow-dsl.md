@@ -18,7 +18,7 @@ keywords:
 governs:
   - packages/core-workflow/
   - packages/domain/
-verified_commit: ed339e9fb684cc46ebcb7ceea48567202de46c3d
+verified_commit: ae7532aa70652a1f63add9d5ada937eaa4f806a6
 ---
 
 # Feature 設計: ワークフロー定義 (core/workflow)
@@ -292,7 +292,9 @@ IR のステップは `action + expectation + 由来 (どの文書のどの宣�
 | 入れ子の深さ       | 上限を設ける。超えたらエラーにする                                       |
 | 展開後のステップ数 | 上限を設ける。循環していなくても、多段の展開で件数が急増しうる           |
 
-いずれも `ref/cyclic` / `ref/too-deep` / `ref/too-many-steps` の構造化エラーで返す。**「重いので止まった」ではなく「規則に反している」として返す。** エージェントが自己修正できる形にするためである。
+いずれも `ref/cyclic` / `ref/too-deep` / `ref/too-many-steps` の構造化エラーで返す。
+
+**Schema が受け付ける語彙のうち、実行系が対応していないものも構造化エラーで返す。** 段階的に実装する過程では、Schema が語彙を一通り受け付けるのに実行系が一部しか実装していない状態が生じる。黙って無視すると、書いたステップが実行されないまま `skipped` として記録されうる。実行前の正規化で `action/unimplemented` / `expect/unimplemented` として弾き、どの語彙が未対応かを返す。**「重いので止まった」ではなく「規則に反している」として返す。** エージェントが自己修正できる形にするためである。
 
 上限の具体値は実装時に決める。**先に決めるのは「上限を持つ」という契約**であり、数値ではない。
 

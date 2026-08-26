@@ -4,12 +4,29 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc --build",
-    "test": "vitest run --passWithNoTests"
+    "build": "vite build",
+    "test": "vitest run --passWithNoTests",
+    "dev": "vite dev"
   },
   "devDependencies": {
     "@screen-contract/api": "workspace:*",
     "@screen-contract/config": "workspace:*",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "vite": "^8.2.2",
     "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/react-start": "^1.168.49",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.34.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3"
   }
 }

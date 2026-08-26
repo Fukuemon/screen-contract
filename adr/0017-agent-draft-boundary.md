@@ -26,6 +26,8 @@
 
 - interface 上もこの境界を強制する: 正本を変更する tool は存在せず、エージェントができるのは承認依頼 (`approval.request`) までとする。
 - 承認は非ブロッキングとし、承認待ちの間もエージェントは他の draft 作業を継続できる。差し戻しは構造化コメントで返し、修正 → 再依頼のループを回せるようにする。**依頼は対象 draft の revision を固定し、承認時に一致しなければ確定しない** (承認待ちの間の編集が、人間の見ていない差分のまま確定するのを防ぐ)。
+- **revision は draft の内容ハッシュとする。** [adr/0018](0018-ir-version-pinning.md) が Workflow IR の版を「正規化した IR の内容から決まる値」と定めており、方式を揃えると版の意味が 1 つで済む。カウンタの永続化も要らない。内容が同じなら同じ値になるため、編集して元に戻した draft は `stale` にならない。人間が見た差分と確定する内容が一致する以上、本 ADR の目的は満たす。
+- **draft と正本は別の置き場に保存する。** 同一ファイルの版として持つ形では分離が実装の約束になり、「別のものとして保存されている」ことを構造で示せない。承認は「draft を正本の置き場へ確定させる」操作になる。
 
 ### この境界が及ばない範囲
 
@@ -42,6 +44,8 @@ run 系を承認ゲートの対象にしない。実行のたびに人間の承�
 ## 代替案
 
 - **エージェントにも確定を許す**: 仕様書の信頼性が AI 出力の正しさに直接依存し、誤った Baseline・採番の混入を確定後にしか発見できないため却下。差分検知の比較基準 (Baseline) が無承認で動くと、検知結果自体が信頼できなくなる。
+- **revision を単調増加する版番号にする**: どちらが新しいかが分かる。しかし ADR-0018 の IR 版と方式が食い違い、内容が同じでも `stale` になる誤検出が出る。承認待ちの間の編集を検出するという目的には内容ハッシュで足りるため却下。
+- **draft と正本を同一ファイルの版として持つ**: ファイル数が少ない。しかし分離を実装の約束で保つことになり、「別のものとして保存されている」ことをテストで直接示せない。置き場を分ければ構造で満たせるため却下。
 - **すべての操作に人間の承認を要求する**: draft 編集まで承認制にすると、エージェントによる自律的な作成・編集・自己修正のループが成立せず、AI ネイティブの成功条件を満たせないため却下。
 
 ## 影響
@@ -66,9 +70,10 @@ run 系を承認ゲートの対象にしない。実行のたびに人間の承�
   - [design/DesignDoc.md](../design/DesignDoc.md) の ADR 表を更新、[design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の ADR 参照を更新 — 実施済み
   - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) に run 系 tool の対象 origin 制限と記録の契約を追加する — 実施済み
   - [context/infrastructure.md](../context/infrastructure.md) に実行してよい origin の設定の置き場を記載する — 実施済み
+  - **追記 (2026-08-23)**: draft と正本を別の置き場に保存する規則を [context/architecture.md](../context/architecture.md) の State Boundary へ反映する (判断の正本は本 ADR) — 本 commit で実施 (`specs/4-walking-skeleton/` の D7 / D9)
 
 ## 関連ドキュメント / チケット
 
 - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md): 公開原則と承認依頼のフロー
 - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md): 承認と差し戻しの UI
-- spec / PR: なし
+- spec / PR: `specs/4-walking-skeleton/` の D7 / D9

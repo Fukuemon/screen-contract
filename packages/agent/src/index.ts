@@ -10,7 +10,15 @@ export interface AgentHandlers {
   startRun(raw: unknown): Promise<void>;
 }
 
-export function createAgentHandlers(useCases: UseCases): AgentHandlers {
+/**
+ * エージェントへ渡す use case を**承認を含まない形に絞る**。
+ *
+ * `UseCases` をそのまま渡すと `approve` へ届き、「承認は人間の行為」という
+ * ADR-0017 の性質が型で守られない。規約ではなく型で示す。
+ */
+export type AgentUseCases = Pick<UseCases, "startRun" | "saveDraft" | "requestApproval">;
+
+export function createAgentHandlers(useCases: AgentUseCases): AgentHandlers {
   return {
     async startRun(raw: unknown): Promise<void> {
       // MCP は stdio のため認証情報を要求しない。ループバック側でトークンを

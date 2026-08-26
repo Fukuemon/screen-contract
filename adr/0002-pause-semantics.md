@@ -19,13 +19,15 @@
 - 一時停止は**ステップ境界でのみ**効く。pause 要求は実行中ステップの完了後に停止する予約として扱う。
 - 一時停止中の**実ページ操作を許可**する。要素選択のための座標問い合わせは操作に含めず常に可能とする。
 - **再開時に通過済みステップの期待状態を再評価**し、満たさなくなった最初のステップへ巻き戻して再実行する。冪等スキップにより、変化のない区間は高速に通過する。
+- **最終ステップの完了と pause 予約が重なったときは、pause 予約を優先して `paused` へ入る。** ステップ列を消化しきったことより、利用者がこのセッションを使いたいという意思表示を優先する。優先順位を決めないと、ステップが 1 件だけの run で `completed` に倒れ、一時停止を前提とする経路 (操作の記録など) が成立しない。
+- **pause 予約は 1 回で消費される。** `resume` すると予約は消え、次の完了では `completed` へ進む。
 
 決定した挙動を状態遷移図で示す。
 
 ```mermaid
 stateDiagram-v2
     [*] --> running : run 開始
-    running --> paused : pause 要求<br/>(実行中ステップの完了後に停止)
+    running --> paused : pause 要求<br/>(実行中ステップの完了後に停止。<br/>最終ステップの完了より優先する)
     paused --> paused : 要素選択 (座標 query) /<br/>実ページ操作 (許可)
     paused --> verify : resume
     state verify <<choice>>
@@ -33,7 +35,7 @@ stateDiagram-v2
     verify --> rollback : 前提不一致
     state "巻き戻し" as rollback
     rollback --> running : 崩れた最初のステップから再実行<br/>(変化のない区間は冪等スキップ)
-    running --> [*] : completed / failed / aborted
+    running --> [*] : completed / failed / aborted<br/>(pause 予約が無いときだけ completed へ進む)
 ```
 
 ## 代替案
@@ -64,9 +66,10 @@ stateDiagram-v2
 - context / AI 向け設定更新要否:
   - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「一時停止中の画面操作の扱い」を解決済みとして削除する — 本 commit で実施
   - 詳細設計は [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) に反映済み
+  - **追記 (2026-08-23)**: 最終ステップの完了と pause 予約の優先順位、および pause 予約が 1 回で消費されることを [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md) の「実行状態と再生制御」へ反映する — 本 commit で実施 (`specs/4-walking-skeleton/` の D19 / D22)
 
 ## 関連ドキュメント / チケット
 
 - [design/DesignDoc.md](../design/DesignDoc.md): 再生制御の成功条件
 - [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md)
-- spec / PR: なし
+- spec / PR: `specs/4-walking-skeleton/` の D15 / D19 / D22 (優先順位と one-shot の追記)

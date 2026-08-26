@@ -17,8 +17,19 @@ module.exports = {
       name: "no-circular",
       severity: "error",
       comment: "循環依存を禁じる。",
-      from: {},
+      // 生成物との型の循環だけを外す。**2 つのファイルをパスで固定する。**
+      // 手書きコードが作った循環は、循環に含まれる手書きファイルを起点として
+      // ここで捕まる (生成物を経由していても、起点が別なら除外に当たらない)。
+      from: { pathNot: "^apps/web/src/(router[.]tsx|routeTree[.]gen[.]ts)$" },
       to: { circular: true },
+    },
+    {
+      name: "no-circular-from-router",
+      severity: "error",
+      comment:
+        "router.tsx からの循環も、生成物 (apps/web/src/routeTree.gen.ts) を経由しないものは禁じる。",
+      from: { path: "^apps/web/src/router[.]tsx$" },
+      to: { circular: true, viaNot: "^apps/web/src/routeTree[.]gen[.]ts$" },
     },
     {
       name: "packages-not-to-apps",
@@ -42,6 +53,17 @@ module.exports = {
         "依存は interface → app の一方向。app から interface を参照すると逆流する (context/architecture.md)。",
       from: { path: "^packages/app/" },
       to: { path: "^packages/(api/|agent/)" },
+    },
+    {
+      name: "fixture-not-into-production",
+      severity: "error",
+      comment:
+        "fixture 対象アプリはテストが操作する相手であり、production の依存グラフへ入れない。listen する HTTP サーバを持つため、紛れ込むと配布物が待受を始める (context/architecture.md)。",
+      from: {
+        pathNot:
+          "^(packages/fixture-app/|apps/server/src/.*\\.(test|integration\\.test)\\.ts$|e2e/)",
+      },
+      to: { path: "^packages/fixture-app/" },
     },
     {
       name: "adapter-not-outward",
