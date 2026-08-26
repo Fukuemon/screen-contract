@@ -8,9 +8,18 @@ const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
 const webRoot = fileURLToPath(new URL("../../../web/dist/client/", import.meta.url));
 
+/**
+ * 開発時は Vite dev server の前に立つ。
+ *
+ * **同一 origin を崩さない。** Vite の origin から開いた画面は、Origin 検査と
+ * トークンの埋め込みのどちらも通らず動かない (context/infrastructure.md)。
+ */
+const webDevOrigin = process.env["SCREEN_CONTRACT_DEV_ORIGIN"];
+
 const result = await runServer({
   home: homedir(),
   webRoot,
+  webDevOrigin,
   xdgStateHome: process.env["XDG_STATE_HOME"],
   cwd: process.cwd(),
   forbiddenRoots: [repoRoot],

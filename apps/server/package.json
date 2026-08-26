@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "dev": "cd ../.. && SCREEN_CONTRACT_DEV_ORIGIN=http://127.0.0.1:5175 node apps/server/dist/bin/serve.js",
     "test": "vitest run --passWithNoTests",
     "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
   },

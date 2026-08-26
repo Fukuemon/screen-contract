@@ -17,6 +17,15 @@ import { StartupAbort } from "./abort.js";
  */
 export interface ProductConfig {
   readonly allowedOrigins: readonly string[];
+  /**
+   * 待受ポート。省略すると OS に割り当てさせる。
+   *
+   * **既定は割り当てさせる側である** (context/infrastructure.md)。固定すると他の
+   * アプリと衝突する。それでも固定したいのは、ブックマークや外部ツールの設定に
+   * 書きたいときである。指定した番号が使えなければ**起動を中止する** — 黙って
+   * 別のポートへ逃げると、固定した意味が無い。
+   */
+  readonly port?: number | undefined;
 }
 
 function parseOrigin(value: unknown): string {
@@ -41,6 +50,24 @@ function parseOrigin(value: unknown): string {
     throw new StartupAbort(
       "プロダクト設定の allowedOrigins に origin ではない要素があります",
       "http:// または https:// の origin のみを書いてください",
+    );
+  }
+  return value;
+}
+
+/**
+ * 待受ポート。
+ *
+ * **well-known port を避ける。** 1024 未満は特権が要り、指定できても起動しない。
+ */
+function parsePort(value: unknown): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1024 || value > 65_535) {
+    throw new StartupAbort(
+      "プロダクト設定の port が待受ポートとして使えません",
+      "1024 以上 65535 以下の整数を書いてください (省略すると OS に割り当てさせます)",
     );
   }
   return value;
@@ -76,15 +103,17 @@ export function loadProductConfig(path: string): ProductConfig {
       "設定ファイルの内容を確認してください",
     );
   }
-  const { allowedOrigins } = parsed as { allowedOrigins?: unknown };
-  if (allowedOrigins === undefined) {
-    return { allowedOrigins: [] };
-  }
-  if (!Array.isArray(allowedOrigins)) {
-    throw new StartupAbort(
-      "プロダクト設定の allowedOrigins が配列ではありません",
-      "allowedOrigins は origin の文字列の配列です",
-    );
-  }
-  return { allowedOrigins: allowedOrigins.map(parseOrigin) };
+  const { allowedOrigins, port } = parsed as { allowedOrigins?: unknown; port?: unknown };
+  const origins =
+    allowedOrigins === undefined
+      ? []
+      : Array.isArray(allowedOrigins)
+        ? allowedOrigins.map(parseOrigin)
+        : (() => {
+            throw new StartupAbort(
+              "プロダクト設定の allowedOrigins が配列ではありません",
+              "allowedOrigins は origin の文字列の配列です",
+            );
+          })();
+  return { allowedOrigins: origins, port: parsePort(port) };
 }

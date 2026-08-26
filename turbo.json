@@ -15,6 +15,11 @@
     "e2e": {
       "dependsOn": ["@screen-contract/server#build"],
       "cache": false
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
     }
   }
 }

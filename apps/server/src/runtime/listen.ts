@@ -14,6 +14,7 @@ import type {
 } from "@screen-contract/app";
 import type { AuthPolicy } from "@screen-contract/api";
 import { compose } from "../compose.js";
+import { createDevProxy } from "../serving/dev-proxy.js";
 import { createFsWebAssets } from "../serving/web-assets.js";
 import { generateBootKey, generateLocalToken } from "../startup/token.js";
 import {
@@ -42,6 +43,13 @@ export interface ListenOptions {
    * (context/infrastructure.md)。渡さないと配信しない。
    */
   readonly webRoot?: string | undefined;
+  /**
+   * 開発時の画面配信元 (Vite dev server の origin)。
+   *
+   * 渡すと `webRoot` の代わりに使う。**同一 origin を崩さない**ため、server が
+   * dev server の前に立つ (context/infrastructure.md)。
+   */
+  readonly webDevOrigin?: string | undefined;
   /** 0 なら OS に割り当てさせる。 */
   readonly port?: number | undefined;
   readonly host?: LifecycleHost | undefined;
@@ -142,9 +150,13 @@ export async function listen(options: ListenOptions): Promise<RunningServer> {
     // **トークンは配信する HTML へ埋め込む。** ブラウザは runtime.json を
     // 読めず、URL の query には載せられない (context/infrastructure.md)。
     web:
-      options.webRoot === undefined
+      options.webDevOrigin !== undefined || options.webRoot === undefined
         ? undefined
         : createFsWebAssets({ root: options.webRoot, token }),
+    webDev:
+      options.webDevOrigin === undefined
+        ? undefined
+        : createDevProxy({ target: options.webDevOrigin, token }),
   }).http;
 
   // listen の完了を待つ。待たずに address() を読むと、ポートが決まる前の

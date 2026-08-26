@@ -63,14 +63,41 @@ screen-contract-server: 実行してよい origin が 1 つも列挙されてい
 
 ```sh
 pnpm serve
-# => screen-contract-server: http://127.0.0.1:<port> で待ち受けています
+# => screen-contract-server: 次の URL を開いてください
+#    http://127.0.0.1:<port>/?boot=<起動チケット>
 ```
 
-ポートは OS が割り当てる。接続先は `runtime.json` に入る。
+**出力された URL をそのまま開く。** origin だけを開くとトークンが埋め込まれず、
+画面が動かない。チケットは起動ごとに変わり、1 度使うと cookie へ移る
+([context/infrastructure.md](../../context/infrastructure.md))。
+
+ポートは既定で OS が割り当てる。固定したいときはプロダクト設定へ書く。
+
+```jsonc
+// screen-contract.config.json
+{ "allowedOrigins": ["http://127.0.0.1:5174"], "port": 5900 }
+```
+
+接続先は `runtime.json` に入る。
 
 ```sh
 cat "${XDG_STATE_HOME:-$HOME/.local/state}/screen-contract/runtime.json"
 ```
+
+### 画面を触りながら直す (HMR)
+
+`pnpm serve` は web をビルドしてから静的に配信する。web を触るたびに build が要る。
+開発中は `pnpm dev` を使う。
+
+```sh
+pnpm dev
+# Vite (127.0.0.1:5175) と Workflow Server が並んで上がる
+# 開くのは Workflow Server の URL (チケット付き)
+```
+
+**Vite の URL (5175) を直接開かない。** Origin 検査とトークンの埋め込みのどちらも
+通らず、画面が一切動かない。Workflow Server が Vite の前に立ち、画面は server の
+origin から配られる。
 
 ## 5. 確認する
 
@@ -80,21 +107,29 @@ cat "${XDG_STATE_HOME:-$HOME/.local/state}/screen-contract/runtime.json"
 | --- | ------------------------------------ | ------------------------------------------------------------------------- |
 | 1   | `http://127.0.0.1:<port>/` を開く    | エディタ画面。右上は「未接続」。viewport は「接続」を促す                 |
 | 2   | ページのソースを見る                 | `<meta name="screen-contract-token" ...>` がある。URL に token を含まない |
-| 3   | 「操作モード」を押す                 | 押せない (run がまだ無いため)                                             |
-| 4   | 「接続」を押す                       | 対象アプリが viewport に映り、右上が「一時停止中」になる                  |
-| 5   | 「操作モード」を押す                 | 押せるようになっている。切り替わると案内文が変わる                        |
-| 6   | viewport のボタンをクリックする      | 対象アプリのモーダルが開く                                                |
-| 7   | 「記録を開始」を押す                 | 右上の記録バッジが赤い「記録中」に変わる                                  |
-| 8   | 「選択モード」へ戻す                 | 記録が止まり、バッジが「停止中」へ戻る                                    |
-| 9   | 選択モードで viewport をクリックする | モーダルは開かず、「選択した座標」が出る                                  |
-| 10  | 「再開」を押す                       | 「再生中」になり、操作モードが押せなくなる                                |
-| 11  | `/approvals` を開く                  | 「承認」が押せない (差分を表示していないため)                             |
-| 12  | 「差分を表示」を押す                 | 差分が出て、「承認」が押せるようになる                                    |
+| 3   | 「操作」を押す                       | 押せない (接続していないため)。理由が読める                               |
+| 4   | 「接続」を押す                       | 対象アプリが viewport に映り、右上が「接続中 — 操作できます」になる       |
+| 5   | 「操作」を押す                       | 押せるようになっている。「要素の枠」は押せなくなる                        |
+| 6   | viewport のボタンをクリックする      | 対象アプリのモーダルが開く。**1 回目から効く**                            |
+| 7   | 「記録」タブ →「記録を開始」         | 赤い「記録中」が出る。手順の前提条件が 3 段で見える                       |
+| 8   | viewport をクリックする              | 「記録」タブの件数が増え、手順が積まれる (数秒で反映)                     |
+| 9   | 「選択」へ戻す                       | 記録が止まる                                                              |
+| 10  | 「要素の枠」を押す                   | 枠と構成番号が出る。**対象ページ側に赤い枠は出ない**                      |
+| 11  | 選択モードで viewport をクリックする | モーダルは開かず、選んだ要素の role と name が出る                        |
+| 12  | 「番号を付ける」→ 別の対象へ移る     | 番号が引き継がれない。戻ると番号も戻る                                    |
+| 13  | ログイン画面 (`/login/`) で入力する  | 文字が入る。記録した手順に値が残らず `secret` バッジが付く                |
+| 14  | 「再生」を押す                       | 記録した手順が最初から実行され、ログインが再現される                      |
+| 15  | 「承認へ回す」を押す                 | 承認へ回した旨が出る                                                      |
+| 16  | `/approvals` を開く                  | 依頼が並ぶ。「承認」が押せない (差分を表示していないため)                 |
+| 17  | 「差分を表示」を押す                 | 差分が出て、「承認」が押せるようになる                                    |
+| 18  | 「切断」→「接続」                    | 何度でも繋ぎ直せる。行き止まりにならない                                  |
 
 ### 認可の負例 (curl)
 
 ```sh
 PORT=<port>; TOKEN=<runtime.json の token>
+# 起動チケット無しではトークンを配らない (同一マシンの他プロセス対策)
+curl -s "http://127.0.0.1:$PORT/" | grep -c screen-contract-token                                 # 0
 curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:$PORT/approvals"                       # 401
 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $TOKEN" \
   -H "Origin: http://127.0.0.1:$PORT" "http://127.0.0.1:$PORT/approvals"                          # 200
@@ -111,11 +146,20 @@ cat "${XDG_STATE_HOME:-$HOME/.local/state}/screen-contract/runtime.json"  # => �
 
 `runtime.json` が消えることまで確かめる。残ると、次に起動した利用者が死んだプロセスへ繋ぎに行く。
 
+## 確認するときの注意
+
+**別のブラウザ自動化ツールで UI を操作しない。** agent-browser を 2 つ同時に動かすと
+片方の配信が切れ、映像が止まる。製品の不具合と見分けが付かない
+([context/testing.md](../../context/testing.md) の実測表)。人が触るか、HTTP と
+WebSocket を直接叩いて確かめる。
+
 ## 未実装で確認できない項目
 
-手順 6〜9 で操作と記録の**モードは動く**が、**記録した手順が draft へ積まれない**。
-記録の use case (`startRecording` / `stopRecording`) は実装済みだが、Stream Proxy が
-中継した入力と結びつける経路がまだ無い。「記録した手順」パネルは常に空になる。
+- **Web Storage を使う対象のログイン維持。** 実行基盤が値を argv でしか受けず、
+  秘密が他プロセスから読めるため復元していない。cookie だけで認証が通らない対象では、
+  手でログインし直す (画面に注意書きが出る)。
+- 同じ URL 上のモーダル開閉を別の画面状態として扱うこと
+  ([adr/0029](../../adr/0029-recording-state-key.md))。
 
 残りは [index.md](index.md) の `## 実装で見つかった上位資料の欠落` を参照する。
 

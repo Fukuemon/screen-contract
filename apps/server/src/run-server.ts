@@ -28,6 +28,13 @@ export interface ServerEnv {
   readonly home: string;
   /** Web UI のビルド成果物。無ければ配信しない。 */
   readonly webRoot?: string | undefined;
+  /**
+   * 開発時の画面配信元 (Vite dev server の origin)。
+   *
+   * 渡すと `webRoot` の代わりに使う。**同一 origin を崩さない**ため、server が
+   * dev server の前に立つ (context/infrastructure.md)。
+   */
+  readonly webDevOrigin?: string | undefined;
   readonly xdgStateHome: string | undefined;
   readonly cwd: string;
   /** リポジトリと worktree のルート。置き場がここの配下なら中止する。 */
@@ -46,9 +53,12 @@ const PRODUCT_CONFIG_NAME = "screen-contract.config.json";
 export async function runServer(env: ServerEnv): Promise<ServerResult> {
   let stateDir: string;
   let allowedOrigins: readonly string[];
+  let port: number | undefined;
   try {
     const chrome = resolveChromeInstall(env.home);
-    allowedOrigins = loadProductConfig(join(env.cwd, PRODUCT_CONFIG_NAME)).allowedOrigins;
+    const config = loadProductConfig(join(env.cwd, PRODUCT_CONFIG_NAME));
+    allowedOrigins = config.allowedOrigins;
+    port = config.port;
     stateDir = runStartupChecks({
       stateDir: resolveStateDir(env.xdgStateHome, env.home),
       forbiddenRoots: env.forbiddenRoots,
@@ -92,8 +102,10 @@ export async function runServer(env: ServerEnv): Promise<ServerResult> {
 
     const server = await listen({
       browser,
+      port,
       stateDir,
       webRoot: env.webRoot,
+      webDevOrigin: env.webDevOrigin,
       allowedOrigins: createAllowedOrigins({
         config: createOriginsConfig(join(env.cwd, PRODUCT_CONFIG_NAME)),
         initial: allowedOrigins,

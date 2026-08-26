@@ -1,5 +1,10 @@
 import { createFsStore } from "@screen-contract/adapter-store";
-import { createHttpApp, type AuthPolicy, type WebAssets } from "@screen-contract/api";
+import {
+  createHttpApp,
+  type AuthPolicy,
+  type DevAssets,
+  type WebAssets,
+} from "@screen-contract/api";
 import { createUseCases } from "@screen-contract/app";
 import type { StorePort, UseCases, ViewportControl } from "@screen-contract/app";
 import type { BrowserPort } from "@screen-contract/core-execution";
@@ -37,6 +42,8 @@ export interface ComposeOptions {
   readonly stream?: MiddlewareHandler | undefined;
   /** Web UI の配信。実体の読み込みは合成ルートが渡す。 */
   readonly web?: WebAssets | undefined;
+  /** 開発時の画面配信。渡すと `web` の代わりに使う。 */
+  readonly webDev?: DevAssets | undefined;
   /**
    * live viewport の run。
    *
@@ -63,6 +70,7 @@ export function compose(options: ComposeOptions) {
       policy: options.policy ?? (() => undefined),
       stream: options.stream,
       web: options.web,
+      webDev: options.webDev,
       viewport: options.viewport?.(useCases),
     }),
   };

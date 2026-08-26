@@ -310,3 +310,33 @@ describe("ローカルトークン", () => {
     expect(a).not.toBe(generateLocalToken());
   });
 });
+
+describe("待受ポートの設定", () => {
+  /** 設定を書いて読み直す。 */
+  function load(config: Record<string, unknown>) {
+    const path = join(tempDir(), `port-${String(Math.abs(JSON.stringify(config).length))}.json`);
+    writeFileSync(path, JSON.stringify(config));
+    return loadProductConfig(path);
+  }
+
+  it("省略すると OS に割り当てさせる", () => {
+    // 既定は割り当てさせる側である。固定すると他のアプリと衝突する。
+    expect(load({ allowedOrigins: [] }).port).toBeUndefined();
+  });
+
+  it("指定した番号を返す", () => {
+    expect(load({ allowedOrigins: [], port: 5900 }).port).toBe(5900);
+  });
+
+  it.each([
+    ["特権ポート", 80],
+    ["範囲外", 70_000],
+    ["0", 0],
+    ["負", -1],
+    ["小数", 5900.5],
+    ["文字列", "5900"],
+  ])("%s を拒否する", (_label, port) => {
+    // 使えない番号を通すと、起動時ではなく listen の失敗として現れる。
+    expect(() => load({ allowedOrigins: [], port })).toThrow(StartupAbort);
+  });
+});

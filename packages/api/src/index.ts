@@ -24,7 +24,7 @@ export type {
   ViewportSnapshot,
 } from "@screen-contract/app";
 
-export { createHttpApp, type HttpAppOptions, type WebAssets } from "./http.js";
+export { createHttpApp, type DevAssets, type HttpAppOptions, type WebAssets } from "./http.js";
 export {
   bootCookie,
   BOOT_COOKIE,

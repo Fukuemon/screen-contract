@@ -7,21 +7,22 @@
     "node": "^24"
   },
   "scripts": {
-    "prepare": "lefthook install",
-    "dev": "tsc --build --watch",
+    "boundaries": "turbo run build && depcruise apps/*/src packages/*/src packages/*/scripts packages/config/vitest e2e/src",
+    "browser:install": "pnpm --filter @screen-contract/adapter-browser run browser:install",
     "build": "turbo run build",
-    "serve": "turbo run build && node apps/server/dist/bin/serve.js",
-    "typecheck": "tsc --build",
-    "lint": "oxlint --type-aware && pnpm typecheck",
+    "check": "pnpm lint && pnpm format && pnpm test && pnpm build",
+    "dev": "turbo run dev --parallel",
+    "dev:types": "tsc --build --watch",
+    "e2e": "turbo run e2e",
     "format": "oxfmt --check --ignore-path .oxfmtignore . && prettier --check \"**/*.{md,yml,yaml,json,css}\"",
     "format:write": "oxfmt --ignore-path .oxfmtignore . && prettier --write \"**/*.{md,yml,yaml,json,css}\"",
+    "knip": "knip",
+    "lint": "oxlint --type-aware && pnpm typecheck",
+    "prepare": "lefthook install",
+    "serve": "turbo run build && node apps/server/dist/bin/serve.js",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
-    "e2e": "turbo run e2e",
-    "check": "pnpm lint && pnpm format && pnpm test && pnpm build",
-    "boundaries": "turbo run build && depcruise apps/*/src packages/*/src packages/*/scripts packages/config/vitest e2e/src",
-    "knip": "knip",
-    "browser:install": "pnpm --filter @screen-contract/adapter-browser run browser:install"
+    "typecheck": "tsc --build"
   },
   "devDependencies": {
     "@typescript/native": "npm:typescript@^7.0.2",

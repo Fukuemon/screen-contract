@@ -1,8 +1,7 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { extname, join, resolve, sep } from "node:path";
 import type { WebAssets } from "@screen-contract/api";
-import { ConflictError } from "@screen-contract/app";
-import { TOKEN_META } from "./web-token.js";
+import { embedToken } from "./web-token-embed.js";
 
 /**
  * Web UI の配信。
@@ -14,25 +13,6 @@ import { TOKEN_META } from "./web-token.js";
  */
 
 /** HTML をエスケープする。トークンは 16 進だが、埋め込みの安全は形に依存させない。 */
-function escapeAttribute(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-export function embedToken(html: string, token: string): string {
-  const meta = `<meta name="${TOKEN_META}" content="${escapeAttribute(token)}">`;
-  const head = html.indexOf("</head>");
-  if (head < 0) {
-    // 埋め込めないまま配信しない。配信すると、原因の分からない 401 になる。
-    // **入力の誤りではない。** ビルド成果物の異常であり、client には直せない。
-    throw new ConflictError("配信する HTML に head がありません");
-  }
-  return html.slice(0, head) + meta + html.slice(head);
-}
-
 const CONTENT_TYPES: Readonly<Record<string, string>> = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",

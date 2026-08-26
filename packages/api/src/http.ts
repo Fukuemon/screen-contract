@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { UseCases, ViewportControl } from "@screen-contract/app";
 import { isConflictError, isExecutionFailure, isValidationError } from "@screen-contract/app";
 import { bootCookie, BOOT_QUERY, checkBootTicket } from "./boot-ticket.js";
@@ -20,6 +20,9 @@ import {
  * 合成ルートである (ADR-0023 / ADR-0024)。認可は Hono のミドルウェアとして
  * interface 層に閉じる (ADR-0021)。
  */
+
+/** Vite dev server が持つ名前空間。API の path とは重ならない。 */
+const DEV_PATHS = ["/", "/@*", "/src/*", "/node_modules/*", "/favicon.ico", "/assets/*"];
 
 const STATUS: Readonly<Record<AuthRejection, 401 | 403>> = {
   "missing-token": 401,
@@ -48,12 +51,31 @@ export interface HttpAppOptions {
    */
   readonly web?: WebAssets | undefined;
   /**
+   * 開発時の画面配信。
+   *
+   * **`web` の代わりに使う。** 同一 origin を崩さないため、server が dev server の
+   * 前に立つ (context/infrastructure.md)。渡すと `web` は無視する。
+   */
+  readonly webDev?: DevAssets | undefined;
+  /**
    * live viewport の run。
    *
    * **操作モードと記録は `paused` の run の枠内でしか使えない** (ADR-0002)。
    * 渡さないと `/viewport` 系の endpoint を生やさない。
    */
   readonly viewport?: ViewportControl | undefined;
+}
+
+/**
+ * 開発時の画面配信。
+ *
+ * 起動チケットの扱いは静的配信と同じである。**片方だけ緩めない。**
+ */
+export interface DevAssets {
+  /** dev server から HTML を取り、トークンを埋めて返す。 */
+  shell(authorized: boolean): Promise<string>;
+  /** HTML 以外の資材を中継する。 */
+  asset: MiddlewareHandler;
 }
 
 export interface WebAssets {
@@ -72,6 +94,33 @@ export interface WebAssets {
 
 export function createHttpApp(options: HttpAppOptions): Hono {
   const app = new Hono();
+
+  /**
+   * 画面の配信。
+   *
+   * **起動チケットを見る。** `GET /` はトークンを埋め込んだ画面を返す唯一の
+   * 経路であり、無条件に開けると同一マシンの任意プロセスがトークンを取れる。
+   * チケットは query で 1 度受け取り、cookie へ移す。
+   *
+   * 静的配信と開発時で**同じ判定を通す**。片方だけ緩めない。
+   */
+  async function serveShell(
+    c: Context,
+    render: (authorized: boolean) => Promise<string>,
+  ): Promise<Response> {
+    const policy = options.policy();
+    if (policy === undefined) {
+      return c.json({ error: "unavailable" }, 503);
+    }
+    const outcome = checkBootTicket(
+      { query: c.req.query(BOOT_QUERY), cookie: c.req.header("cookie") },
+      policy.bootKey,
+    );
+    if (outcome.kind === "issue") {
+      c.header("set-cookie", bootCookie(policy.bootKey));
+    }
+    return c.html(await render(outcome.kind !== "denied"));
+  }
 
   /**
    * ブラウザが直接叩く経路。**トークンを要求しない。**
@@ -103,31 +152,29 @@ export function createHttpApp(options: HttpAppOptions): Hono {
     app.get("/stream", options.stream);
   }
 
-  if (options.web !== undefined) {
+  if (options.webDev !== undefined) {
+    /**
+     * 開発時の画面配信。
+     *
+     * **API の path を巻き込まない。** `*` で受けると、後ろに登録する endpoint
+     * より先に一致してしまう。dev server が持つ名前空間だけを列挙する。
+     *
+     * 列挙から漏れると dev で 404 になる。**認可には影響しない** — トークンを
+     * 要求する経路はここに入らない。
+     */
+    const dev = options.webDev;
+    for (const path of DEV_PATHS) {
+      app.use(path, browserFacing);
+    }
+    app.get("/", (c) => serveShell(c, async (authorized) => dev.shell(authorized)));
+    for (const path of DEV_PATHS.filter((path) => path !== "/")) {
+      app.get(path, dev.asset);
+    }
+  } else if (options.web !== undefined) {
     const web = options.web;
     app.use("/", browserFacing);
     app.use("/assets/*", browserFacing);
-    /**
-     * 画面の配信。
-     *
-     * **起動チケットを見る。** `GET /` はトークンを埋め込んだ画面を返す唯一の
-     * 経路であり、無条件に開けると同一マシンの任意プロセスがトークンを取れる。
-     * チケットは query で 1 度受け取り、cookie へ移す。
-     */
-    app.get("/", (c) => {
-      const policy = options.policy();
-      if (policy === undefined) {
-        return c.json({ error: "unavailable" }, 503);
-      }
-      const outcome = checkBootTicket(
-        { query: c.req.query(BOOT_QUERY), cookie: c.req.header("cookie") },
-        policy.bootKey,
-      );
-      if (outcome.kind === "issue") {
-        c.header("set-cookie", bootCookie(policy.bootKey));
-      }
-      return c.html(web.shell(outcome.kind !== "denied"));
-    });
+    app.get("/", (c) => serveShell(c, (authorized) => Promise.resolve(web.shell(authorized))));
     app.get("/assets/*", (c) => {
       const asset = web.asset(c.req.path);
       return asset === undefined

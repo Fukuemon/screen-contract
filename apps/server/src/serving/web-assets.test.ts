@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedToken } from "./web-assets.js";
+import { embedToken } from "./web-token-embed.js";
 import { TOKEN_META } from "./web-token.js";
 
 const SHELL = "<!doctype html><html><head><title>x</title></head><body></body></html>";
