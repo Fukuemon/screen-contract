@@ -1,7 +1,4 @@
-# 消費 repo 向け git hooks (sdd-template が配布する初期値)。
-# link.sh が消費 repo に「無い場合だけ」コピーする。以後は消費 repo が所有・編集してよい。
-# テンプレ側の lefthook.yml とは別物 (check-skills 等のテンプレ著作用検査は含めない)。
-# 有効化: npx lefthook install
+# git hooks。有効化: pnpm install (prepare が lefthook install を実行する)
 
 # node を要求するコマンドは scripts/run-with-node.sh 経由で呼ぶ。
 # git hook は mise が activate されていないシェルで動くため、素で叩くと
@@ -11,18 +8,16 @@ pre-commit:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-commit
-    # 配布物の hooks/format/run_prettier.sh は使わない。整形後に
-    # `git add <ファイル全体>` するため、部分 stage したファイルの未 stage 変更まで
-    # commit に巻き込む。lefthook の stage_fixed で同じことを安全に行う。
-    # (配布物はテンプレ側でのみ編集できるため、ここで置き換えている)
+    # 整形した結果だけを stage_fixed で staging へ戻す。明示的な git add を使うと、
+    # 部分 stage したファイルの未 stage 変更まで commit に巻き込む。
     prettier:
       glob: "*.{md,yml,yaml,json,css}"
       run: sh scripts/run-with-node.sh pnpm exec prettier --write --ignore-unknown -- {staged_files}
       stage_fixed: true
     # TypeScript / JavaScript の整形と lint。prettier は .prettierignore で
-    # これらを除外しており、ここが担当する (context/engineering.md)。
+    # これらを除外しており、ここが担当する (context/conventions.md の Shared Configuration)。
     # 型検査は入れない。TypeScript 7 は tsc にファイルパスを渡せないため、
-    # 変更ファイルだけの型検査が組めない (context/toolchain.md)。
+    # 変更ファイルだけの型検査が組めない (context/tech-stack.md の Upgrade Checks)。
     # 整形した結果だけを stage_fixed で staging へ戻す。明示的な git add を使うと、
     # 部分 stage したファイルの未 stage 変更まで commit に巻き込む。
     # `--` はオプション終端。ファイル名がハイフンで始まってもオプションと解釈させない。
@@ -33,12 +28,16 @@ pre-commit:
     oxlint:
       glob: "*.{ts,tsx,js,jsx,cjs,mjs}"
       run: sh scripts/run-with-node.sh pnpm exec oxlint -- {staged_files}
+    # 文章の規則。経緯の混入とリンクは編集後のフックと CI が見る
+    textlint:
+      glob: "*.md"
+      run: sh scripts/run-with-node.sh pnpm exec textlint {staged_files}
 
 pre-push:
   commands:
     protected-branch:
       run: python3 hooks/protected-branch/git_hook.py pre-push
-    # 秒オーダーの検査はここへ置く (context/engineering.md の Root Task Boundary)。
+    # 秒オーダーの検査はここへ置く (context/conventions.md の Shared Configuration)。
     # check は lint (oxlint + 型検査) / format / test / build を通す。
     check:
       run: sh scripts/run-with-node.sh pnpm check
@@ -54,15 +53,6 @@ commit-msg:
     ticket-number:
       glob: "**/*"
       run: hooks/commit-msg/check_ticket_number.sh {1}
-    # AI の attribution trailer を落とす。.claude/settings.json で無効化して
-    # いるが、それでも入った commit が 332 件積み上がったため機械検査を置く。
-    no-ai-attribution:
-      run: bash hooks/commit-msg/check_no_ai_attribution.sh {1}
-
-# git worktree を作った直後に共有プロセス層を繋ぐ。
-# 配布は symlink で追跡されないため、worktree には配布物が 1 つも来ない。
-# 手当てしないと hook が silent に no-op になる。
-post-checkout:
-  commands:
-    link-worktree:
-      run: bash scripts/link-worktree.sh
+    # 形式と AI の帰属表示の禁止は commitlint.config.mjs が持つ
+    commitlint:
+      run: sh scripts/run-with-node.sh pnpm exec commitlint --edit {1}

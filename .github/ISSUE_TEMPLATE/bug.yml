@@ -1,0 +1,36 @@
+name: 不具合
+description: 期待と違う動作を報告する
+labels: [type:bug]
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 出力やエラーの文をそのまま貼る
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 再現の手順
+      description: コマンド、入力、順序。同じ結果になる最短の手順
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待した動作
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影響
+      description: 何がどう困るか。放置すると何が起きるか
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 環境
+      description: 再現したコミット、実行したコマンド、コーディングエージェントとそのバージョン、OS

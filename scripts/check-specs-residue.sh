@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # closed issue の spec dir が残っていないかを検査する (closeout 契約の機械検査)。
-# 契約の正本は `spec-lifecycle` skill の references/closeout.md。
+# spec は issue を閉じるときに削除する (agent-harness の write-design-docs の references/spec.md)。
 #
 #   bash scripts/check-specs-residue.sh
 #   SPECS_CHECK_REPO=<owner>/<repo> bash scripts/check-specs-residue.sh   # repo を明示する (既定は gh の origin)
@@ -11,11 +11,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_YML="$ROOT/context/project.yml"
 
-# paths.spec_dir (例: `specs/<issue-id>-<slug>/`) の固定部分だけを取り出す
+# docs.spec (例: `specs`) を取り出す
 resolve_specs_dir() {
   local value=""
   if [ -f "$PROJECT_YML" ]; then
-    value="$(sed -n 's/^[[:space:]]*spec_dir:[[:space:]]*\([^#]*\).*/\1/p' "$PROJECT_YML" | head -1)"
+    value="$(sed -n '/^docs:/,/^[^[:space:]#]/s/^[[:space:]]*spec:[[:space:]]*\([^#]*\).*/\1/p' "$PROJECT_YML" | head -1)"
     value="${value%%<*}"                                  # <issue-id> 以降を落とす
     value="$(printf '%s' "$value" | tr -d '"'"'"' ' | sed 's:/*$::')"
   fi
@@ -79,7 +79,7 @@ fi
 if [ ${#residue[@]} -gt 0 ]; then
   echo "closed issue の spec が残存しています (closeout 未実施):"
   printf '  - %s\n' "${residue[@]}"
-  echo "清算手順: spec-lifecycle skill の references/closeout.md"
+  echo "残す設計を Design Doc、context、ADR へ移してから、spec を削除する"
   exit 1
 fi
 

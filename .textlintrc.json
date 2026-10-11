@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "preset-ai-words-ja": true,
+    "prh": {
+      "rulePaths": ["./prh.yml"]
+    },
+    "no-mix-dearu-desumasu": {
+      "preferInBody": "である",
+      "preferInList": "である",
+      "strict": true
+    },
+    "sentence-length": {
+      "max": 120
+    }
+  }
+}
