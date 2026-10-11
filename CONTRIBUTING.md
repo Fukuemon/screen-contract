@@ -94,11 +94,13 @@ issue と pull request は GitHub で扱い、`gh` で操作する。
 
 | 軸          | 値                                                                                                                                                            | 色        | 付け方                                                                           |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------------------------------- |
-| `type:*`    | `type:feature`、`type:bug`、`type:research`、`type:task`、`type:chore`                                                                                        | `#1d76db` | すべての issue に 1 件                                                           |
+| `type:*`    | `type:requirements`、`type:feature`、`type:bug`、`type:research`、`type:task`、`type:chore`                                                                   | `#1d76db` | すべての issue に 1 件                                                           |
 | `phase:*`   | `phase:design`、`phase:implementation`                                                                                                                        | `#5319e7` | 設計の issue は `phase:design`、実装の issue は `phase:implementation`           |
 | `domain:*`  | `domain:workflow`、`domain:execution`、`domain:element`、`domain:artifact`、`domain:diff`、`domain:web`、`domain:agent`、`domain:infra`、横断は `domain:core` | `#0e8a16` | 実装の対象が決まる issue に 1 件以上                                             |
 | `epic`      | `epic`                                                                                                                                                        | `#fbca04` | 複数の段階や spec にまたがる親の issue                                           |
 | `status:*`  | `status:designing`、`status:ready-to-implement`、`status:implementing`                                                                                        | `#0052cc` | 設計の対象の issue に常に 1 件                                                   |
 | `quality:*` | `quality:requirement-gap`、`quality:design-gap`                                                                                                               | `#d93f0b` | 前の段階の取りこぼしから派生した issue にだけ付ける。変更元の issue には付けない |
+
+`type:requirements` は、要求の起票の雛形（`.github/ISSUE_TEMPLATE/requirements.yml`）が付ける。
 
 `domain:*` の値は、モジュールの名前に対応する。モジュールを増やすときは、ラベルも足す。
