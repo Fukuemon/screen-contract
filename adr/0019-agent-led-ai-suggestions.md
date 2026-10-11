@@ -1,110 +1,82 @@
 # ADR-0019: AI 候補生成をエージェント主導とし adapter/ai を MVP 実装対象外とする
 
-## 状態
+## Status
 
 承認
 
-## 決定日
+## Context
 
-2026-08-11
+AI による候補生成で、推論をどこで行い、adapter/ai をどの認証で実装するかを決める必要がある。  
+ADR-0009 は adapter/ai の認証を API キーと OAuth（サブスクリプション連携）の両対応と決めた。  
+想定する利用者の主な動線はサブスクリプションの保有者であり、サブスクリプションの credential をプログラムから使えるかどうかが adapter/ai の設計の前提を左右する。  
+ADR-0009: [adapter/ai の認証は API キーと OAuth の両対応とする](0009-ai-adapter-auth.md)
 
-## 背景
+MVP はローカル実行と単一の利用者を前提とし、チームでの利用、クラウドでの利用、CI での実行は範囲の外にする。  
+出典: [PRD の MVP](../PRD.md#mvp)
 
-- [adr/0009](0009-ai-adapter-auth.md) は adapter/ai の認証を API キーと OAuth (サブスクリプション連携) の両対応と決め、未確認事項として「サブスクリプション credential のプログラム利用に関する利用規約の確認」を残していた。想定利用者の主要動線がサブスクリプション保有者である以上、この確認結果が adapter/ai の設計前提を左右する状態だった。
-- MVP はローカル実行・単一利用者を前提とし、チーム利用とクラウド利用、CI 実行はスコープ外である ([context/infrastructure.md](../context/infrastructure.md)、DesignDoc の Future Work)。
-- 未確認事項を確認した結果、次の 3 点が判明した。出典は末尾の参考リンク。
-  - Anthropic は、事前承認がない限り、サードパーティ開発者が自社製品に claude.ai のログインおよびレート制限を提供することを認めていない。Claude Agent SDK を用いて構築したエージェントも対象に含まれ、API キー認証を使うよう指示されている。
-  - スクリプト / SDK 呼び出しの推奨モードである `--bare` は OAuth credential とシステムキーチェーンを読まず `ANTHROPIC_API_KEY` を要求する。将来 `-p` の既定になる予定である。
-  - MCP の sampling (サーバがクライアントへ推論を依頼する機能) は仕様版 2026-07-28 で deprecated となり、移行先は「LLM provider API を直接統合する」と示されている。新規実装は採用すべきでないとされる。
-- したがって「本システムが利用者のサブスクリプション枠を消費して AI 補完を提供する」構成は、規約上も MCP の仕様上も成立しない。
+サブスクリプションの credential の扱いについて、次の 3 点が分かっている。
 
-## 決定
+- Anthropic は、事前の承認がない限り、サードパーティの開発者が自社の製品に claude.ai のログインとレート制限を提供することを認めていない。Claude Agent SDK で構築したエージェントも対象に含まれ、API キー認証を使うよう指示されている。
+  - 出典: [Agent SDK overview](https://code.claude.com/docs/en/agent-sdk/overview)
+- スクリプトと SDK からの呼び出しで推奨されるモード `--bare` は、OAuth の credential とシステムのキーチェーンを読まず、`ANTHROPIC_API_KEY` を要求する。将来は `-p` の既定になる予定である。
+  - 出典: [Run Claude Code programmatically](https://code.claude.com/docs/en/headless)
+- MCP の sampling（サーバーがクライアントへ推論を依頼する機能）は、仕様版 2026-07-28 で deprecated になった。移行先は「LLM provider の API を直接統合する」と示され、新しい実装には採らないよう求めている。
+  - 出典: [MCP Deprecated Features](https://modelcontextprotocol.io/specification/2026-07-28/deprecated)
 
-- **AI 候補生成の主動線を「エージェント自身の推論」とする**。エージェントは agent interface から Snapshot 断片と機械抽出済みの要素候補列を取得し、名称・種別・Locator の判断を自身のコンテキストで行い、draft として書き戻す。本システムは LLM credential を保持しない。
-- **adapter/ai は MVP の実装対象外とする**。core/element の AI Port と core/workflow の DSL Fix Port は定義のみ残し、実装は Lower-Priority Goals へ移す。
-- adapter/ai を実装する場合の認証は **API キーのみ**とする。利用者のサブスクリプションを本システムが消費する構成は採らない。
-- **AI なしでも要素マッピングが完結することを MVP の必須要件とする**。要素候補は Accessibility Snapshot と DOM からの機械抽出だけで構成でき、AI はその上に載る補完に位置づける。DesignDoc の Goal も「システムまたは AI が候補を提示する」と規定している。
+この 3 点から、本システムが利用者のサブスクリプションの枠を使って AI の補完を提供する構成は、規約の上でも MCP の仕様の上でも成り立たない。
 
-推論がどこで行われ、credential がどこに置かれるかを示す。
+## Decision
 
-```mermaid
-flowchart LR
-    subgraph local["利用者のマシン"]
-        agent["AI エージェント<br/>推論はここで行う<br/>credential もここ"]
-        subgraph server["Workflow Server (LLM credential を持たない)"]
-            iface["agent interface"]
-            app["app / core"]
-            port["AI Port / DSL Fix Port<br/>定義のみ"]
-            adapter["adapter/ai<br/>API キー前提<br/>MVP 実装なし"]
-        end
-    end
-    svc["外部 AI サービス"]
+AI 候補生成の主な動線を、エージェント自身の推論にする。  
+エージェントは agent interface から Snapshot の断片と機械的に抽出した要素候補の列を取得し、名称、種別、Locator を自身のコンテキストで判断して、draft として書き戻す。  
+本システムは LLM の credential を持たない。  
+推論と credential の位置は [AI 候補生成](../design/features/ai-suggestions/DesignDoc.md) にある。
 
-    agent -->|"Snapshot 断片と候補列を取得"| iface
-    agent -->|"名称 / 種別 / Locator を draft で書き戻す"| iface
-    iface --> app
-    app -.-> port
-    adapter -.->|"実装は Lower-Priority Goals"| port
-    adapter -.-> svc
-```
+adapter/ai は MVP の実装の対象から外す。  
+core/element の AI Port と core/workflow の DSL Fix Port は定義だけを残し、実装は Lower-Priority Goals へ移す。
 
-Workflow Server は LLM credential を持たない。破線は MVP で実装しない経路を示す。
+adapter/ai を実装するときの認証は API キーだけにする。  
+利用者のサブスクリプションを本システムが使う構成は採らない。
 
-### OpenAI (Codex) 側の調査結果
+AI なしでも要素マッピングが完結することを、MVP の必須の要件にする。  
+要素候補は Accessibility Snapshot と DOM からの機械的な抽出だけで作れ、AI はその上に載る補完に位置づける。  
+PRD の利用者の物語も「システムか AI が候補を示す」と定めている。  
+出典: [PRD の User Stories](../PRD.md#user-stories)
 
-Anthropic 側と同じく、**第三者プロダクトからサブスクリプションの credential を使わせる形は取れない**。
+## Verification
 
-- OpenAI の利用規約は、サービスを「自動的またはプログラム的に」利用・抽出することを禁じている。
-- Codex にはプログラム利用向けの料金表が別に用意されており、サブスクリプションとは課金の枠が分かれている。
-- サブスクリプション認証を前提とするモデルも存在するが、それを第三者プロダクトが代理で使う形は規約上グレーである。
+OpenAI（Codex）の側も、Anthropic の側と同じく、第三者の製品にサブスクリプションの credential を使わせる形は取れない。
 
-いずれにせよ **本決定は変わらない**。仮に Codex 側で許容されても、Claude Code の利用者には提供できない機能になり、プロダクトとして成立しないためである。
+- OpenAI の利用規約は、サービスを「自動的またはプログラム的に」利用し、抽出することを禁じている。
+- Codex にはプログラムから使う向けの料金表が別にあり、サブスクリプションとは課金の枠が分かれている。
+- サブスクリプションの認証を前提とするモデルもあるが、第三者の製品が代理で使う形は規約の上でグレーである。
 
-## 代替案
+Codex の側で許されても、この決定は変わらない。  
+Claude Code の利用者には提供できない機能になり、製品として成り立たないためである。
 
-- **OAuth によるサブスクリプション直接利用** ([adr/0009](0009-ai-adapter-auth.md) の決定): 技術的には成立する。Claude Agent SDK の Streaming Input Mode は常駐セッションと `--json-schema` による構造化出力を提供しており、AI Port の契約 (入力 + 出力 Schema から検証済みオブジェクトを得る) にそのまま嵌る。しかし背景に挙げた規約が禁じる形に該当するため却下。
-- **CLI をサーバから駆動する** (Codex App Server への接続、または `claude -p` の subprocess 起動): サーバが利用者の CLI を起動し、自製品の機能のためにサブスクリプション枠を消費する形であり、同じ規約の対象と解釈される。加えて Claude Code と Codex で機構が異なる (常駐 JSON-RPC と一発起動) ため provider 抽象が再発生し、実装量が当初想定を超える。さらにサーバと CLI が同一マシンにいる必要があり、クラウド化の経路を塞ぐ。却下。
-  - 未確認事項: OpenAI (Codex) におけるサブスクリプションのプログラム利用規定。仮に Codex 側で許容されても、Claude Code 利用者に提供できない機能となるため本決定は変わらない。
-- **MCP sampling でクライアントへ推論を委譲する**: サーバが credential を持たずに済み、目的には最も適合する。しかし仕様上 deprecated であり、新規実装は非推奨、将来の削除対象でもあるため却下。
-- **API キーのみで adapter/ai を MVP に実装する**: 規約上の問題はない。しかしサブスクリプション保有者に API 従量課金の二重負担を強いる。かつチーム利用と CI 実行が MVP 外である以上、API キー運用を前提とする利用者が MVP 時点で存在しない。却下。
+## Considered Options
 
-## 影響
+| 選択肢                                                                                    | 強み                                                                                                                                                                         | 弱み                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **採用:** 推論をエージェント自身が行い、adapter/ai を MVP で実装しない                    | 本システムが LLM の credential を持たない。データが利用者の手元を出ない。AI サービスの障害、規約の変更、レート制限がコアの機能を止めない。サーバーをリモートにしても成り立つ | Web UI だけを操作する利用者は、機械的に抽出した候補を自分で名付ける。ai-suggestions の設計（provider の抽象、credential の解決層、両対応の認証）が MVP で使われない                                                                                                                                              |
+| OAuth でサブスクリプションを直接使う（ADR-0009 の決定）                                   | 技術的には成り立つ。Claude Agent SDK の Streaming Input Mode は常駐セッションと `--json-schema` による構造化した出力を提供し、AI Port の契約にそのまま合う                   | Context に挙げた規約が禁じる形に当たる                                                                                                                                                                                                                                                                           |
+| CLI をサーバーから動かす（Codex App Server への接続か、`claude -p` の subprocess の起動） | —                                                                                                                                                                            | サーバーが利用者の CLI を起動し、自製品の機能のためにサブスクリプションの枠を使う形で、同じ規約の対象と解釈される。Claude Code と Codex で機構が違い（常駐の JSON-RPC と一度きりの起動）、provider の抽象が再び要り、実装の量が想定を超える。サーバーと CLI が同じマシンにいる必要があり、クラウドへ移す道を塞ぐ |
+| MCP sampling でクライアントへ推論を任せる                                                 | サーバーが credential を持たずに済み、目的に最も合う                                                                                                                         | 仕様の上で deprecated で、新しい実装には推奨されず、将来の削除の対象である                                                                                                                                                                                                                                       |
+| API キーだけで adapter/ai を MVP に実装する                                               | 規約の上の問題がない                                                                                                                                                         | サブスクリプションの保有者に、API の従量課金の二重の負担を強いる。チームでの利用と CI での実行が MVP の外なので、API キーの運用を前提とする利用者が MVP の時点でいない                                                                                                                                           |
 
-### 良い影響
+## Consequences
 
-- 本システムが LLM credential を保持しないため、credential の保存・失効・漏えいに関する設計と運用が MVP から消える。
-- [adr/0010](0010-ai-data-boundary.md) が扱う送信境界の相手が「外部 AI サービス」から「利用者のマシン上で動くエージェント」に変わり、データが利用者の手元を出ない。
-- エージェントが動いていない環境でも要素マッピングが完結するため、AI サービスの障害・規約変更・レート制限がコア機能を止めない。
-- adapter/ai の実装 (provider 抽象、credential 解決層、エラー分類) が MVP から外れ、core と interface の実装に集中できる。
-- 本経路はエージェントが利用者側で動くため、将来サーバをリモート化しても成立する。CLI 駆動型の代替案はこの性質を持たない。
+### Positive
 
-### 悪い影響 / トレードオフ
+- 本システムが LLM の credential を持たないため、credential の保存、失効、漏えいに関する設計と運用が MVP から消える。
+- ADR-0010 が扱う送信の境界の相手が、外部の AI サービスから利用者のマシンで動くエージェントに変わり、データが利用者の手元を出ない。
+  - ADR-0010: [AI サービスへの送信の境界](0010-ai-data-boundary.md)
+- エージェントが動いていない環境でも要素マッピングが完結するため、AI サービスの障害、規約の変更、レート制限がコアの機能を止めない。
+- adapter/ai の実装（provider の抽象、credential の解決層、エラーの分類）が MVP から外れ、core と interface の実装に集中できる。
+- エージェントが利用者の側で動くため、サーバーを将来リモートにしても成り立つ。CLI をサーバーから動かす案は、この性質を持たない。
 
-- Web UI だけを操作している利用者は、機械抽出の候補を自分で名付けることになる。この緩和は [adr/0020](0020-suggestion-pull-queue.md) で扱う。
-- [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) の設計 (provider 抽象、credential 解決層、API キーと OAuth の両対応) が MVP では使われない。同 doc の改訂が必要になる。
+### Negative
 
-### 影響範囲
-
-- 対象モジュール / package: element / workflow / agent / infra
-
-## 実装・運用への反映
-
-- spec 更新要否: 不要 (spec 未作成)
-- context / AI 向け設定更新要否:
-  - [adr/0009](0009-ai-adapter-auth.md) の状態を「ADR-0019 に置換」へ変更する
-  - [adr/0010](0010-ai-data-boundary.md) の送信境界の理由付けを、送信先がローカルのエージェントである前提に見直す
-  - [design/DesignDoc.md](../design/DesignDoc.md): モジュール責務表の adapter/ai を MVP 実装対象外と明記、Container 図から AI サービスへの線を削除、スコープの「AI による要素名、種別、Locator 候補の提案」の位置づけを修正、ADR 表に本 ADR を追加する
-  - [design/features/ai-suggestions/DesignDoc_ai-suggestions.md](../design/features/ai-suggestions/DesignDoc_ai-suggestions.md) を改訂する (provider 抽象と credential 解決層を落とし、AI Port の実装候補と適用時期の整理へ差し替える) — 実施済み
-  - [design/features/element-mapping/DesignDoc_element-mapping.md](../design/features/element-mapping/DesignDoc_element-mapping.md) に AI 提案の取得経路を反映する — 実施済み
-- 未確認事項: なし。OpenAI 側も調査した結果、本決定は変わらない (下記)。
-
-## 関連ドキュメント / チケット
-
-- [adr/0009](0009-ai-adapter-auth.md): 本 ADR が置換する決定
-- [adr/0010](0010-ai-data-boundary.md): AI への送信情報の境界
-- [adr/0020](0020-suggestion-pull-queue.md): Web UI 利用者からの提案依頼の扱い
-- [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md): エージェントが呼ぶ tool 語彙
-- Agent SDK overview: https://code.claude.com/docs/en/agent-sdk/overview
-- Run Claude Code programmatically (headless): https://code.claude.com/docs/en/headless
-- MCP Deprecated Features: https://modelcontextprotocol.io/specification/2026-07-28/deprecated
-- spec / PR: なし
+- Web UI だけを操作している利用者は、機械的に抽出した候補を自分で名付ける。緩和は ADR-0020 で扱う。
+  - ADR-0020: [人間起点の提案依頼を pull 型キューで実現する](0020-suggestion-pull-queue.md)
+- ai-suggestions の設計（provider の抽象、credential の解決層、API キーと OAuth の両対応）が MVP では使われない。

@@ -1,84 +1,58 @@
 # ADR-0021: agent interface の認可をループバック限定とローカルトークンで行う
 
-## 状態
+## Status
 
 承認
 
-## 決定日
+## Context
 
-2026-08-11
+agent の実装の前に、agent interface の認可の方式を決める必要がある。  
+候補は、ローカルで認証しない方式、トークン、OAuth の 3 つである。
 
-## 背景
+MVP はローカル実行を前提とし、クラウドでの利用は範囲の外にする。  
+出典: [PRD の MVP](../PRD.md#mvp)
 
-- DesignDoc の Open Question「agent interface の認可方式」が agent 実装前の決定事項として残っていた。提示されていた選択肢はローカル無認証、トークン、OAuth の 3 つ。
-- MVP はローカル実行を前提とする ([context/infrastructure.md](../context/infrastructure.md))。クラウド利用は MVP のスコープ外である。
-- Web UI と agent interface は**同一の常駐サーバ**を見る必要がある。agent-browser のセッションとライブ映像を共有するためである。したがって MCP の stdio 単独 (エージェントがサーバ本体をプロセスとして起動する形) では構成が成立しない。
-- [adr/0008](0008-stream-proxy.md) はライブ映像を Workflow Server 経由の Proxy に寄せた。理由の一つは無認証ポートを公開しないことだった。認可方式はこの判断と整合する必要がある。
+Web UI と agent interface は、同じ常駐サーバーを見る必要がある。  
+agent-browser のセッションとライブ映像を共有するためである。  
+そのため、MCP の stdio だけ（エージェントがサーバーの本体をプロセスとして起動する形）では、構成が成り立たない。
 
-## 決定
+ADR-0008 は、ライブ映像を Workflow Server 経由の Proxy に寄せた。  
+理由の 1 つは、認証のないポートを公開しないことだった。  
+認可の方式は、この判断と合わせる必要がある。  
+ADR-0008: [ライブ映像は Workflow Server 経由の Proxy で配信する](0008-stream-proxy.md)
 
-- 常駐サーバは **127.0.0.1 にのみ bind する**。
-- **MCP は stdio transport を既定とする**。薄いブリッジプロセスがループバック経由で常駐サーバへ転送する。ブリッジはエージェントが起動するため、MCP 側の設定に認証情報を要求しない。
-- **HTTP / App Server 型 JSON-RPC と Stream Proxy は、サーバ起動時に生成するローカルトークンを要求する**。トークンはファイルへ書き出し、クライアントが読む。
-- ブラウザ由来の呼び出しと DNS rebinding を防ぐため、**Origin を検査する**。
-- OAuth / OIDC はリモート公開時に、MCP 現行仕様 (標準 OAuth / OIDC 準拠、Client ID Metadata Documents) に沿って追加する。MVP では実装しない。
+## Decision
 
-接続経路ごとの認証要件を示す。
+- 常駐サーバーは 127.0.0.1 にだけ bind する。
+- MCP は stdio transport を既定にする。薄いブリッジのプロセスが、ループバックを通して常駐サーバーへ転送する。
+  - ブリッジはエージェントが起動するため、MCP の側の設定に認証情報を求めない。
+- HTTP、App Server 型 JSON-RPC、Stream Proxy は、サーバーの起動時に生成するローカルトークンを要求する。
+  - トークンはファイルへ書き出し、クライアントが読む。
+- ブラウザからの呼び出しと DNS rebinding を防ぐため、Origin を確かめる。
+- OAuth と OIDC は、リモートに公開するときに、MCP の現行の仕様（標準の OAuth と OIDC に準拠し、Client ID Metadata Documents を使う）に沿って足す。MVP では実装しない。
 
-```mermaid
-flowchart LR
-    web["Web UI<br/>(ブラウザ)"]
-    mcp["AI エージェント<br/>(MCP)"]
-    rpc["常駐統合<br/>(App Server 型 JSON-RPC)"]
-    bridge["MCP ブリッジ<br/>エージェントが stdio で起動"]
-    server["Workflow Server<br/>127.0.0.1 のみ bind"]
-    ab["agent-browser"]
+MCP の利用者だけはトークンの取り回しを負わない。  
+ブリッジがループバックの側でトークンを付ける。  
+接続ごとの認証、トークンの生成と受け渡し、Origin と Host のチェックは [ローカル実行のセキュリティ](../design/features/local-security/DesignDoc.md#接続ごとの認証) にある。
 
-    web -->|"トークン + Origin 検査"| server
-    mcp -->|"stdio (認証情報なし)"| bridge
-    bridge -->|"ループバック + トークン"| server
-    rpc -->|"トークン + Origin 検査"| server
-    server --> ab
-```
+## Considered Options
 
-MCP 利用者だけがトークンの取り回しを負わない。ブリッジがループバック側でトークンを付与する。
+| 選択肢                                                                                                 | 強み                                                                                                                                        | 弱み                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **採用:** 127.0.0.1 への bind、MCP は stdio のブリッジ、それ以外はローカルトークンと Origin のチェック | 接続先が Workflow Server の 1 点にそろう。MCP の利用者はトークンの取り回しを負わない。認可の実装が interface 層に閉じ、OAuth を後から足せる | MCP と HTTP、JSON-RPC で認証の要否が違い、差を吸収するブリッジのプロセスが増える。トークンのファイルの権限の管理が運用の前提になる                                                                                                          |
+| ループバックに限り、認証しない                                                                         | 実装が最小                                                                                                                                  | 同じマシンの任意のプロセスから、Origin を確かめなければ任意の Web ページからも、`run.start` や `screen.save_draft` を呼べる。ADR-0008 が避けた「認証のないポートの公開」と実質同じ状態になる                                                |
+| 最初から OAuth と OIDC にする                                                                          | リモートでの利用へすぐ対応できる                                                                                                            | Authorization Server、Client ID Metadata Documents、トークンの更新、scope の設計が要り、ローカルの単一の利用者の MVP に対して実装と確かめる手間が大きすぎる。認可の実装は interface 層に閉じるため、後から足しても app と core へ広がらない |
+| MCP を stdio だけで完結させる（エージェントがサーバーの本体を起動する）                                | 認証が要らず、最も単純                                                                                                                      | Web UI とエージェントが同じ agent-browser のセッションを共有できず、本システムの構成が成り立たない                                                                                                                                          |
 
-## 代替案
+## Consequences
 
-- **ループバック限定の無認証**: 実装は最小。しかし同一マシン上の任意のプロセスから、また Origin 検査がなければ任意の Web ページから `run.start` や `screen.save_draft` を呼べる。[adr/0008](0008-stream-proxy.md) が避けた「無認証ポートの公開」と実質同じ状態を作るため却下。
-- **最初から OAuth / OIDC**: リモート利用へ即対応できる。しかし Authorization Server、Client ID Metadata Documents、token 更新、scope 設計が必要になり、ローカル単一利用者の MVP に対して実装量と検証パスが過大。却下。認可の実装は interface 層に閉じるため、後から追加しても app / core へ波及しない。
-- **MCP を stdio 単独で完結させる (エージェントがサーバ本体を起動する)**: 認証が不要になり最も単純。しかし Web UI と agent が同じ agent-browser セッションを共有できず、本システムの構成が成立しないため却下。
+### Positive
 
-## 影響
+- Web UI、agent interface、Stream Proxy の接続先が Workflow Server の 1 点にそろい、ADR-0008 の配信の設計と合う。
+- MCP の利用者は、エージェントの設定に 1 行足すだけでよく、トークンの取り回しを負わない。
+- 認可の実装が interface 層に閉じるため、リモートにするときに app と core を変えずに OAuth を足せる。
 
-### 良い影響
+### Negative
 
-- Web UI・agent interface・Stream Proxy の接続先が Workflow Server の 1 点に揃い、[adr/0008](0008-stream-proxy.md) の経路設計と整合する。
-- MCP 利用者はエージェント設定に 1 行加えるだけでよく、トークンの取り回しを負わない。
-- 認可の実装が interface 層に閉じるため、リモート化時に app / core を変更せずに OAuth を追加できる。
-
-### 悪い影響 / トレードオフ
-
-- MCP と HTTP / JSON-RPC で認証の要否が異なる。差を吸収するブリッジプロセスが増えるため、実装と障害調査の対象が 1 つ増える。
-- トークンをファイルへ書き出すため、そのファイルの権限管理が運用上の前提になる。置き場と権限は [context/infrastructure.md](../context/infrastructure.md) に記載する。
-
-### 影響範囲
-
-- 対象モジュール / package: agent / web / infra
-
-## 実装・運用への反映
-
-- spec 更新要否: 不要 (spec 未作成)
-- context / AI 向け設定更新要否:
-  - [design/DesignDoc.md](../design/DesignDoc.md) の Open Question「agent interface の認可方式」を削除する
-  - [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md) の「やらないこと」から認可方式の項を外し、決定内容を本文へ反映する — 実施済み
-  - [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md) の「やらないこと」から認可の項を外す — 実施済み
-  - [context/infrastructure.md](../context/infrastructure.md) に bind アドレス、トークンの置き場と権限、Origin 検査を記載する — 実施済み
-
-## 関連ドキュメント / チケット
-
-- [adr/0008](0008-stream-proxy.md): ライブ映像を Workflow Server 経由の Proxy で配信する判断
-- [adr/0016](0016-dual-agent-protocol.md): MCP と App Server 型 JSON-RPC の併用
-- [design/features/agent-interface/DesignDoc_agent-interface.md](../design/features/agent-interface/DesignDoc_agent-interface.md): プロトコル対応表
-- [context/infrastructure.md](../context/infrastructure.md): secret の置き場と扱い
-- spec / PR: なし
+- MCP と HTTP、JSON-RPC で、認証の要否が違う。差を吸収するブリッジのプロセスが増えるため、実装と障害の調査の対象が 1 つ増える。
+- トークンをファイルへ書き出すため、そのファイルの権限の管理が運用の前提になる。置き場と権限は [ローカル実行のセキュリティ](../design/features/local-security/DesignDoc.md#ローカルトークン) にある。
