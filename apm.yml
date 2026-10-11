@@ -1,0 +1,13 @@
+name: screen-contract
+version: 0.1.0
+targets: [claude, codex]
+dependencies:
+  apm:
+    - Fukuemon/agent-harness/packages/core#v0.2.1
+    - Fukuemon/agent-harness/packages/docs#v0.2.1
+lifecycle:
+  post-install:
+  - type: command
+    description: apm の配置先を .gitignore に足す（agent-harness）
+    command: 'd=$(ls -d .claude/skills/setup-agent-harness .agents/skills/setup-agent-harness 2>/dev/null | head -1); [ -n "$d" ] || d=$(find "$HOME/.claude/plugins/cache" -maxdepth 5 -type d -path "*/core/*/skills/setup-agent-harness" 2>/dev/null | head -1); [ -z "$d" ] || node "$d/scripts/setup.mjs" --gitignore'
+    timeoutSec: 30

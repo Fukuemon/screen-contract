@@ -4,7 +4,7 @@ name: Spec residue check
 # 実体は scripts/check-specs-residue.sh。exit 2 (検査不能) を成功扱いにしないこと。
 #
 # PR ゲートにしない: 別 PR で spec を清算する運用だと「issue は閉じたが spec は残っている」窓の間、
-# 無関係な PR が落ちる。ゲート化の条件は closeout.md を参照。
+# 無関係な PR が落ちる。
 
 # branches は "**" で受けて job 側でデフォルトブランチに絞る (on ではブランチ名を動的に解決できず、
 # 決め打ちすると別名の消費 repo で検査が効かない)。対象外では job が skip され runner は起動しない。

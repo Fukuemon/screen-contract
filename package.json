@@ -22,6 +22,8 @@
     "knip": "knip"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@typescript/native": "npm:typescript@^7.0.2",
     "dependency-cruiser": "^18.2.0",
     "knip": "^6.32.2",
@@ -30,6 +32,11 @@
     "oxlint": "^1.78.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.6.2",
+    "textlint": "^15.8.0",
+    "textlint-rule-no-mix-dearu-desumasu": "^6.0.4",
+    "textlint-rule-preset-ai-words-ja": "^1.2.1",
+    "textlint-rule-prh": "^6.1.0",
+    "textlint-rule-sentence-length": "^5.2.1",
     "turbo": "^2.10.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
   }

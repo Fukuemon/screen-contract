@@ -1,0 +1,56 @@
+name: 要求の起票
+description: 実現したいことを起票する。要件定義から検証までは、この issue の中で進める
+labels: [type:requirements]
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 目的
+      description: この要求で何を達成したいか。1 文から 2 文
+    validations:
+      required: true
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景と課題
+      description: 誰が、どの場面で、何に困っているか
+    validations:
+      required: true
+  - type: textarea
+    id: as-is
+    attributes:
+      label: 現状
+      description: いまはどうなっているか。関係する文書やコードがあればリンクする
+    validations:
+      required: true
+  - type: textarea
+    id: to-be
+    attributes:
+      label: あるべき姿
+      description: 要求が満たされた後の状態。「〜できる」の形で書く
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      description: 満たされたと言える条件を、確かめられる形の箇条書きで書く
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: 範囲外
+      description: この要求でやらないこと
+  - type: textarea
+    id: open-points
+    attributes:
+      label: 前提と論点
+      description: 前提にしていることと、決まっていないこと。確認先があれば書く
+  - type: textarea
+    id: process
+    attributes:
+      label: 進め方
+      description: context/project.yml の既定と違うときだけ書く。行うプロセス、レビューの範囲、spec を置くかどうか

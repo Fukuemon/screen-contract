@@ -16,7 +16,7 @@ export function createApiApp(useCases: UseCases): ApiApp {
   return {
     async startRun(raw: unknown): Promise<void> {
       // 認可はここに入る。ローカルトークンの検証と Origin 検査を通してから
-      // use case を呼ぶ (ADR-0021 / context/infrastructure.md)。
+      // use case を呼ぶ (ADR-0021 / design/features/local-security/DesignDoc.md)。
       // framework は Hono に確定しており (ADR-0024)、認可はそのミドルウェアとして
       // 実装する。**未確定だから保留しているのではない。**
 

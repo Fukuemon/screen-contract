@@ -62,7 +62,7 @@ export interface StartRunInput {
  * 型アサーションで持ち上げると `{kind:"profile", name:"../../.ssh/id_rsa"}` が
  * そのまま保存先のパス組み立てまで届く。
  *
- * interface 層は core / domain を参照できない (context/architecture.md) ため、
+ * interface 層は core / domain を参照できない (context/codebase.md の Dependency Rules) ため、
  * AuthContext を自力で組み立てられない。app がこの変換を提供する。
  */
 export function parseStartRunInput(raw: unknown): StartRunInput {

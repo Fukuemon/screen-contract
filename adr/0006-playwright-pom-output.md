@@ -1,64 +1,61 @@
-# ADR-0006: 正本は YAML DSL のまま、Playwright の Page Object コードを生成物として提供する
+# ADR-0006: 元のデータは YAML DSL のまま、Playwright の Page Object コードを生成物として提供する
 
-## 状態
+## Status
 
 承認
 
-## 決定日
+## Context
 
-2026-08-07
+再現実行の基盤は agent-browser だが、利用者の資産としては、Playwright のコードとして再現できることに価値がある。  
+E2E テストへ流用でき、開発者にとって既知の形式だからである。  
+元のデータの形式と、Playwright のコードの提供の仕方を決める必要がある。  
+候補には、TS の Page Object Model（POM）の形式を元のデータとして管理する案がある。
 
-## 背景
+このシステムの中心のループは、元のデータへの機械的な書き戻しで成り立っている。
 
-- 本プロダクトの再現実行は agent-browser を基盤にしているが、利用者側の資産としては「Playwright のコードとして再現可能」であることに価値がある (E2E テストへの流用、開発者にとって既知の形式)。
-- そこで「TS の Page Object Model (POM) 形式を正本として管理する」案を検討した。
-- 一方、本システムの中核ループは正本への機械的な書き戻しで成立している: Web UI での要素選択の反映、AI 候補の承認反映、再採番 (`badges` の書き戻し)、エージェントの draft 編集と構造化エラーによる自己修正。
+- Web UI での要素の選択の反映
+- AI の候補の承認の反映
+- 再採番（`badges` の書き戻し）
+- エージェントの draft の編集と、構造化したエラーによる自己修正
 
-## 決定
+## Decision
 
-- **正本は YAML DSL (Screen / Workflow) のまま**とし、Workflow IR を中間表現とする現行構成を維持する。
-- **Playwright TS の POM コードを、IR からの決定的 codegen による生成物として提供し、MVP スコープに含める**:
-  - Screen 文書 → 画面ごとの Page Object クラス (要素定義 → 型付き locator プロパティ、状態遷移 steps → メソッド)
-  - Workflow 文書 → 到達手順の fixture / helper
-  - Locator の対応: `role+name` → `getByRole`、`label` → `getByLabel`、`testid` → `getByTestId`、`text` → `getByText`、`css` + `index` → `locator().nth()`
-  - **`index` は 1 始まり、`nth()` は 0 始まりである。** 変換時に 1 を引く。引き忘れると生成した POM が隣の要素を操作し、しかも実行しても例外にならない (規則は [artifact-generation feature](../design/features/artifact-generation/DesignDoc_artifact-generation.md))
-- 生成コードは**編集禁止・再生成で更新** (生成ヘッダで明示)。個別に編集可能な正本にはしない (DesignDoc の原則) ため、他の成果物と同じ書き換え抑止の対象に入れる。
-- 実行基盤は agent-browser のまま変えない。POM 出力は利用者の Playwright 環境で動くコードの提供であり、本システムの Runner を Playwright に置き換える判断ではない。
-- **POM 生成はプロダクト設定で明示的に有効にしたときだけ行う**。本システム自体は Playwright に依存せず (codegen はテキスト生成)、依存が生じるのは生成された POM を利用者のテストで import する場合のみ。Playwright を使わない利用者は仕様書生成だけで完結する。
+- 元のデータは YAML DSL（Screen と Workflow）のままにし、Workflow IR を中間の表現とする構成を保つ。
+- Playwright の TS の POM のコードを、IR からの決定的な codegen による生成物として提供し、MVP の範囲に含める。
+  - Screen 文書からは、画面ごとの Page Object のクラスを作る。
+  - Workflow 文書からは、到達手順の fixture と helper を作る。
+- 生成したコードは編集を禁じ、再生成で更新する。
+  - 個別に編集できる元のデータにはしないため、ほかの成果物と同じ書き換えの抑止の対象に入れる。
+- 実行の基盤は agent-browser のまま変えない。
+  - POM の出力は、利用者の Playwright の環境で動くコードの提供であり、このシステムの Runner を Playwright に置き換える判断ではない。
+- POM の生成は、プロダクトの設定で明示的に有効にしたときだけ行う。
+  - このシステムは Playwright に依存しない（codegen はテキストの生成）。依存が生じるのは、生成した POM を利用者のテストで import する場合だけである。
+  - Playwright を使わない利用者は、仕様書の生成だけで済む。
 
-## 代替案
+Locator の対応表、`index` の変換（1 始まりから `nth()` の 0 始まりへ）、識別子の導き方は、[仕様成果物の生成の Design Doc](../packages/core-artifact/DesignDoc.md#playwright-の-pom-のコードの生成規則) にある。
 
-- **TS の POM を正本にする**: 開発者に既知で IDE 支援も強いが、(1) 正本への機械的な書き戻しが AST 操作になり、人間のフォーマット・コメントを保ちながらの安全な編集という難問を抱える、(2) Turing 完全なコードが正本になると「同じ正本 → 同じ成果物」の決定性を静的に保証できず、decision_priority 最上位 (再現性・決定性) と「任意 JS を実行しない」の Non Goals に矛盾する、(3) JSON Schema 検証と構造化エラー (エージェント自己修正の要) が型検査どまりになる、ため却下。
-- **宣言的サブセットに制限した TS DSL (`defineScreen({...})` 型) を正本にする**: 制限を守らせる lint、書き戻しの AST 編集、読み込み時のコード評価 (サンドボックス) が必要になり、YAML に対する優位が IDE 補完程度しか残らない。IDE 補完は JSON Schema (yaml-language-server) で同等が得られるため却下。
-- **POM 生成を Lower-Priority のまま据え置く**: IR がある限り後付けできるが、「仕様書と E2E の Page Object が同じ正本から出る」ことはプロダクトの差別化価値であり、MVP に含める判断とした。
+## Considered Options
 
-## 影響
+| 選択肢                                                                                 | 強み                                                                                                                                                       | 弱み                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **採用:** YAML DSL を元のデータのままにし、POM を IR からの生成物として MVP で提供する | 仕様書と Page Object が同じ元のデータから生成される。書き戻し、検証、決定性という中心のループの性質を損なわずに、Playwright の資産としての価値を提供できる | MVP の成果物が 1 種類増え、core/artifact の実装の範囲が広がる。agent-browser と Playwright の Locator の意味の差で、生成したコードの動作が実行の基盤と完全には一致しない可能性がある                                                                                                                                                                                                                                          |
+| TS の POM を元のデータにする                                                           | 開発者に既知で、IDE の支援も強い                                                                                                                           | 元のデータへの機械的な書き戻しが AST の操作になり、人間のフォーマットとコメントを保ったままの安全な編集という難問を抱える。Turing 完全なコードが元のデータになると、同じ元のデータから同じ成果物が出る決定性を静的に保証できず、判断の優先順位の最上位（再現性と決定性）と、任意の JS を実行しないという Non-Goals に矛盾する。JSON Schema の検証と構造化したエラー（エージェントの自己修正の要）が、型のチェックどまりになる |
+| 宣言的なサブセットに制限した TS の DSL（`defineScreen({...})` 型）を元のデータにする   | IDE の補完                                                                                                                                                 | 制限を守らせる lint、書き戻しの AST の編集、読み込み時のコードの評価（サンドボックス）が要る。YAML に対する優位が IDE の補完ほどしか残らず、IDE の補完は JSON Schema（yaml-language-server）で同等に得られる                                                                                                                                                                                                                  |
+| POM の生成を Lower-Priority のまま据え置く                                             | IR がある限り、後から付けられる                                                                                                                            | プロダクトの差別化の価値である、仕様書と E2E の Page Object が同じ元のデータから出ることを、MVP で提供できない                                                                                                                                                                                                                                                                                                                |
 
-### 良い影響
+判断の優先順位は [Design Doc の判断の優先順位](../design/DesignDoc.md#判断の優先順位) に、Non-Goals は [PRD の Non-Goals](../PRD.md#non-goals) にある。
 
-- 仕様書と Page Object が同じ正本から生成され、画面変更への追従が「DSL 更新 → 再生成」に一本化される。
-- 書き戻し・検証・決定性という中核ループの性質を一切損なわずに、Playwright 資産としての価値を提供できる。
+## Consequences
 
-### 悪い影響 / トレードオフ
+### Positive
 
-- MVP の成果物が 1 種類増え、core/artifact の実装範囲が広がる。
-- 生成コードを手で編集したくなる誘惑が残る (編集禁止ヘッダと再生成の規律で抑える。拡張はクラス継承など生成物の外側で行う)。
-- agent-browser と Playwright の Locator 意味論の差 (Accessible Name の解決規則等) により、生成コードの動作が実行基盤と完全一致しない可能性がある。差異は codegen の対応表で吸収し、吸収できないものは生成時警告にする。
+- 仕様書と Page Object が同じ元のデータから生成され、画面の変更への追従が「DSL の更新、再生成」の 1 つの手順になる。
+- 書き戻し、検証、決定性という中心のループの性質を損なわずに、Playwright の資産としての価値を提供できる。
 
-### 影響範囲
+### Negative
 
-- 対象モジュール / package: workflow / artifact
-
-## 実装・運用への反映
-
-- spec 更新要否: 不要 (spec 未作成)
-- 追補: `index` の 0/1 始まりの変換規則を [artifact-generation feature](../design/features/artifact-generation/DesignDoc_artifact-generation.md) へ追加した — 実施済み
-- context / AI 向け設定更新要否:
-  - [design/DesignDoc.md](../design/DesignDoc.md) のスコープ・成功条件・Lower-Priority Goals を更新する — 本 commit で実施
-  - [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md) に POM 生成の規則を追記する — 本 commit で実施
-
-## 関連ドキュメント / チケット
-
-- [adr/0003-dsl-structure.md](0003-dsl-structure.md): DSL の文書構造
-- [design/features/artifact-generation/DesignDoc_artifact-generation.md](../design/features/artifact-generation/DesignDoc_artifact-generation.md)
-- spec / PR: なし
+- MVP の成果物が 1 種類増え、core/artifact の実装の範囲が広がる。
+- 生成したコードを手で編集したくなる誘惑が残る。
+  - 編集を禁じるヘッダと再生成の規律で抑える。拡張は、クラスの継承など、生成物の外で行う。
+- agent-browser と Playwright の Locator の意味の差（Accessible Name の解決の規則など）により、生成したコードの動作が実行の基盤と完全には一致しない可能性がある。
+  - 差は codegen の対応表で吸収し、吸収できないものは生成時の警告にする。

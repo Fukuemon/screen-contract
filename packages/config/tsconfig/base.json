@@ -1,6 +1,6 @@
 {
   // 全パッケージ共通。composite / declaration / declarationMap は
-  // project references の前提 (context/toolchain.md)。
+  // project references の前提 (context/tech-stack.md の Scaffolding)。
   "compilerOptions": {
     "strict": true,
     "module": "nodenext",

@@ -33,5 +33,13 @@
       "entry": ["src/**/*.ts", "scripts/*.mjs"],
       "project": ["src/**/*.ts", "scripts/*.mjs"]
     }
-  }
+  },
+  "ignoreDependencies": [
+    "@commitlint/cli",
+    "textlint",
+    "textlint-rule-no-mix-dearu-desumasu",
+    "textlint-rule-preset-ai-words-ja",
+    "textlint-rule-prh",
+    "textlint-rule-sentence-length"
+  ]
 }

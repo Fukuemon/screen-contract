@@ -1,49 +1,41 @@
 # ADR-0015: Web UI は dashboard の fork ではなく自前実装とする
 
-## 状態
+## Status
 
 承認
 
-## 決定日
+## Context
 
-2026-08-09 (設計初期からの前提を ADR として明文化)
+Web UI の live viewport を、どう作るかを決める必要がある。
 
-## 背景
+agent-browser には、Next.js で作った組み込みの dashboard がある。  
+dashboard は、WebSocket による JPEG のフレームの配信と入力の転送を行う live viewport と、コマンドの実行の履歴を示す activity feed を提供する。  
+本システムの Web UI にも live viewport が要り、dashboard を fork して拡張する選択肢がある。
 
-- agent-browser には組み込みの dashboard (Next.js 製) があり、WebSocket による JPEG フレーム配信と入力転送を行う live viewport、コマンド実行履歴の activity feed を提供する。
-- 本システムの Web UI にも live viewport が必要であり、dashboard を fork して拡張する選択肢があった。
+## Decision
 
-## 決定
+Web UI は dashboard を fork せず、live viewport の配信と入力の転送のパターンを参考にして、自前で実装する。  
+framework は TanStack Start にする。  
+ADR-0001: [技術スタックを TypeScript monorepo（TanStack Start、中間層なし）にする](0001-tech-stack.md)
 
-- **Web UI は dashboard を fork せず、live viewport の配信・入力転送パターンを参考にした自前実装とする**。framework は TanStack Start ([adr/0001](0001-tech-stack.md))。
+ライブ映像の配信の構成は ADR-0008 が決めている。  
+ADR-0008: [ライブ映像は Workflow Server 経由の Proxy で配信する](0008-stream-proxy.md)
 
-## 代替案
+## Considered Options
 
-- **dashboard を fork して拡張する**: 要素選択・採番・差分承認・承認キューという本システム固有の機能が UI の大半を占め、fork による upstream 追従コストが参照の利益を上回るため却下。dashboard は Next.js 製であり、[adr/0001](0001-tech-stack.md) の framework 選定 (TanStack Start) とも一致しない。
-- **dashboard を iframe 等で埋め込む**: viewport と自前 UI (選択モード・注釈オーバーレイ・タイムライン) の統合が embed 境界をまたげず、選択モードのクリック捕捉が実現できないため却下。
+| 選択肢                                                         | 強み                                                                                                                                                      | 弱み                                                                                                                                                                                                                        |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **採用:** 配信と入力の転送のパターンを参考にして自前で実装する | UI の構造を固有の機能（選択、採番、承認）を中心に設計でき、framework と状態の管理をプロジェクトの規約にそろえられる。dashboard の変更に追従する義務がない | live viewport（フレームの描画、入力の転送、座標の変換）を自前で実装して確かめるコストがかかる                                                                                                                               |
+| dashboard を fork して拡張する                                 | —                                                                                                                                                         | 要素の選択、採番、差分の承認、承認キューという固有の機能が UI の大半を占め、fork による upstream への追従のコストが参照の利益を上回る。dashboard は Next.js で作られ、ADR-0001 の framework（TanStack Start）とも一致しない |
+| dashboard を iframe などで埋め込む                             | —                                                                                                                                                         | viewport と自前の UI（選択モード、注釈の重ね描き、タイムライン）を、埋め込みの境界をまたいで統合できない。選択モードのクリックを捕まえられない                                                                              |
 
-## 影響
+## Consequences
 
-### 良い影響
+### Positive
 
-- UI の構造を固有機能 (選択・採番・承認) 中心に設計でき、framework・状態管理を自プロジェクトの規約に揃えられる。
-- agent-browser の dashboard 変更に追従する義務がない。
+- UI の構造を固有の機能（選択、採番、承認）を中心に設計でき、framework と状態の管理をプロジェクトの規約にそろえられる。
+- agent-browser の dashboard の変更に追従する義務がない。
 
-### 悪い影響 / トレードオフ
+### Negative
 
-- live viewport (フレーム描画・入力転送・座標変換) を自前で実装・検証するコストがかかる。
-
-### 影響範囲
-
-- 対象モジュール / package: web
-
-## 実装・運用への反映
-
-- spec 更新要否: 不要 (spec 未作成)
-- context / AI 向け設定更新要否: [design/DesignDoc.md](../design/DesignDoc.md) の ADR 表を更新 — 本 commit で実施
-
-## 関連ドキュメント / チケット
-
-- [design/features/web-editor/DesignDoc_web-editor.md](../design/features/web-editor/DesignDoc_web-editor.md)
-- [adr/0001](0001-tech-stack.md): framework 選定 / [adr/0008](0008-stream-proxy.md): 配信経路
-- spec / PR: なし
+- live viewport（フレームの描画、入力の転送、座標の変換）を自前で実装して確かめるコストがかかる。

@@ -1,0 +1,42 @@
+{
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" || exit 0; [ -f context/project.yml ] && [ -f apm.lock.yaml ] || exit 0; if ! (sed -n 's/^ *- \\(\\.[^ :]*\\)$/\\1/p' apm.lock.yaml | while read -r p; do [ -e \"$p\" ] || exit 1; done); then if command -v apm >/dev/null; then apm install --frozen >&2 || exit 1; fi; fi; d=$(ls -d .claude/skills/setup-agent-harness .agents/skills/setup-agent-harness ${CLAUDE_PLUGIN_ROOT:+\"$CLAUDE_PLUGIN_ROOT/skills/setup-agent-harness\"} 2>/dev/null | head -1); [ -z \"$d\" ] || node \"$d/scripts/setup.mjs\" --gitignore >&2",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR}/.claude/hooks/core/hooks/check-comments.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || exit 0; node \"$f\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_PROJECT_DIR}/.claude/hooks/docs/hooks/check-docs.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || exit 0; node \"$f\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

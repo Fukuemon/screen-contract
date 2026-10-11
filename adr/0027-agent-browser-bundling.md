@@ -1,91 +1,66 @@
-# ADR-0027: agent-browser を npm 依存として同梱しブラウザは起動時に検査する
+# ADR-0027: agent-browser を npm 依存として同梱しブラウザは起動時に確かめる
 
-## 状態
+## Status
 
 承認
 
-## 決定日
+## Context
 
-2026-08-16
+agent-browser を同梱する具体的な手段を決める必要がある。  
+ADR-0013 は「本システムが同梱し、adapter/browser が管理する。利用者は agent-browser を直接導入せず、直接操作しない」と決めたが、同梱の手段は決めていない。  
+ADR-0013: [MVP のブラウザ実行基盤に agent-browser を使用する](0013-agent-browser-runtime.md)
 
-## 背景
+実装の最初の段階で同梱の手段が決まっていないと、`adapter/browser` が CLI をどう呼ぶかも、利用者が何を用意すればよいかも決まらない。
 
-- [adr/0013](0013-agent-browser-runtime.md) は「本システムが同梱し adapter/browser が管理する。利用者は agent-browser を直接導入・操作しない」と決めたが、**同梱の具体的な手段を決めていない**。
-- 実装に入る最初の段階でこれが決まっていないと、`adapter/browser` が CLI をどう呼ぶかも、利用者が何を用意すればよいかも定まらない。
-- agent-browser の配布形態を調べた結果、次が分かった。
-  - **npm パッケージとして配布されている** (`agent-browser`)。実体は Rust のネイティブバイナリで、macOS (ARM64 / x64)・Linux (ARM64 / x64)・Windows x64 に対応する。
-  - Homebrew と cargo でも入るが、どちらもリポジトリの依存管理から外れる。
-  - **ブラウザ本体は同梱されない。** `agent-browser install` が Chrome for Testing を取得する。既存の Chrome / Brave / Playwright / Puppeteer のインストールを自動検出する経路もある。
-  - client-daemon 構成で、daemon は最初のコマンドで自動起動し、1 時間アイドルで終了する。
-  - 機械可読な出力は `--json` で得る。
+agent-browser の配布の形について、次のことが分かっている。
 
-## 決定
+- npm のパッケージ（`agent-browser`）として配布されている。実体は Rust のネイティブのバイナリで、macOS（ARM64、x64）、Linux（ARM64、x64）、Windows x64 に対応する。
+- Homebrew と cargo でも入るが、どちらもリポジトリの依存の管理から外れる。
+- ブラウザの本体は同梱されない。`agent-browser install` が Chrome for Testing を取得する。既存の Chrome、Brave、Playwright、Puppeteer のインストールを自動で検出する仕組みもある。
+- client と daemon の構成で、daemon は最初のコマンドで自動で起動し、1 時間アイドルが続くと終了する。
+- 機械が読める出力は `--json` で得る。
 
-- **`agent-browser` を npm の依存として `packages/adapter-browser` に宣言する。** Homebrew と cargo は使わない。リポジトリの依存管理 (lockfile) の外に出ると、再現性を最優先とする方針 ([context/project.yml](../context/project.yml)) を満たせない。
-- **バージョンを範囲指定せず固定する。** ブラウザ操作の挙動が変わると成果物と差分判定が変わるためである。更新は動作確認を伴う明示的な操作とする。
-- **ブラウザ本体を `postinstall` で自動取得しない。** 代わりに **Workflow Server の起動時に検査し、無ければ導入コマンドを案内して中止する**。
-- **daemon の起動は CLI の自動起動に任せる。** 本システムから daemon を明示的に終了させない。
-- CLI の呼び出しは `--json` を使い、**引数は配列で渡す**。文字列を連結してシェルに解釈させない。
-- ブラウザ本体の取得だけは利用者の 1 回の明示操作とする。ADR-0013 の「利用者は agent-browser を直接導入・操作しない」は、**日常の操作に agent-browser が現れない**という意味に限定する。
+出典: [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser)  
+出典: [agent-browser（npm）](https://www.npmjs.com/package/agent-browser)
 
-導入から実行までの流れを示す。
+判断の優先順位の 1 位は、再現性と決定性である。  
+出典: [Design Doc の判断の優先順位](../design/DesignDoc.md#判断の優先順位)
 
-```mermaid
-flowchart TD
-    install["pnpm install"] --> dep["agent-browser の<br/>ネイティブバイナリが入る"]
-    dep --> start["Workflow Server を起動"]
-    start --> check{"ブラウザ本体はあるか"}
-    check -->|"ある (既存の Chrome 等を検出)"| ready["起動する"]
-    check -->|"ない"| stop["導入コマンドを案内して中止する"]
-    stop -.->|"利用者が 1 回だけ実行"| fetch["agent-browser install"]
-    fetch --> start
-    ready --> run["run 実行時に CLI を子プロセスで呼ぶ<br/>(--json / 引数は配列)"]
-    run --> daemon["daemon は CLI が自動起動する"]
-```
+## Decision
 
-## 代替案
+- `agent-browser` を npm の依存として `packages/adapter-browser` に宣言する。Homebrew と cargo は使わない。
+  - リポジトリの依存の管理（lockfile）の外に出ると、再現性を最も優先する方針を満たせないためである。
+- バージョンを範囲で指定せず、固定する。ブラウザの操作の挙動が変わると、成果物と差分の判定が変わるためである。更新は、動作の確認を伴う明示の操作にする。
+- ブラウザの本体を `postinstall` で自動で取得しない。代わりに Workflow Server の起動時に確かめ、なければ導入のコマンドを案内して中止する。
+  - 起動時のチェックは [context/operations.md](../context/operations.md#health-and-monitoring) にある。
+- daemon の起動は CLI の自動の起動に任せる。本システムから daemon を明示的に終了させない。
+- CLI の呼び出しには `--json` を使い、引数は配列で渡す。文字列を連結してシェルに解釈させない。
+  - 呼び出し方は [冪等実行と再生制御](../packages/core-execution/DesignDoc.md#agent-browser-の呼び出し) にある。
+- ブラウザの本体の取得だけは、利用者の 1 回の明示の操作にする。ADR-0013 の「利用者は agent-browser を直接導入せず、直接操作しない」は、日常の操作に agent-browser が現れないという意味に限る。
 
-- **`postinstall` でブラウザ本体を自動取得する**: 利用者の手順が 1 つ減る。しかし数百 MB のダウンロードが `pnpm install` に入り、**CI・オフライン・プロキシ配下で install 全体が壊れる**。加えて agent-browser は既存の Chrome / Brave / Playwright / Puppeteer を検出するため、多くの環境では取得自体が不要である。得るものに対して壊し方が大きいため却下。
-- **Homebrew か cargo で導入させる**: 利用者の環境に合わせやすい。しかし lockfile の外に出るため、**どの版で動かしたかが記録に残らない**。再現性を最優先とする方針と噛み合わないため却下。
-- **バージョンを範囲指定 (`^`) にする**: 修正を自動で取り込める。しかしブラウザ操作の挙動が変わると成果物と差分判定が変わり、**利用者から見ると「何もしていないのに差分が出た」**ことになる。差分検知が中核機能である以上、実行基盤を勝手に動かさない。却下。
-- **ブラウザ本体が無いときに自動取得して続行する**: 起動が止まらない。しかし起動のたびに大きなダウンロードが走りうるうえ、**利用者が何が起きているか分からないまま待たされる**。起動を止めて案内する方が、原因と対処が同時に伝わる。却下。
-- **daemon を本システムが起動・終了まで管理する**: 生存を完全に制御できる。しかし daemon は他のプロセスとも共有される資源であり、本システムが終了時に落とすと**同じマシンの別の利用を巻き添えにする**。1 時間のアイドルで自動終了する仕組みが既にあるため却下。
+## Considered Options
 
-## 影響
+| 選択肢                                                                                         | 強み                                                                                                                                                                                                      | 弱み                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **採用:** npm の依存としてバージョンを固定して宣言し、ブラウザの本体は起動時に確かめて案内する | 依存が lockfile に載り、どのバージョンの実行基盤で成果物を作ったかが記録に残る。`pnpm install` が重くならず、CI とオフラインの環境で install が失敗しない。ブラウザの本体がないときに原因が起動時に分かる | 利用者に 1 回だけ明示の操作（`agent-browser install`）が残る。更新が手動の作業になる。pnpm の build script の許可（`onlyBuiltDependencies`）が要る                                                                          |
+| `postinstall` でブラウザの本体を自動で取得する                                                 | 利用者の手順が 1 つ減る                                                                                                                                                                                   | 数百 MB のダウンロードが `pnpm install` に入り、CI、オフライン、プロキシの配下で install の全体が失敗する。agent-browser は既存の Chrome、Brave、Playwright、Puppeteer を検出するため、多くの環境では取得そのものが要らない |
+| Homebrew か cargo で導入させる                                                                 | 利用者の環境に合わせやすい                                                                                                                                                                                | lockfile の外に出るため、どのバージョンで動かしたかが記録に残らない。再現性を最も優先する方針と合わない                                                                                                                     |
+| バージョンを範囲（`^`）で指定する                                                              | 修正を自動で取り込める                                                                                                                                                                                    | ブラウザの操作の挙動が変わると成果物と差分の判定が変わり、利用者から見ると「何もしていないのに差分が出た」ことになる。差分の検知が中核の機能なので、実行基盤を勝手に動かさない                                              |
+| ブラウザの本体がないときに自動で取得して続ける                                                 | 起動が止まらない                                                                                                                                                                                          | 起動のたびに大きなダウンロードが起きうる。利用者が何が起きているか分からないまま待たされる。起動を止めて案内する方が、原因と対処が同時に伝わる                                                                              |
+| daemon を本システムが起動から終了まで管理する                                                  | 生存を完全に制御できる                                                                                                                                                                                    | daemon はほかのプロセスとも共有される資源で、本システムが終了時に落とすと、同じマシンの別の利用を巻き添えにする。1 時間のアイドルで自動で終了する仕組みがすでにある                                                         |
 
-### 良い影響
+## Consequences
 
-- 依存が lockfile に載るため、**どの版の実行基盤で成果物を作ったかが記録に残る**。差分検知の前提が守られる。
-- `pnpm install` が重くならない。CI とオフライン環境で壊れない。
-- ブラウザ本体が無いときに黙って進まないため、**原因が起動時に分かる**。実行の途中で不可解に失敗しない。
-- daemon を共有資源として扱うため、同じマシンの他の利用と衝突しない。
+### Positive
 
-### 悪い影響 / トレードオフ
+- 依存が lockfile に載るため、どのバージョンの実行基盤で成果物を作ったかが記録に残る。差分の検知の前提が守られる。
+- `pnpm install` が重くならない。CI とオフラインの環境で install が失敗しない。
+- ブラウザの本体がないときに知らせずに進まないため、原因が起動時に分かる。実行の途中で原因の分からない失敗をしない。
+- daemon を共有の資源として扱うため、同じマシンのほかの利用とぶつからない。
 
-- 利用者に 1 回だけ明示操作 (`agent-browser install`) が残る。完全な「入れるだけで動く」にはならない。
-- バージョンを固定するため、更新は手動の作業になる。放置すると古いまま動き続ける。
-- daemon の生存を制御しないため、**別のプロセスが daemon を落とした場合の挙動を本システムから保証できない**。CLI が再起動する前提に依存する。
-- ネイティブバイナリを依存に持つため、pnpm の build script 許可 (`onlyBuiltDependencies`) が要る。許可を忘れると**バイナリが入らないまま install が成功したように見える**。
+### Negative
 
-### 影響範囲
-
-- 対象モジュール / package: execution / infra
-
-## 実装・運用への反映
-
-- spec 更新要否: 不要 (spec 未作成)
-- context / AI 向け設定更新要否:
-  - [context/toolchain.md](../context/toolchain.md) の標準スタック表へブラウザ実行基盤の行を足す — 実施済み
-  - [context/infrastructure.md](../context/infrastructure.md) に起動時の検査項目としてブラウザ本体の有無を追加する — 実施済み
-  - [adr/0013](0013-agent-browser-runtime.md) の「利用者は直接導入・操作しない」に、ブラウザ本体の取得だけは例外である旨を追記する — 実施済み
-  - `pnpm-workspace.yaml` の `onlyBuiltDependencies` に `agent-browser` を足す (実装時)
-- 未確認事項: `agent-browser install` が取得する Chrome for Testing の版を本システム側で固定できるか。固定できないと、ブラウザの更新で描画が変わり画像差分に出る。skeleton の実装で確認する
-
-## 関連ドキュメント / チケット
-
-- [adr/0013](0013-agent-browser-runtime.md): ブラウザ実行基盤に agent-browser を使う判断 (本 ADR は同梱の手段を決める)
-- [adr/0001](0001-tech-stack.md): 技術スタックの選定
-- [design/features/execution/DesignDoc_execution.md](../design/features/execution/DesignDoc_execution.md): Browser Port の契約
-- [context/infrastructure.md](../context/infrastructure.md): 起動時の検査
-- 参考: [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) / [agent-browser (npm)](https://www.npmjs.com/package/agent-browser)
-- spec / PR: なし
+- 利用者に 1 回だけ明示の操作（`agent-browser install`）が残る。入れるだけで動く形にはならない。
+- バージョンを固定するため、更新は手動の作業になる。放っておくと古いまま動き続ける。
+- daemon の生存を制御しないため、別のプロセスが daemon を落とした場合の挙動を本システムから保証できない。CLI が再び起動する前提に依存する。
+- ネイティブのバイナリを依存に持つため、pnpm の build script の許可（`onlyBuiltDependencies`）が要る。許可を忘れると、バイナリが入らないまま install が成功したように見える。
