@@ -1,7 +1,7 @@
 /**
- * 依存境界の正本 (context/engineering.md の Repository Quality Gate)。
+ * 依存境界の正本 (context/codebase.md の Dependency Rules)。
  *
- * ルールは context/architecture.md の禁止経路と 1 対 1 で対応させる。
+ * ルールは context/codebase.md の Dependency Rules の禁止する依存と 1 対 1 で対応させる。
  * oxlint には層やディレクトリ単位のゾーン制約がないため、方向の強制はここが担う。
  * type-only と value の import を区別できるのが本ツールを選んだ理由である。
  *
@@ -39,7 +39,7 @@ module.exports = {
       name: "app-not-to-interface",
       severity: "error",
       comment:
-        "依存は interface → app の一方向。app から interface を参照すると逆流する (context/architecture.md)。",
+        "依存は interface → app の一方向。app から interface を参照すると逆流する (context/codebase.md の Dependency Rules)。",
       from: { path: "^packages/app/" },
       to: { path: "^packages/(api/|agent/)" },
     },
@@ -47,7 +47,7 @@ module.exports = {
       name: "adapter-not-outward",
       severity: "error",
       comment:
-        "adapter は Port を実装するだけ。interface 層と他の adapter、fixture へは依存しない (context/architecture.md)。",
+        "adapter は Port を実装するだけ。interface 層と他の adapter、fixture へは依存しない (context/codebase.md の Dependency Rules)。",
       from: { path: "^packages/adapter-([a-z-]+)/" },
       to: {
         path: "^packages/(api/|agent/|fixture-app/|adapter-)",
@@ -65,7 +65,7 @@ module.exports = {
       name: "web-not-to-inner",
       severity: "error",
       comment:
-        "Web UI は別プロセスで動く。内部層を参照するとブラウザ束に backend が混入する (context/architecture.md の Runtime Boundary)。",
+        "Web UI は別プロセスで動く。内部層を参照するとブラウザ束に backend が混入する (context/codebase.md の Module Boundaries)。",
       from: { path: "^apps/web/" },
       to: { path: "^packages/(core-|app/|adapter-|agent/|domain)" },
     },
@@ -95,7 +95,8 @@ module.exports = {
     {
       name: "core-cross-module-type-only",
       severity: "error",
-      comment: "core 同士と core → domain は型の参照のみ許可する (context/architecture.md)。",
+      comment:
+        "core 同士と core → domain は型の参照のみ許可する (context/codebase.md の Dependency Rules)。",
       from: { path: "^packages/core-([a-z-]+)/" },
       to: {
         path: "^packages/(core-|domain/)",

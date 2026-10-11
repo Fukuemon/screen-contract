@@ -42,7 +42,7 @@ export function isPortablePathSegment(segment: string): boolean {
  * 認証プロファイルの名前。
  *
  * 復号した Storage State を引く索引になるため、検証していない文字列を
- * そのまま流すと保存先のパス組み立てへ届く (context/infrastructure.md)。
+ * そのまま流すと保存先のパス組み立てへ届く (context/operations.md の Secrets)。
  * 生成経路を parseAuthProfileName に限ることで、未検証の値を型で弾く。
  */
 export type AuthProfileName = string & { readonly __brand: "AuthProfileName" };

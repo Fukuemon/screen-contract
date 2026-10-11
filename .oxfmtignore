@@ -2,7 +2,7 @@
 # oxfmt は --ignore-path を指定しないと .gitignore と .prettierignore を読む。
 # .prettierignore は TypeScript を除外しているため、そのままでは
 # oxfmt が担当すべき .ts を飛ばして JSON だけを整形してしまう。
-# 担当を分けるため、oxfmt にはこのファイルを渡す (context/toolchain.md)。
+# 担当を分けるため、oxfmt にはこのファイルを渡す (context/conventions.md の Shared Configuration)。
 
 # TypeScript / JavaScript 以外は prettier が担当する
 *.json

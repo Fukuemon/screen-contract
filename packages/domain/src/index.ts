@@ -1,7 +1,7 @@
 /**
  * 全 core が共有する型のみを置く。**実行時の値を置かない。**
  *
- * core → domain は型の参照だけが許される (context/architecture.md)。値を置くと
+ * core → domain は型の参照だけが許される (context/codebase.md の Dependency Rules)。値を置くと
  * core から呼べない API になり、置いた側は使われないことに気付けない。
  */
 
