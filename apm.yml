@@ -5,6 +5,7 @@ dependencies:
   apm:
     - Fukuemon/agent-harness/packages/core#v0.2.1
     - Fukuemon/agent-harness/packages/docs#v0.2.1
+    - Fukuemon/agent-playbooks/packages/playbooks#v0.2.0
 lifecycle:
   post-install:
   - type: command
