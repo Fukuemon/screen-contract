@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" || exit 0; [ -f context/project.yml ] && [ -f apm.lock.yaml ] || exit 0; if ! (sed -n 's/^ *- \\(\\.[^ :]*\\)$/\\1/p' apm.lock.yaml | while read -r p; do [ -e \"$p\" ] || exit 1; done); then if command -v apm >/dev/null; then apm install --frozen >&2 || exit 1; fi; fi; d=$(ls -d .claude/skills/setup-agent-harness .agents/skills/setup-agent-harness ${CLAUDE_PLUGIN_ROOT:+\"$CLAUDE_PLUGIN_ROOT/skills/setup-agent-harness\"} 2>/dev/null | head -1); [ -z \"$d\" ] || node \"$d/scripts/setup.mjs\" --gitignore >&2",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}\" || exit 0; [ -f context/project.yml ] && [ -f apm.lock.yaml ] || exit 0; r=$(git rev-parse --git-path agent-harness/apm-lock 2>/dev/null); s=$(cksum < apm.lock.yaml); if ! (sed -n 's/^ *- \\(\\.[^ :]*\\)$/\\1/p' apm.lock.yaml | while read -r p; do [ -e \"$p\" ] || exit 1; done) || { [ -n \"$r\" ] && [ \"$(cat \"$r\" 2>/dev/null)\" != \"$s\" ]; }; then if command -v apm >/dev/null; then apm install --frozen >&2 || exit 1; [ -z \"$r\" ] || { mkdir -p \"$(dirname \"$r\")\" && printf '%s\\n' \"$s\" > \"$r\"; }; else echo \"agent-harness: apm \u304c\u306a\u3044\u306e\u3067\u3001apm.lock.yaml \u306b\u914d\u7f6e\u5148\u3092\u305d\u308d\u3048\u3089\u308c\u306a\u3044\" >&2; fi; fi; d=$(ls -d .claude/skills/setup-agent-harness .agents/skills/setup-agent-harness ${CLAUDE_PLUGIN_ROOT:+\"$CLAUDE_PLUGIN_ROOT/skills/setup-agent-harness\"} 2>/dev/null | head -1); [ -z \"$d\" ] || node \"$d/scripts/setup.mjs\" --gitignore >&2",
             "timeout": 120
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\".codex/hooks/core/hooks/check-comments.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || exit 0; node \"$f\"",
+            "command": "f=\".codex/hooks/core/hooks/check-comments.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || { t=$(git rev-parse --show-toplevel 2>/dev/null); [ -n \"$t\" ] && [ -f \"$t/context/project.yml\" ] && echo \"agent-harness: check-comments.mjs \u304c\u306a\u3044\u306e\u3067\u3001\u30b3\u30e1\u30f3\u30c8\u306e\u30c1\u30a7\u30c3\u30af\u3092\u98db\u3070\u3057\u305f\u3002apm install --frozen \u3067\u914d\u7f6e\u3059\u308b\" >&2; exit 0; }; node \"$f\"",
             "timeout": 10
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\".codex/hooks/docs/hooks/check-docs.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || exit 0; node \"$f\"",
+            "command": "f=\".codex/hooks/docs/hooks/check-docs.mjs\"; [ -f \"$f\" ] || f=\"$(git rev-parse --show-toplevel 2>/dev/null)/$f\"; [ -f \"$f\" ] || { t=$(git rev-parse --show-toplevel 2>/dev/null); [ -n \"$t\" ] && [ -f \"$t/context/project.yml\" ] && echo \"agent-harness: check-docs.mjs \u304c\u306a\u3044\u306e\u3067\u3001\u6587\u66f8\u306e\u30c1\u30a7\u30c3\u30af\u3092\u98db\u3070\u3057\u305f\u3002apm install --frozen \u3067\u914d\u7f6e\u3059\u308b\" >&2; exit 0; }; node \"$f\"",
             "timeout": 10
           }
         ]

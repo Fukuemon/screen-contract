@@ -3,8 +3,8 @@ version: 0.1.0
 targets: [claude, codex]
 dependencies:
   apm:
-    - Fukuemon/agent-harness/packages/core#v0.2.1
-    - Fukuemon/agent-harness/packages/docs#v0.2.1
+    - Fukuemon/agent-harness/packages/core#v0.2.2
+    - Fukuemon/agent-harness/packages/docs#v0.2.2
     - Fukuemon/agent-playbooks/packages/playbooks#v0.2.0
 lifecycle:
   post-install:
